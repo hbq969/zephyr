@@ -70,6 +70,11 @@ function onSend(text: string) {
   })
 }
 
+function onStop() {
+  axios({ url: '/chat/cancel', method: 'post' }).catch(() => {})
+  chatStore.streaming = false
+}
+
 function restoreConversation(id: string) {
   axios({ url: `/conversations/${id}/messages`, method: 'get' })
     .then(res => {
@@ -124,7 +129,7 @@ onMounted(() => {
       </div>
       <ChatArea />
       <CommandPalette />
-      <InputArea @send="onSend" />
+      <InputArea @send="onSend" @stop="onStop" />
       <StatusBar />
     </div>
     <SettingsPanel :visible="showSettings" @close="showSettings = false" />
