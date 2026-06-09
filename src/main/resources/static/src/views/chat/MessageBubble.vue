@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUpdated, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { Message } from '@/types/chat'
 import ThinkingBlock from './ThinkingBlock.vue'
@@ -27,6 +27,31 @@ const rendered = computed(() => {
   return md.render(props.message.content)
 })
 const streaming = computed(() => props.isLast)
+
+function setupCodeBlocks() {
+  nextTick(() => {
+    document.querySelectorAll('.markdown-body pre').forEach((pre) => {
+      if (pre.querySelector('.code-toggle')) return
+      const wrapper = document.createElement('div')
+      wrapper.className = 'code-block-wrapper'
+      const btn = document.createElement('button')
+      btn.className = 'code-toggle'
+      btn.textContent = '收起'
+      btn.onclick = () => {
+        const code = wrapper.querySelector('code')
+        const collapsed = wrapper.classList.toggle('collapsed')
+        btn.textContent = collapsed ? '展开' : '收起'
+        if (code) code.style.display = collapsed ? 'none' : ''
+      }
+      pre.parentNode!.insertBefore(wrapper, pre)
+      wrapper.appendChild(btn)
+      wrapper.appendChild(pre)
+    })
+  })
+}
+
+onMounted(setupCodeBlocks)
+onUpdated(setupCodeBlocks)
 </script>
 
 <template>
@@ -74,4 +99,11 @@ const streaming = computed(() => props.isLast)
 .markdown-body :deep(code) { background: var(--el-fill-color); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; color: var(--el-color-primary-dark-2); }
 .markdown-body :deep(pre) { background: #181715; color: #faf9f5; border-radius: 8px; padding: 16px; margin: 8px 0; overflow-x: auto; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; line-height: 1.55; }
 .markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+
+.code-block-wrapper { position: relative; margin: 8px 0; }
+.code-block-wrapper :deep(pre) { margin: 0; }
+.code-block-wrapper :deep(.code-toggle) { position: absolute; top: 6px; right: 8px; z-index: 1; background: rgba(255,255,255,0.1); color: rgba(250,249,245,0.7); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-family: inherit; }
+.code-block-wrapper :deep(.code-toggle):hover { background: rgba(255,255,255,0.2); color: #faf9f5; }
+.code-block-wrapper.collapsed :deep(pre) { max-height: 120px; overflow: hidden; border-radius: 8px 8px 0 0; }
+.code-block-wrapper:not(.collapsed) :deep(pre) { max-height: none; }
 </style>

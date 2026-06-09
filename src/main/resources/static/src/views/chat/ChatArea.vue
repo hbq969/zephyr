@@ -3,10 +3,20 @@ import { ref, watch, nextTick } from 'vue'
 import { useChatStore } from '@/store/chat'
 import { useConversationsStore } from '@/store/conversations'
 import MessageBubble from './MessageBubble.vue'
+import { Icon } from '@iconify/vue'
 
 const chatStore = useChatStore()
 const convStore = useConversationsStore()
 const areaRef = ref<HTMLElement>()
+
+const fontSize = ref(16)
+const sizes = [12, 14, 16, 18, 20]
+
+function changeFont(step: number) {
+  const idx = sizes.indexOf(fontSize.value)
+  const next = idx + step
+  if (next >= 0 && next < sizes.length) fontSize.value = sizes[next]
+}
 
 function scrollToBottom() {
   nextTick(() => {
@@ -26,7 +36,16 @@ watch(
 </script>
 
 <template>
-  <div ref="areaRef" class="chat-area">
+  <div ref="areaRef" class="chat-area" :style="{ fontSize: fontSize + 'px' }">
+    <div v-if="chatStore.messages.length > 0" class="font-ctrl">
+      <button class="fc-btn" @click="changeFont(-1)" :disabled="fontSize <= sizes[0]">
+        <Icon icon="lucide:minus" />
+      </button>
+      <span class="fc-val">{{ fontSize }}px</span>
+      <button class="fc-btn" @click="changeFont(1)" :disabled="fontSize >= sizes[sizes.length - 1]">
+        <Icon icon="lucide:plus" />
+      </button>
+    </div>
     <div v-if="chatStore.messages.length === 0" class="empty-state">
       <div class="empty-icon">z</div>
       <p class="empty-title">zephyr</p>
@@ -37,9 +56,14 @@ watch(
 </template>
 
 <style scoped>
-.chat-area { flex: 1; overflow-y: auto; padding: 20px 0; }
+.chat-area { flex: 1; overflow-y: auto; padding: 20px 0; position: relative; }
 .chat-area::-webkit-scrollbar { width: 1px; }
 .chat-area::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 1px; }
+.font-ctrl { position: absolute; top: 8px; right: 16px; display: flex; align-items: center; gap: 4px; z-index: 10; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 2px 4px; }
+.fc-btn { width: 24px; height: 24px; border-radius: 4px; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.fc-btn:hover:not(:disabled) { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
+.fc-btn:disabled { opacity: 0.3; cursor: default; }
+.fc-val { font-size: 11px; color: var(--el-text-color-placeholder); min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--el-text-color-secondary); }
 .empty-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(204,120,92,0.12); display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 24px; color: var(--el-color-primary); margin-bottom: 12px; }
 .empty-title { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin-bottom: 4px; }
