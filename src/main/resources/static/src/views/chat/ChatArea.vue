@@ -22,7 +22,7 @@ watch(() => chatStore.messages.length, () => {
       <p class="empty-title">zephyr</p>
       <p class="empty-sub">开始一段新的对话</p>
     </div>
-    <MessageBubble v-for="msg in chatStore.messages" :key="msg.id" :message="msg" />
+    <MessageBubble v-for="(msg, i) in chatStore.messages" :key="msg.id" :message="msg" :isLast="i === chatStore.messages.length - 1 && chatStore.streaming" />
   </div>
 </template>
 
