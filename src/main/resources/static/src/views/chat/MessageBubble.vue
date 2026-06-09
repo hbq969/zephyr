@@ -138,7 +138,7 @@ onUpdated(setupCodeBlocks)
 .markdown-body :deep(li) { margin: 3px 0; }
 .markdown-body :deep(a) { color: var(--el-color-primary); }
 .markdown-body :deep(code) { background: var(--el-fill-color); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 0.85em; color: var(--el-color-primary-dark-2); }
-.markdown-body :deep(pre) { background: #f5f0e8; color: #141413; border-radius: 8px; padding: 16px; margin: 8px 0; overflow-x: auto; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 0.85em; line-height: 1.55; }
+.markdown-body :deep(pre) { background: #f5f0e8; color: #141413; border-radius: 8px; padding: 16px; margin: 0; overflow-x: auto; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 0.85em; line-height: 1.55; }
 .markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
 </style>
 
