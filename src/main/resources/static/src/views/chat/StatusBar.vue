@@ -5,7 +5,7 @@ import { Icon } from '@iconify/vue'
 
 const settingsStore = useSettingsStore()
 
-onMounted(() => { settingsStore.loadModels(); settingsStore.loadMcpToolCount() })
+onMounted(() => { settingsStore.loadModels(); settingsStore.loadMcpToolCount(); settingsStore.loadSkills() })
 </script>
 
 <template>
