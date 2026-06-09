@@ -273,7 +273,7 @@ export default { inheritAttrs: false }
 .cmd-desc { color: var(--el-text-color-secondary); font-size: 12px; }
 
 /* 能力二级菜单 */
-.ability-menu { min-width: 180px; max-height: 360px; overflow-y: auto; }
+.ability-menu { min-width: 180px; }
 .ability-parent { justify-content: space-between; position: relative; }
 .ability-parent.active { background: var(--el-fill-color-light); color: var(--el-color-primary); }
 .sub-arrow { font-size: 12px; color: var(--el-text-color-placeholder); flex-shrink: 0; }
@@ -282,15 +282,21 @@ export default { inheritAttrs: false }
   position: absolute; left: 100%; top: 0;
   background: var(--el-bg-color); border: 1px solid var(--el-border-color);
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-  min-width: 200px; max-width: 300px; max-height: 320px; overflow-y: auto; padding: 4px; z-index: 110;
+  min-width: 240px; max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 4px; z-index: 110;
 }
 .sub-group-label {
   font-size: 11px; color: var(--el-text-color-placeholder);
   padding: 6px 10px 2px; text-transform: uppercase; letter-spacing: 0.3px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.sub-option { white-space: nowrap; }
-.sub-option .cmd-name { min-width: auto; font-size: 13px; font-weight: 500; }
+.sub-option {
+  max-width: 400px;
+}
+.sub-option .cmd-name { min-width: auto; font-size: 13px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.sub-option .cmd-desc {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 280px;
+}
 .sub-loading { padding: 20px; text-align: center; font-size: 12px; color: var(--el-text-color-placeholder); }
 
 .model-overlay { position: fixed; inset: 0; z-index: 99; }
