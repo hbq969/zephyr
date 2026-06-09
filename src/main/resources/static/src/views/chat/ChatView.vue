@@ -17,6 +17,13 @@ const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const showSettings = ref(false)
 
+function refreshConversationList() {
+  axios({ url: '/conversations/list', method: 'get' })
+    .then(res => {
+      if (res.data.state === 'OK') convStore.setConversations(res.data.body)
+    })
+}
+
 function newChat() {
   chatStore.clearMessages()
   convStore.currentId = null
@@ -46,7 +53,9 @@ function onSend(text: string) {
             chatStore.updateLastThinking(event.content)
           } else if (event.type === 'meta') {
             convStore.currentId = event.content
+            refreshConversationList()
           } else if (event.type === 'done') {
+            refreshConversationList()
             chatStore.streaming = false
           } else if (event.type === 'error') {
             chatStore.appendToken('\n\n[错误] ' + (event.content || '请求失败'))
