@@ -36,7 +36,7 @@ watch(
 </script>
 
 <template>
-  <div ref="areaRef" class="chat-area" :style="{ fontSize: fontSize + 'px' }">
+  <div ref="areaRef" class="chat-area" :style="{ '--chat-font-size': fontSize + 'px' }">
     <div v-if="chatStore.messages.length > 0" class="font-ctrl">
       <button class="fc-btn" @click="changeFont(-1)" :disabled="fontSize <= sizes[0]">
         <Icon icon="lucide:minus" />
@@ -59,7 +59,7 @@ watch(
 .chat-area { flex: 1; overflow-y: auto; padding: 20px 0; position: relative; }
 .chat-area::-webkit-scrollbar { width: 1px; }
 .chat-area::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 1px; }
-.font-ctrl { position: absolute; top: 8px; right: 16px; display: flex; align-items: center; gap: 4px; z-index: 10; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 2px 4px; }
+.font-ctrl { position: sticky; top: 0; float: right; display: inline-flex; align-items: center; gap: 4px; z-index: 10; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 2px 4px; margin-right: 16px; }
 .fc-btn { width: 24px; height: 24px; border-radius: 4px; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 .fc-btn:hover:not(:disabled) { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 .fc-btn:disabled { opacity: 0.3; cursor: default; }

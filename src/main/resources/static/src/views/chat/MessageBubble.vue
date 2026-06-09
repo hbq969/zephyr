@@ -81,7 +81,8 @@ onUpdated(setupCodeBlocks)
 <style scoped>
 .msg-row { padding: 14px 24px; max-width: 820px; margin: 0 auto; }
 .msg-row.user { display: flex; justify-content: flex-end; }
-.msg-bubble { max-width: 88%; border-radius: 12px; padding: 12px 16px; font-size: 15px; line-height: 1.65; }
+.msg-bubble { max-width: 88%; border-radius: 12px; padding: 12px 16px; font-size: var(--chat-font-size, 16px); line-height: 1.65; }
+.stream-text { font-size: var(--chat-font-size, 16px); }
 .user-bubble { background: var(--el-fill-color-light); color: var(--el-text-color-primary); border-radius: 12px 12px 4px 12px; }
 .ai-bubble { background: transparent; border-radius: 12px 12px 12px 4px; color: var(--el-text-color-regular); padding-top: 0; }
 .mb-2 { margin-bottom: 8px; }
@@ -91,13 +92,14 @@ onUpdated(setupCodeBlocks)
 .ai-avatar { width: 28px; height: 28px; border-radius: 8px; background: rgba(204,120,92,0.12); display: flex; align-items: center; justify-content: center; color: var(--el-color-primary); font-size: 14px; flex-shrink: 0; }
 .ai-label { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); }
 
-.markdown-body :deep(h3) { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 20px; letter-spacing: -0.3px; margin: 14px 0 6px; color: var(--el-text-color-primary); }
+.markdown-body { font-size: inherit; }
+.markdown-body :deep(h3) { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 1.25em; letter-spacing: -0.3px; margin: 14px 0 6px; color: var(--el-text-color-primary); }
 .markdown-body :deep(p) { margin: 6px 0; }
 .markdown-body :deep(ul) { padding-left: 20px; margin: 6px 0; }
 .markdown-body :deep(li) { margin: 3px 0; }
 .markdown-body :deep(a) { color: var(--el-color-primary); }
-.markdown-body :deep(code) { background: var(--el-fill-color); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; color: var(--el-color-primary-dark-2); }
-.markdown-body :deep(pre) { background: #181715; color: #faf9f5; border-radius: 8px; padding: 16px; margin: 8px 0; overflow-x: auto; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; line-height: 1.55; }
+.markdown-body :deep(code) { background: var(--el-fill-color); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 0.85em; color: var(--el-color-primary-dark-2); }
+.markdown-body :deep(pre) { background: #181715; color: #faf9f5; border-radius: 8px; padding: 16px; margin: 8px 0; overflow-x: auto; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 0.85em; line-height: 1.55; }
 .markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
 
 .code-block-wrapper { position: relative; margin: 8px 0; }
