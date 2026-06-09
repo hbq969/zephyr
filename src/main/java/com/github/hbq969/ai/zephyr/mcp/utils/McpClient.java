@@ -228,7 +228,7 @@ public class McpClient {
         return new String[]{null, null};
     }
 
-    private static String extractSSEData(String raw) {
+    public static String extractSSEData(String raw) {
         if (raw == null) return null;
         // SSE format: "data:{json}"
         for (String line : raw.split("\n")) {

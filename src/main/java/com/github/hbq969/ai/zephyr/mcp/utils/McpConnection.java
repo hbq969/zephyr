@@ -1,0 +1,258 @@
+package com.github.hbq969.ai.zephyr.mcp.utils;
+
+import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Slf4j
+public class McpConnection {
+
+    private static final Gson gson = new Gson();
+    private static final AtomicInteger requestId = new AtomicInteger(100);
+
+    public enum Type { STDIO, HTTP }
+
+    private final Type type;
+    @Getter
+    private final McpServerEntity server;
+    @Getter
+    private volatile long lastUsedAt;
+
+    // stdio
+    private Process process;
+    private BufferedReader reader;
+    private BufferedWriter writer;
+
+    // http
+    private String sessionId;
+
+    private McpConnection(Type type, McpServerEntity server) {
+        this.type = type;
+        this.server = server;
+    }
+
+    public static McpConnection create(McpServerEntity server) {
+        McpConnection conn = new McpConnection(
+                "http".equals(server.getTransport()) ? Type.HTTP : Type.STDIO,
+                server
+        );
+        conn.init();
+        return conn;
+    }
+
+    private void init() {
+        try {
+            if (type == Type.STDIO) {
+                initStdio();
+            } else {
+                initHttp();
+            }
+            touch();
+        } catch (Exception e) {
+            log.warn("MCP 连接初始化失败: {} - {}", server.getName(), e.getMessage());
+            throw new RuntimeException("连接失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void initStdio() throws Exception {
+        List<String> cmd = new ArrayList<>();
+        cmd.add(server.getCommand());
+        if (server.getArgs() != null) {
+            for (String a : server.getArgs().split("\n")) {
+                if (!a.trim().isEmpty()) cmd.add(a.trim());
+            }
+        }
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        if (server.getEnvVars() != null && !server.getEnvVars().isEmpty()) {
+            for (String line : server.getEnvVars().split("\n")) {
+                if (line.trim().isEmpty()) continue;
+                int idx = line.indexOf('=');
+                if (idx > 0) pb.environment().put(line.substring(0, idx).trim(), line.substring(idx + 1).trim());
+            }
+        }
+        process = pb.start();
+        reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+        writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+
+        JsonObject initReq = new JsonObject();
+        initReq.addProperty("jsonrpc", "2.0");
+        initReq.addProperty("id", requestId.incrementAndGet());
+        initReq.addProperty("method", "initialize");
+        JsonObject params = new JsonObject();
+        params.addProperty("protocolVersion", "2024-11-05");
+        params.add("capabilities", new JsonObject());
+        JsonObject clientInfo = new JsonObject();
+        clientInfo.addProperty("name", "zephyr");
+        clientInfo.addProperty("version", "1.0.0");
+        params.add("clientInfo", clientInfo);
+        initReq.add("params", params);
+
+        String resp = sendAndRead(gson.toJson(initReq));
+        if (resp == null || !resp.contains("\"id\"")) throw new RuntimeException("initialize 失败");
+
+        JsonObject notif = new JsonObject();
+        notif.addProperty("jsonrpc", "2.0");
+        notif.addProperty("method", "notifications/initialized");
+        writeMsg(gson.toJson(notif));
+    }
+
+    private void initHttp() throws Exception {
+        JsonObject initReq = new JsonObject();
+        initReq.addProperty("jsonrpc", "2.0");
+        initReq.addProperty("id", requestId.incrementAndGet());
+        initReq.addProperty("method", "initialize");
+        JsonObject params = new JsonObject();
+        params.addProperty("protocolVersion", "2024-11-05");
+        params.add("capabilities", new JsonObject());
+        JsonObject clientInfo = new JsonObject();
+        clientInfo.addProperty("name", "zephyr");
+        clientInfo.addProperty("version", "1.0.0");
+        params.add("clientInfo", clientInfo);
+        initReq.add("params", params);
+
+        String resp = _httpPost(gson.toJson(initReq));
+        if (resp == null || !resp.contains("\"id\"")) throw new RuntimeException("HTTP initialize 失败");
+    }
+
+    public String callTool(String toolName, JsonObject arguments) {
+        try {
+            touch();
+            if (type == Type.STDIO) {
+                return callToolStdio(toolName, arguments);
+            } else {
+                return callToolHttp(toolName, arguments);
+            }
+        } catch (Exception e) {
+            log.warn("MCP 工具调用失败: {} - {}", toolName, e.getMessage());
+            throw new RuntimeException("工具调用失败: " + e.getMessage(), e);
+        }
+    }
+
+    private String callToolStdio(String toolName, JsonObject arguments) throws Exception {
+        JsonObject req = new JsonObject();
+        req.addProperty("jsonrpc", "2.0");
+        req.addProperty("id", requestId.incrementAndGet());
+        req.addProperty("method", "tools/call");
+        JsonObject params = new JsonObject();
+        params.addProperty("name", toolName);
+        params.add("arguments", arguments);
+        req.add("params", params);
+
+        String resp = sendAndRead(gson.toJson(req));
+        return extractContent(resp);
+    }
+
+    private String callToolHttp(String toolName, JsonObject arguments) throws Exception {
+        JsonObject req = new JsonObject();
+        req.addProperty("jsonrpc", "2.0");
+        req.addProperty("id", requestId.incrementAndGet());
+        req.addProperty("method", "tools/call");
+        JsonObject params = new JsonObject();
+        params.addProperty("name", toolName);
+        params.add("arguments", arguments);
+        req.add("params", params);
+
+        String resp = _httpPost(gson.toJson(req));
+        return extractContent(resp);
+    }
+
+    private String extractContent(String resp) {
+        if (resp == null) return "工具返回空结果";
+        try {
+            JsonObject r = gson.fromJson(resp, JsonObject.class);
+            if (r.has("error")) {
+                return "工具调用出错: " + r.get("error").toString();
+            }
+            if (r.has("result")) {
+                JsonObject result = r.getAsJsonObject("result");
+                if (result.has("content")) {
+                    JsonArray content = result.getAsJsonArray("content");
+                    if (content.size() > 0 && content.get(0).getAsJsonObject().has("text")) {
+                        return content.get(0).getAsJsonObject().get("text").getAsString();
+                    }
+                }
+                return result.toString();
+            }
+        } catch (Exception e) {
+            log.warn("解析工具返回失败", e);
+        }
+        return resp;
+    }
+
+    private String sendAndRead(String json) throws Exception {
+        writeMsg(json);
+        return readMsg();
+    }
+
+    private void writeMsg(String json) throws Exception {
+        writer.write(json);
+        writer.newLine();
+        writer.flush();
+    }
+
+    private String readMsg() throws Exception {
+        return reader.readLine();
+    }
+
+    private String _httpPost(String json) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) URI.create(server.getUrl()).toURL().openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Accept", "application/json, text/event-stream");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(30000);
+
+        if (sessionId != null) {
+            conn.setRequestProperty("Mcp-Session-Id", sessionId);
+        }
+        if (server.getHeaders() != null && !server.getHeaders().isEmpty()) {
+            for (String line : server.getHeaders().split("\n")) {
+                if (line.trim().isEmpty()) continue;
+                int idx = line.indexOf('=');
+                if (idx > 0) conn.setRequestProperty(line.substring(0, idx).trim(), line.substring(idx + 1).trim());
+            }
+        }
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(json.getBytes(StandardCharsets.UTF_8));
+        }
+
+        String respSessionId = conn.getHeaderField("Mcp-Session-Id");
+        if (respSessionId != null) this.sessionId = respSessionId;
+
+        int code = conn.getResponseCode();
+        if (code >= 200 && code < 300) {
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                return McpClient.extractSSEData(sb.toString());
+            }
+        }
+        return null;
+    }
+
+    private void touch() {
+        this.lastUsedAt = System.currentTimeMillis();
+    }
+
+    public void close() {
+        try {
+            if (type == Type.STDIO && process != null) {
+                process.destroyForcibly();
+            }
+        } catch (Exception ignored) {}
+    }
+}
