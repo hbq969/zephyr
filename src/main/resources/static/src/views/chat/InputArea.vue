@@ -1,26 +1,30 @@
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useSettingsStore } from '@/store/settings'
-import { useConversationsStore } from '@/store/conversations'
-import { useChatStore } from '@/store/chat'
 import { Icon } from '@iconify/vue'
-import axios from '@/network'
-import SlashMenu from './SlashMenu.vue'
 
-const emit = defineEmits<{
-  send: [text: string]
-  slashCommand: [cmd: string]
-}>()
+const emit = defineEmits<{ send: [text: string] }>()
 const text = ref('')
 const inputRef = ref<HTMLTextAreaElement>()
 const settingsStore = useSettingsStore()
-const convStore = useConversationsStore()
-const chatStore = useChatStore()
 const showModelList = ref(false)
-const showSlashMenu = ref(false)
-const mcpCount = ref(0)
-const skillCount = ref(0)
-const memoryCount = ref(0)
+const showAbility = ref(false)
+const showSession = ref(false)
+const showAction = ref(false)
+
+const abilityItems = [
+  { cmd: '/mcp', label: 'MCP 工具列表' },
+  { cmd: '/skills', label: '可用技能' },
+  { cmd: '/memory', label: '用户记忆' },
+]
+const sessionItems = [
+  { cmd: '/resume', label: '恢复之前的对话' },
+  { cmd: '/context', label: '上下文占比' },
+]
+const actionItems = [
+  { cmd: '/clear', label: '清空当前对话' },
+  { cmd: '/help', label: '查看帮助' },
+]
 
 function onInput() {
   const el = inputRef.value
@@ -42,7 +46,7 @@ function doSend() {
 
 function toggleModelList() {
   if (settingsStore.models.length === 0) return
-  showModelList.value = !showModelList.value
+  closeAll() ; showModelList.value = !showModelList.value
 }
 
 async function selectModel(name: string) {
@@ -54,79 +58,95 @@ async function selectModel(name: string) {
 
 function closeModelList() { showModelList.value = false }
 
-watch(text, (val) => {
-  if (val === '/') {
-    showSlashMenu.value = true
-    fetchSlashCounts()
+function insertCommand(cmd: string) {
+  const el = inputRef.value
+  if (el) {
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const before = text.value.substring(0, start)
+    const after = text.value.substring(end)
+    text.value = before + cmd + ' ' + after
+    setTimeout(() => {
+      el.focus()
+      el.selectionStart = el.selectionEnd = start + cmd.length + 1
+    })
   } else {
-    showSlashMenu.value = false
+    text.value += cmd + ' '
   }
-})
-
-function fetchSlashCounts() {
-  axios({ url: '/mcp/server/list', method: 'get' }).then(res => {
-    if (res.data.state === 'OK') mcpCount.value = res.data.body.length
-  }).catch(() => {})
-  axios({ url: '/skill/list', method: 'get' }).then(res => {
-    if (res.data.state === 'OK') skillCount.value = res.data.body.length
-  }).catch(() => {})
-  axios({ url: '/memory/list', method: 'get' }).then(res => {
-    if (res.data.state === 'OK') memoryCount.value = res.data.body.length
-  }).catch(() => {})
+  closeAll()
 }
 
-function onSlashSelect(cmd: string) {
-  showSlashMenu.value = false
-  text.value = ''
-  if (cmd === '/model') {
-    showModelList.value = !showModelList.value
-  } else if (cmd === '/clear') {
-    chatStore.clearMessages()
-  } else {
-    emit('slashCommand', cmd.replace('/', ''))
-  }
-}
-
-function closeSlashMenu() {
-  showSlashMenu.value = false
-  text.value = ''
+function closeAll() {
+  showModelList.value = false
+  showAbility.value = false
+  showSession.value = false
+  showAction.value = false
 }
 </script>
 
 <template>
   <div class="input-section">
     <div class="input-container">
-      <SlashMenu
-        :visible="showSlashMenu"
-        :models="settingsStore.models"
-        :mcpCount="mcpCount"
-        :skillCount="skillCount"
-        :memoryCount="memoryCount"
-        @close="closeSlashMenu"
-        @select="onSlashSelect"
-      />
       <textarea
         ref="inputRef"
         class="input-textarea"
         v-model="text"
-        placeholder="给 zephyr 发送消息...  Enter 发送 · Shift+Enter 换行  / 查看命令"
+        placeholder="给 zephyr 发送消息...  Enter 发送 · Shift+Enter 换行"
         rows="1"
         @input="onInput"
         @keydown="onKeydown"
       ></textarea>
       <div class="input-toolbar">
         <div class="input-left">
-          <div class="model-pick" @click.stop="toggleModelList">
+          <!-- 模型切换 -->
+          <div class="tool-pick" @click.stop="toggleModelList">
             <span>{{ settingsStore.models.length ? settingsStore.currentModel : '无' }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showModelList" class="model-dropdown" @click.stop>
-              <div v-for="m in settingsStore.models" :key="m.name" class="model-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
+            <div v-if="showModelList" class="pick-dropdown" @click.stop>
+              <div v-for="m in settingsStore.models" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                 <span>{{ m.name }}</span>
                 <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
               </div>
             </div>
           </div>
+
+          <!-- 能力 -->
+          <div class="tool-pick" @click.stop="closeAll(); showAbility = !showAbility">
+            <span>能力</span>
+            <Icon icon="lucide:chevron-down" class="pick-arrow" />
+            <div v-if="showAbility" class="pick-dropdown" @click.stop>
+              <div v-for="it in abilityItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
+                <span class="cmd-name">{{ it.cmd }}</span>
+                <span class="cmd-desc">{{ it.label }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 会话 -->
+          <div class="tool-pick" @click.stop="closeAll(); showSession = !showSession">
+            <span>会话</span>
+            <Icon icon="lucide:chevron-down" class="pick-arrow" />
+            <div v-if="showSession" class="pick-dropdown" @click.stop>
+              <div v-for="it in sessionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
+                <span class="cmd-name">{{ it.cmd }}</span>
+                <span class="cmd-desc">{{ it.label }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作 -->
+          <div class="tool-pick" @click.stop="closeAll(); showAction = !showAction">
+            <span>操作</span>
+            <Icon icon="lucide:chevron-down" class="pick-arrow" />
+            <div v-if="showAction" class="pick-dropdown" @click.stop>
+              <div v-for="it in actionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
+                <span class="cmd-name">{{ it.cmd }}</span>
+                <span class="cmd-desc">{{ it.label }}</span>
+              </div>
+            </div>
+          </div>
         </div>
+
         <div class="input-right">
           <button class="action-btn" title="上传附件">
             <Icon icon="lucide:paperclip" />
@@ -139,6 +159,9 @@ function closeSlashMenu() {
     </div>
     <Teleport to="body">
       <div v-if="showModelList" class="model-overlay" @click="closeModelList"></div>
+      <div v-if="showAbility" class="model-overlay" @click="showAbility = false"></div>
+      <div v-if="showSession" class="model-overlay" @click="showSession = false"></div>
+      <div v-if="showAction" class="model-overlay" @click="showAction = false"></div>
     </Teleport>
   </div>
 </template>
@@ -157,34 +180,34 @@ export default { inheritAttrs: false }
 
 .input-toolbar { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
 
-.input-left { display: flex; align-items: center; }
+.input-left { display: flex; align-items: center; gap: 2px; }
 
-/* Model picker — text-only, subtle hover bg */
-.model-pick {
+.tool-pick {
   position: relative; display: flex; align-items: center; gap: 3px;
   padding: 3px 8px; border-radius: 6px; cursor: pointer;
   font-size: 12px; color: var(--el-text-color-secondary);
-  transition: background 0.15s; user-select: none;
+  transition: background 0.15s, color 0.15s; user-select: none;
 }
-.model-pick:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
+.tool-pick:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 .pick-arrow { font-size: 10px; opacity: 0.5; }
 
-/* Dropdown */
-.model-dropdown {
+.pick-dropdown {
   position: absolute; bottom: calc(100% + 8px); left: 0;
   background: var(--el-bg-color); border: 1px solid var(--el-border-color);
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-  min-width: 180px; padding: 4px; z-index: 100;
+  min-width: 200px; padding: 4px; z-index: 100;
 }
-.model-option {
-  display: flex; align-items: center; justify-content: space-between;
+.pick-option {
+  display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; border-radius: 6px; cursor: pointer;
   font-size: 13px; color: var(--el-text-color-primary);
   transition: background 0.1s;
 }
-.model-option:hover { background: var(--el-fill-color-light); }
-.model-option.current { color: var(--el-color-primary); }
-.check-icon { font-size: 15px; color: var(--el-color-primary); }
+.pick-option:hover { background: var(--el-fill-color-light); }
+.pick-option.current { color: var(--el-color-primary); }
+.check-icon { font-size: 15px; color: var(--el-color-primary); flex-shrink: 0; }
+.cmd-name { font-weight: 600; color: var(--el-color-primary); min-width: 60px; font-size: 12px; }
+.cmd-desc { color: var(--el-text-color-secondary); font-size: 12px; }
 
 .model-overlay { position: fixed; inset: 0; z-index: 99; }
 
