@@ -203,7 +203,7 @@ public class MemoryServiceImpl implements MemoryService {
                     String trimmed = line.trim();
                     if (trimmed.startsWith("metadata:")) { inMetadata = true; continue; }
                     if (inMetadata) {
-                        if (trimmed.length() > 0 && Character.isLetter(trimmed.charAt(0)) && !trimmed.startsWith(" ")) {
+                        if (line.length() > 0 && !Character.isWhitespace(line.charAt(0))) {
                             inMetadata = false;
                         }
                         if (inMetadata) {
