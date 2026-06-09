@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.chat.dao.ChatDao">
+
+    <select id="queryConversations" resultType="com.github.hbq969.ai.zephyr.chat.dao.entity.ConversationEntity">
+        select id, user_name as userName, title,
+               created_at as createdAt, updated_at as updatedAt
+        from conversations
+        where user_name = #{userName}
+        order by updated_at desc
+    </select>
+
+    <insert id="insertConversation">
+        insert into conversations (id, user_name, title, created_at, updated_at)
+        values (#{id}, #{userName}, #{title}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateConversationTitle">
+        update conversations set title = #{title}, updated_at = #{updatedAt}
+        where id = #{id} and user_name = #{userName}
+    </update>
+
+    <delete id="deleteConversation">
+        delete from conversations where id = #{id} and user_name = #{userName}
+    </delete>
+
+    <select id="queryConversationById" resultType="com.github.hbq969.ai.zephyr.chat.dao.entity.ConversationEntity">
+        select id, user_name as userName, title,
+               created_at as createdAt, updated_at as updatedAt
+        from conversations where id = #{id}
+    </select>
+
+    <select id="queryMessages" resultType="com.github.hbq969.ai.zephyr.chat.dao.entity.MessageEntity">
+        select id, conversation_id as conversationId, role, content,
+               thinking, tool_calls_json as toolCallsJson, tool_call_id as toolCallId,
+               created_at as createdAt
+        from messages
+        where conversation_id = #{conversationId}
+        order by created_at asc
+    </select>
+
+    <insert id="insertMessage">
+        insert into messages (id, conversation_id, role, content, thinking, tool_calls_json, tool_call_id, created_at)
+        values (#{id}, #{conversationId}, #{role}, #{content}, #{thinking}, #{toolCallsJson}, #{toolCallId}, #{createdAt})
+    </insert>
+
+    <delete id="deleteMessagesByConvId">
+        delete from messages where conversation_id = #{conversationId}
+    </delete>
+
+</mapper>
