@@ -91,12 +91,12 @@ public class ContextBuilder {
         // 7. 加载历史消息（最近 20 轮）
         List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt.toString());
 
-        return Context.builder()
-                .model(model)
-                .systemPrompt(systemPrompt.toString())
-                .tools(toolDefs)
-                .messages(messages)
-                .build();
+        Context ctx = new Context();
+        ctx.setModel(model);
+        ctx.setSystemPrompt(systemPrompt.toString());
+        ctx.setTools(toolDefs);
+        ctx.setMessages(messages);
+        return ctx;
     }
 
     private List<ToolDef> buildMcpToolDefs(String userName) {
@@ -215,7 +215,6 @@ public class ContextBuilder {
     }
 
     @Data
-    @Builder
     public static class Context {
         private ModelConfigEntity model;
         private String systemPrompt;
