@@ -8,11 +8,21 @@ const chatStore = useChatStore()
 const convStore = useConversationsStore()
 const areaRef = ref<HTMLElement>()
 
-watch(() => chatStore.messages.length, () => {
+function scrollToBottom() {
   nextTick(() => {
     if (areaRef.value) areaRef.value.scrollTop = areaRef.value.scrollHeight
   })
-}, { deep: true })
+}
+
+watch(
+  () => {
+    const msgs = chatStore.messages
+    if (msgs.length === 0) return ''
+    const last = msgs[msgs.length - 1]
+    return `${msgs.length}-${last.content.length}-${(last.thinking || '').length}`
+  },
+  scrollToBottom
+)
 </script>
 
 <template>
