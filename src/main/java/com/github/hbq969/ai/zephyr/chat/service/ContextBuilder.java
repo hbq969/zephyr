@@ -1,0 +1,225 @@
+package com.github.hbq969.ai.zephyr.chat.service;
+
+import com.github.hbq969.ai.zephyr.chat.dao.ChatDao;
+import com.github.hbq969.ai.zephyr.chat.dao.entity.MessageEntity;
+import com.github.hbq969.ai.zephyr.chat.model.ToolDef;
+import com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao;
+import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
+import com.github.hbq969.ai.zephyr.mcp.dao.McpDao;
+import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity;
+import com.github.hbq969.ai.zephyr.memory.model.MemoryVO;
+import com.github.hbq969.ai.zephyr.memory.service.MemoryService;
+import com.github.hbq969.ai.zephyr.skill.dao.SkillDao;
+import com.github.hbq969.ai.zephyr.skill.dao.entity.SkillConfigEntity;
+import com.github.hbq969.ai.zephyr.skill.model.SkillVO;
+import com.github.hbq969.ai.zephyr.skill.service.SkillService;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import jakarta.annotation.Resource;
+import lombok.Builder;
+import lombok.Data;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+
+@Component
+public class ContextBuilder {
+
+    private static final Gson gson = new Gson();
+
+    @Resource
+    private ModelConfigDao modelConfigDao;
+    @Resource
+    private McpDao mcpDao;
+    @Resource
+    private SkillDao skillDao;
+    @Resource
+    private SkillService skillService;
+    @Resource
+    private MemoryService memoryService;
+    @Resource
+    private ChatDao chatDao;
+
+    private static final int MAX_HISTORY_ROUNDS = 20;
+
+    private static final String ROLE_PROMPT = """
+            你是一个 AI 助手，名为 zephyr。
+
+            你可以使用 MCP 工具获取实时数据，使用技能（Skill）获取特定任务的详细指导，
+            查看用户记忆（Memory）了解历史上下文和偏好。
+
+            ## 工具使用说明
+            - 优先使用 MCP 工具获取实时准确的数据
+            - 需要特定任务的详细指导时，使用 use_skill 工具
+            - 需要了解用户的背景或偏好时，使用 use_memory 工具
+            - 你可以多次调用工具，直到获得足够信息后再回答
+            """;
+
+    public Context build(String userName, String conversationId) {
+        // 1. 加载模型配置
+        List<ModelConfigEntity> models = modelConfigDao.queryByUserName(userName);
+        ModelConfigEntity model = models.stream()
+                .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
+                .findFirst()
+                .orElse(models.isEmpty() ? null : models.get(0));
+        if (model == null) throw new RuntimeException("请先配置模型");
+
+        // 2. 加载 MCP 工具 → OpenAI tool definitions
+        List<ToolDef> toolDefs = buildMcpToolDefs(userName);
+
+        // 3. 加载 Skills 索引
+        String skillIndex = buildSkillIndex(userName);
+
+        // 4. 加载记忆索引
+        String memoryIndex = buildMemoryIndex(userName);
+
+        // 5. 组装 system prompt
+        StringBuilder systemPrompt = new StringBuilder(ROLE_PROMPT);
+        if (!skillIndex.isEmpty()) {
+            systemPrompt.append("\n\n## 可用技能\n").append(skillIndex)
+                    .append("\n（需要详细指导时使用 use_skill 工具加载）");
+        }
+        if (!memoryIndex.isEmpty()) {
+            systemPrompt.append("\n\n## 用户记忆\n").append(memoryIndex)
+                    .append("\n（需要完整内容时使用 use_memory 工具查看）");
+        }
+
+        // 6. 添加内置工具
+        toolDefs.add(buildUseSkillTool());
+        toolDefs.add(buildUseMemoryTool());
+
+        // 7. 加载历史消息（最近 20 轮）
+        List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt.toString());
+
+        return Context.builder()
+                .model(model)
+                .systemPrompt(systemPrompt.toString())
+                .tools(toolDefs)
+                .messages(messages)
+                .build();
+    }
+
+    private List<ToolDef> buildMcpToolDefs(String userName) {
+        List<ToolDef> defs = new ArrayList<>();
+        List<McpToolEntity> tools = mcpDao.queryEnabledToolsByUserName(userName);
+        for (McpToolEntity t : tools) {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("type", "object");
+            params.put("properties", new LinkedHashMap<>());
+            params.put("required", Collections.emptyList());
+
+            defs.add(ToolDef.builder()
+                    .type("function")
+                    .function(ToolDef.FunctionDef.builder()
+                            .name(t.getToolName())
+                            .description(t.getDescription() != null ? t.getDescription() : "")
+                            .parameters(params)
+                            .build())
+                    .build());
+        }
+        return defs;
+    }
+
+    private String buildSkillIndex(String userName) {
+        StringBuilder sb = new StringBuilder();
+        List<SkillConfigEntity> skills = skillDao.queryEnabledByUserName(userName);
+        Set<String> seen = new HashSet<>();
+        for (SkillConfigEntity s : skills) {
+            sb.append("- ").append(s.getSkillName()).append(": ").append(s.getDescription()).append("\n");
+            seen.add(s.getSkillName());
+        }
+        // Also include synced skills from local directories
+        List<SkillVO> synced = skillService.syncScan(userName);
+        for (SkillVO s : synced) {
+            if (seen.contains(s.getSkillName())) continue;
+            sb.append("- ").append(s.getSkillName()).append(": ").append(s.getDescription()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    private String buildMemoryIndex(String userName) {
+        StringBuilder sb = new StringBuilder();
+        List<MemoryVO> memories = memoryService.list(null, userName);
+        for (MemoryVO m : memories) {
+            sb.append("- ").append(m.getName()).append(" (").append(m.getType()).append("): ")
+                    .append(m.getDescription()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    private List<Map<String, Object>> buildMessages(String userName, String conversationId, String systemPrompt) {
+        List<Map<String, Object>> messages = new ArrayList<>();
+
+        Map<String, Object> systemMsg = new HashMap<>();
+        systemMsg.put("role", "system");
+        systemMsg.put("content", systemPrompt);
+        messages.add(systemMsg);
+
+        if (conversationId != null) {
+            List<MessageEntity> history = chatDao.queryMessages(conversationId);
+            List<MessageEntity> recent = history;
+            if (history.size() > MAX_HISTORY_ROUNDS * 2) {
+                recent = history.subList(history.size() - MAX_HISTORY_ROUNDS * 2, history.size());
+            }
+            for (MessageEntity e : recent) {
+                Map<String, Object> msg = new HashMap<>();
+                msg.put("role", e.getRole());
+                msg.put("content", e.getContent());
+                if (e.getToolCallId() != null && !e.getToolCallId().isEmpty()) {
+                    msg.put("tool_call_id", e.getToolCallId());
+                }
+                if (e.getToolCallsJson() != null && !e.getToolCallsJson().isEmpty()) {
+                    msg.put("tool_calls", gson.fromJson(e.getToolCallsJson(),
+                            new TypeToken<List<Map<String, Object>>>(){}.getType()));
+                }
+                messages.add(msg);
+            }
+        }
+        return messages;
+    }
+
+    private ToolDef buildUseSkillTool() {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("type", "object");
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("skill_name", Map.of("type", "string", "description", "技能名称"));
+        params.put("properties", props);
+        params.put("required", List.of("skill_name"));
+
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("use_skill")
+                        .description("加载指定 skill 的完整指导内容到上下文")
+                        .parameters(params)
+                        .build())
+                .build();
+    }
+
+    private ToolDef buildUseMemoryTool() {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("type", "object");
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("memory_name", Map.of("type", "string", "description", "记忆名称"));
+        params.put("properties", props);
+        params.put("required", List.of("memory_name"));
+
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("use_memory")
+                        .description("查看指定记忆的完整内容")
+                        .parameters(params)
+                        .build())
+                .build();
+    }
+
+    @Data
+    @Builder
+    public static class Context {
+        private ModelConfigEntity model;
+        private String systemPrompt;
+        private List<ToolDef> tools;
+        private List<Map<String, Object>> messages;
+    }
+}

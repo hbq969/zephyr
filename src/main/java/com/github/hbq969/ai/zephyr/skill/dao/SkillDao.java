@@ -14,6 +14,7 @@ public interface SkillDao {
     void createSkillConfigsTable();
 
     List<SkillConfigEntity> queryByUserName(@Param("userName") String userName);
+    List<SkillConfigEntity> queryEnabledByUserName(@Param("userName") String userName);
     SkillConfigEntity queryById(@Param("id") String id);
     SkillConfigEntity queryBySkillName(@Param("skillName") String skillName, @Param("userName") String userName);
 

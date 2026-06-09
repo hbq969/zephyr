@@ -13,6 +13,16 @@
         order by source asc, created_at desc
     </select>
 
+    <select id="queryEnabledByUserName" resultType="com.github.hbq969.ai.zephyr.skill.dao.entity.SkillConfigEntity">
+        select id, user_name as userName, skill_name as skillName,
+               display_name as displayName, description, source, source_url as sourceUrl,
+               version, enabled, install_path as installPath,
+               created_at as createdAt, updated_at as updatedAt
+        from skill_configs
+        where user_name = #{userName} and enabled = 1
+        order by source asc, created_at desc
+    </select>
+
     <select id="queryById" resultType="com.github.hbq969.ai.zephyr.skill.dao.entity.SkillConfigEntity">
         select id, user_name as userName, skill_name as skillName,
                display_name as displayName, description, source, source_url as sourceUrl,
