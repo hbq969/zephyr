@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ModelConfig, McpServer, McpTool, Skill } from '@/types/chat'
+import type { ModelConfig, McpServer, McpTool, SkillConfig } from '@/types/chat'
 import axios from '@/network'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -13,13 +13,7 @@ export const useSettingsStore = defineStore('settings', () => {
   ])
   const mcpServers = ref<McpServer[]>([])
   const mcpToolCount = ref(0)
-  const skills = ref<Skill[]>([
-    { name: 'brainstorming', source: 'builtin', enabled: true },
-    { name: 'systematic-debugging', source: 'builtin', enabled: true },
-    { name: 'frontend-design', source: 'builtin', enabled: true },
-    { name: 'code-simplifier', source: 'community', enabled: true },
-    { name: 'code-explorer', source: 'community', enabled: false }
-  ])
+  const skills = ref<SkillConfig[]>([])
   const contextUsed = ref(53248)
   const contextTotal = ref(131072)
 
@@ -29,7 +23,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function setModel(name: string) { currentModel.value = name }
   function addModel(model: ModelConfig) { models.value.push(model) }
-  function addSkill(skill: Skill) { skills.value.push(skill) }
 
   // === Model API 方法 ===
 
@@ -146,13 +139,74 @@ export const useSettingsStore = defineStore('settings', () => {
     await axios({ url: '/mcp/tool/toggle', method: 'post', data: { id, enabled: enabled ? 1 : 0 } })
   }
 
+  // === Skill API 方法 ===
+
+  async function loadSkills() {
+    try {
+      const res = await axios({ url: '/skill/list', method: 'get' })
+      if (res.data.state === 'OK' && Array.isArray(res.data.body)) {
+        skills.value = res.data.body.map((s: any) => ({
+          id: s.id, skillName: s.skillName, displayName: s.displayName,
+          description: s.description, source: s.source, sourceUrl: s.sourceUrl,
+          version: s.version, enabled: s.enabled, installPath: s.installPath,
+          createdAt: s.createdAt, updatedAt: s.updatedAt
+        }))
+      }
+    } catch (_) {}
+  }
+
+  async function installSkill(data: Record<string, string>) {
+    const res = await axios({ url: '/skill/install', method: 'post', data })
+    if (res.data.state === 'OK') await loadSkills()
+    return res.data
+  }
+
+  async function uploadSkill(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await axios({
+      url: '/skill/upload', method: 'post',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    if (res.data.state === 'OK') await loadSkills()
+    return res.data
+  }
+
+  async function uninstallSkill(id: string) {
+    await axios({ url: '/skill/uninstall', method: 'post', data: { id } })
+    await loadSkills()
+  }
+
+  async function toggleSkill(id: string, enabled: boolean) {
+    await axios({ url: '/skill/toggle', method: 'post', data: { id, enabled: enabled ? 1 : 0 } })
+    await loadSkills()
+  }
+
+  async function syncScanSkills() {
+    const res = await axios({ url: '/skill/sync-scan', method: 'get' })
+    if (res.data.state === 'OK') return res.data.body as SkillConfig[]
+    return []
+  }
+
+  async function syncInstallSkills(platform: string, skillNames: string[]) {
+    const res = await axios({
+      url: '/skill/sync-install', method: 'post',
+      data: { platform, skillNames: skillNames.join(',') }
+    })
+    if (res.data.state === 'OK') await loadSkills()
+    return res.data
+  }
+
   return {
     currentModel, models, mcpServers, mcpToolCount, skills,
     contextUsed, contextTotal, contextPercent,
-    setModel, addModel, addSkill,
+    setModel, addModel,
     loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote,
     loadMcpServers, createMcpServer, updateMcpServer, deleteMcpServer,
     connectMcpServer, disconnectMcpServer,
-    loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, loadMcpToolCount
+    loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, loadMcpToolCount,
+    loadSkills, installSkill, uploadSkill, uninstallSkill, toggleSkill,
+    syncScanSkills, syncInstallSkills
   }
 })

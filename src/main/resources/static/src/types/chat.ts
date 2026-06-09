@@ -67,12 +67,29 @@ export interface McpTool {
   createdAt?: number
 }
 
-// === Skill ===
+// === Skill (legacy) ===
 export interface Skill {
   name: string
   source: 'builtin' | 'community' | 'custom'
   path?: string
   enabled: boolean
+}
+
+// === Skill Config ===
+export interface SkillConfig {
+  id?: string
+  skillName: string
+  displayName: string
+  description: string
+  source: 'builtin' | 'git' | 'url' | 'local' | 'upload' | 'sync' | 'marketplace'
+  sourceUrl?: string
+  version?: string
+  enabled: boolean
+  installPath?: string
+  createdAt?: number
+  updatedAt?: number
+  platform?: string
+  platformPath?: string
 }
 
 // === Model ===
