@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useConversationsStore } from '@/store/conversations'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
+import axios from '@/network'
 
 const convStore = useConversationsStore()
 const settingsStore = useSettingsStore()
@@ -10,6 +11,12 @@ const settingsStore = useSettingsStore()
 const openMenuId = ref<string | null>(null)
 const renameId = ref<string | null>(null)
 const renameText = ref('')
+
+function deleteConversation(id: string) {
+  axios({ url: '/conversations/delete', method: 'post', data: { id } })
+    .then(() => { convStore.removeConversation(id); openMenuId.value = null })
+    .catch(() => {})
+}
 
 function toggleMenu(id: string) {
   openMenuId.value = openMenuId.value === id ? null : id
@@ -77,7 +84,7 @@ function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
                   <div class="conv-menu-item" @click.stop="startRename(conv.id, conv.title)">
                     <Icon icon="lucide:pencil" />重命名
                   </div>
-                  <div class="conv-menu-item danger" @click.stop="convStore.removeConversation(conv.id)">
+                  <div class="conv-menu-item danger" @click.stop="deleteConversation(conv.id)">
                     <Icon icon="lucide:trash-2" />删除
                   </div>
                 </div>
