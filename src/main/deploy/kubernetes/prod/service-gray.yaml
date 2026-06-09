@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zephyr-gray
+  namespace: ${k8s_ns}
+  labels:
+    app: zephyr-gray
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+    - port: 30733
+      targetPort: 30733
+      protocol: TCP
+      name: restful
+  selector:
+    app: zephyr-gray
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zephyr-gray-deployment
+  namespace: ${k8s_ns}
+spec:
+  replicas: ${replicas}
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      name: zephyr-gray
+  template:
+    metadata:
+      labels:
+        name: zephyr-gray
+        app: zephyr-gray
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/zone
+                    operator: In
+                    values:
+                      - suzhou
+                      - wuxi
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - zephyr-gray
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: zephyr-gray
+      tolerations:
+        - key: node.pool.kubernetes.io
+          operator: Equal
+          value: p15f1
+          effect: NoSchedule
+      restartPolicy: Always
+      volumes:
+        - name: app-logs
+          hostPath:
+            path: /tmp/apps/zephyr-gray/logs
+      containers:
+        - name: zephyr-gray-deployment
+          image: ${docker_prefix}/zephyr-gray:${tag}
+          imagePullPolicy: Always
+          livenessProbe:
+            tcpSocket:
+              port: 30733
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 240
+          readinessProbe:
+            tcpSocket:
+              port: 30733
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 240
+          resources:
+            requests:
+              cpu: '1'
+              memory: 1Gi
+            limits:
+              cpu: '1'
+              memory: 1.5Gi
+          volumeMounts:
+            - mountPath: /opt/app/zephyr/logs
+              name: app-logs
+          ports:
+            - containerPort: 30733
+          env:
+            - name: spring_cloud_zookeeper_enabled
+              value: "false"
+            - name: spring_cloud_zookeeper_connectString
+              value: ""
+            - name: spring_cloud_zookeeper_auth_info
+              value: ""
+            - name: spring_profiles_active
+              value: "${spring_profiles_active}"
+          command: [ "java" ]
+          args: [ "-Xmx512m","-Xms512m","-DAPP_SN=h-dbc","-Dspring.profiles.active=${spring_profiles_active}", "-Dspring.main.allow-bean-definition-overriding=true","-Dreactor.netty.http.server.accessLogEnabled=true","-Dfile.encoding=utf-8","-XX:+UseG1GC","-XX:MaxGCPauseMillis=100", "-jar","/opt/app/zephyr/lib/zephyr-1.0-SNAPSHOT.jar" ]
+

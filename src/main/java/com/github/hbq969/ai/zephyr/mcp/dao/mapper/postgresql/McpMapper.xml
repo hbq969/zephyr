@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.mcp.dao.McpDao">
+
+  <update id="createMcpServersTable">
+    create table if not exists mcp_servers (
+      id varchar(64) primary key,
+      user_name varchar(64) not null,
+      name varchar(128) not null,
+      transport varchar(16) not null,
+      command varchar(256),
+      args text,
+      env_vars text,
+      url varchar(512),
+      headers text,
+      status varchar(16) default 'disconnected',
+      created_at bigint,
+      updated_at bigint
+    );
+    create index if not exists idx_ms_user on mcp_servers(user_name);
+  </update>
+
+  <update id="createMcpToolsTable">
+    create table if not exists mcp_tools (
+      id varchar(64) primary key,
+      user_name varchar(64) not null,
+      server_id varchar(64) not null,
+      tool_name varchar(128) not null,
+      description varchar(512),
+      enabled smallint default 1,
+      source varchar(16) not null,
+      created_at bigint
+    );
+    create index if not exists idx_mt_server on mcp_tools(server_id);
+    create index if not exists idx_mt_user on mcp_tools(user_name);
+  </update>
+
+</mapper>

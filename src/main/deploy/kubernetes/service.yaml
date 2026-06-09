@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zephyr
+  namespace: ${k8s_ns}
+  labels:
+    app: zephyr
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+    - port: 30733
+      targetPort: 30733
+      protocol: TCP
+      name: restful
+  selector:
+    app: zephyr
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: zephyr-deployment
+  namespace: ${k8s_ns}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      name: zephyr
+  template:
+    metadata:
+      labels:
+        name: zephyr
+        app: zephyr
+    spec:
+      restartPolicy: Always
+      volumes:
+        - name: app-logs
+          hostPath:
+            path: /tmp/apps/zephyr/logs
+      containers:
+        - name: zephyr
+          image: ${docker_prefix}/zephyr:${tag}
+          imagePullPolicy: Always
+          livenessProbe:
+            tcpSocket:
+              port: 30733
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 240
+          readinessProbe:
+            tcpSocket:
+              port: 30733
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 240
+          resources:
+            requests:
+              cpu: '1'
+              memory: 1Gi
+            limits:
+              cpu: '1'
+              memory: 1.5Gi
+          volumeMounts:
+            - mountPath: /opt/app/zephyr/logs
+              name: app-logs
+          ports:
+            - containerPort: 30733
+          env:
+            - name: spring_cloud_zookeeper_enabled
+              value: "false"
+            - name: spring_cloud_zookeeper_connectString
+              value: ""
+            - name: spring_cloud_zookeeper_auth_info
+              value: ""
+            - name: spring_profiles_active
+              value: "${spring_profiles_active}"
+          command: [ "java" ]
+          args: [ "-Xmx512m","-Xms512m","-DAPP_SN=zephyr","-Dspring.profiles.active=${spring_profiles_active}", "-Dspring.main.allow-bean-definition-overriding=true","-Dfile.encoding=utf-8", "-jar","/opt/app/zephyr/lib/zephyr-1.0-SNAPSHOT.jar" ]
+

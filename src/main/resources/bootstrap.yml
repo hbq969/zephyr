@@ -1,0 +1,16 @@
+spring:
+  cloud:
+    config:
+      h-dbc:
+        enabled: false
+        dbc-key: h-dbc
+        service-name: zephyr
+        profile-name: default
+        api:
+          basic-auth:
+            username: user
+            password: 123456
+          charset: utf-8
+          https: false
+          truststore-password: 和配置中心保持一致
+          url: https://hdbc.for.host.internal:30170/h-dbc

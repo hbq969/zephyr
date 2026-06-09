@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.mcp.dao.McpDao">
+
+    <select id="queryServersByUserName" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
+        select id, user_name as userName, name, transport,
+               command, args, env_vars as envVars,
+               url, headers, status,
+               created_at as createdAt, updated_at as updatedAt
+        from mcp_servers
+        where user_name = #{userName}
+        order by created_at desc
+    </select>
+
+    <insert id="insertServer">
+        insert into mcp_servers (id, user_name, name, transport, command, args, env_vars, url, headers, status, created_at, updated_at)
+        values (#{id}, #{userName}, #{name}, #{transport}, #{command}, #{args}, #{envVars}, #{url}, #{headers}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateServer">
+        update mcp_servers
+        set name = #{name}, transport = #{transport},
+            command = #{command}, args = #{args}, env_vars = #{envVars},
+            url = #{url}, headers = #{headers},
+            updated_at = #{updatedAt}
+        where id = #{id} and user_name = #{userName}
+    </update>
+
+    <delete id="deleteServer">
+        delete from mcp_servers where id = #{id} and user_name = #{userName}
+    </delete>
+
+    <select id="queryServerById" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
+        select id, user_name as userName, name, transport,
+               command, args, env_vars as envVars,
+               url, headers, status,
+               created_at as createdAt, updated_at as updatedAt
+        from mcp_servers where id = #{id}
+    </select>
+
+    <update id="updateServerStatus">
+        update mcp_servers set status = #{status} where id = #{id} and user_name = #{userName}
+    </update>
+
+    <select id="queryToolsByServerId" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
+        select id, user_name as userName, server_id as serverId,
+               tool_name as toolName, description, enabled, source,
+               created_at as createdAt
+        from mcp_tools
+        where server_id = #{serverId} and user_name = #{userName}
+        order by source desc, tool_name asc
+    </select>
+
+    <insert id="insertTool">
+        insert into mcp_tools (id, user_name, server_id, tool_name, description, enabled, source, created_at)
+        values (#{id}, #{userName}, #{serverId}, #{toolName}, #{description}, #{enabled}, #{source}, #{createdAt})
+    </insert>
+
+    <update id="updateTool">
+        update mcp_tools
+        set tool_name = #{toolName}, description = #{description}
+        where id = #{id} and user_name = #{userName}
+    </update>
+
+    <delete id="deleteTool">
+        delete from mcp_tools where id = #{id} and user_name = #{userName}
+    </delete>
+
+    <delete id="deleteToolsByServerId">
+        delete from mcp_tools where server_id = #{serverId} and user_name = #{userName}
+    </delete>
+
+    <update id="toggleTool">
+        update mcp_tools set enabled = #{enabled} where id = #{id} and user_name = #{userName}
+    </update>
+
+    <select id="countEnabledTools" resultType="int">
+        select count(*) from mcp_tools where user_name = #{userName} and enabled = 1
+    </select>
+
+</mapper>

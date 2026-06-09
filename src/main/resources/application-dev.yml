@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    dynamic:
+      enabled: true
+      base-packages: com.github.hbq969,com.github.hbq969.ai.zephyr
+      default-lookup-key: hikari
+    hikari:
+      jdbc-url: jdbc:mysql://docker.for.mac.host.internal:3306/dbc?useUnicode=true&allowPublicKeyRetrieval=true&characterEncoding=utf-8&useSSL=false&autoReconnect=true&failOverReadOnly=false&maxReconnects=15000
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      username: dbc
+      password: 123456
+      maximum-pool-size: 10
+      minimum-idle: 2
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+  mvc:
+    interceptors:
+      login:
+        enabled: true
+
+mybatis:
+  mapper-locations:
+    - classpath*:mappers/*.xml
+    - classpath*:com/github/hbq969/**/mapper/common/*Mapper.xml
+    - classpath*:com/github/hbq969/**/mapper/mysql/*Mapper.xml
+  config-location: classpath:jpaConfig-mysql.xml

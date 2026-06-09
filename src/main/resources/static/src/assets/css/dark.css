@@ -1,0 +1,542 @@
+/* ========================================
+ * Element Plus 全组件暗黑模式 — CSS 变量全覆盖
+ * 策略：在组件根元素上覆盖所有颜色相关 CSS 变量
+ * ======================================== */
+
+/* === 1. Basic 基础 === */
+/* Button: 仅 default 类型用灰色，其他保留 Element Plus 暗黑配色 */
+html.dark .el-button--default {
+  --el-button-bg-color: var(--el-fill-color-light);
+  --el-button-border-color: var(--el-border-color);
+  --el-button-text-color: var(--el-text-color-primary);
+  --el-button-hover-bg-color: var(--el-fill-color);
+  --el-button-hover-border-color: var(--el-border-color-dark);
+  --el-button-hover-text-color: var(--el-text-color-primary);
+  --el-button-active-bg-color: var(--el-fill-color-dark);
+  --el-button-active-border-color: var(--el-border-color-darker);
+  --el-button-active-color: var(--el-text-color-primary);
+  --el-button-disabled-bg-color: var(--el-fill-color-light);
+  --el-button-disabled-border-color: var(--el-border-color-lighter);
+  --el-button-disabled-text-color: var(--el-text-color-disabled);
+}
+html.dark .el-button.is-circle {
+  background-color: var(--el-fill-color-light) !important;
+  border-color: var(--el-border-color) !important;
+}
+
+/* Link: 仅 default 用灰色 */
+html.dark .el-link--default {
+  --el-link-text-color: var(--el-text-color-primary);
+}
+html.dark .el-link.is-disabled {
+  --el-link-disabled-text-color: var(--el-text-color-disabled);
+}
+html.dark .el-link--primary { --el-link-hover-text-color: var(--el-color-primary-light-3); }
+
+/* === 2. Layout === */
+html.dark .el-container { background: var(--el-bg-color-page); }
+html.dark .el-header,
+html.dark .el-footer,
+html.dark .el-aside { background: var(--el-bg-color); }
+
+/* === 3. Container === */
+html.dark .el-card {
+  --el-card-bg-color: var(--el-bg-color);
+  --el-card-border-color: var(--el-border-color);
+}
+html.dark .el-page-header__title { color: var(--el-text-color-primary); }
+html.dark .el-page-header__content { color: var(--el-text-color-secondary); }
+
+/* === 4. Form === */
+html.dark .el-input {
+  --el-input-bg-color: var(--el-fill-color-light);
+  --el-input-text-color: var(--el-text-color-primary);
+  --el-input-border-color: var(--el-border-color);
+  --el-input-hover-border-color: var(--el-border-color-dark);
+  --el-input-focus-border-color: var(--el-border-color-darker);
+  --el-input-placeholder-color: var(--el-text-color-placeholder);
+  --el-input-icon-color: var(--el-text-color-secondary);
+  --el-input-clear-hover-color: var(--el-text-color-primary);
+  --el-input-tag-text-color: var(--el-text-color-primary);
+  --el-input-tag-border-color-hover: var(--el-border-color-dark);
+}
+html.dark .el-input__wrapper,
+html.dark .el-textarea__inner {
+  background-color: var(--el-fill-color-light);
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
+}
+html.dark .el-input__inner,
+html.dark .el-textarea__inner { color: var(--el-text-color-primary); }
+html.dark .el-form-item__label { color: var(--el-text-color-primary); }
+
+html.dark .el-input-number__decrease,
+html.dark .el-input-number__increase {
+  background-color: var(--el-fill-color-light);
+  color: var(--el-text-color-primary);
+  border-color: var(--el-border-color);
+}
+
+/* Select */
+html.dark .el-select {
+  --el-select-border-color-hover: var(--el-border-color-dark);
+  --el-select-input-color: var(--el-text-color-primary);
+  --el-select-input-focus-border-color: var(--el-border-color-darker);
+  --el-select-disabled-color: var(--el-text-color-disabled);
+  --el-select-close-hover-color: var(--el-text-color-primary);
+}
+html.dark .el-select-dropdown { background: var(--el-bg-color-overlay); }
+html.dark .el-select-dropdown__item { color: var(--el-text-color-primary); }
+html.dark .el-select-dropdown__item.hover,
+html.dark .el-select-dropdown__item:hover { background: var(--el-fill-color-light); }
+html.dark .el-select-dropdown__item.selected {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+/* Checkbox */
+html.dark .el-checkbox {
+  --el-checkbox-text-color: var(--el-text-color-primary);
+  --el-checkbox-checked-text-color: var(--el-text-color-primary);
+  --el-checkbox-checked-bg-color: var(--el-fill-color-dark);
+  --el-checkbox-checked-border-color: var(--el-border-color-darker);
+  --el-checkbox-checked-icon-color: var(--el-text-color-primary);
+  --el-checkbox-checked-input-border-color: var(--el-border-color-darker);
+  --el-checkbox-bg-color: var(--el-fill-color-light);
+  --el-checkbox-input-border-color-hover: var(--el-border-color-darker);
+  --el-checkbox-disabled-border-color: var(--el-border-color-lighter);
+  --el-checkbox-disabled-checked-icon-color: var(--el-text-color-disabled);
+  --el-checkbox-disabled-checked-input-border-color: var(--el-border-color-lighter);
+  --el-checkbox-disabled-icon-color: var(--el-text-color-disabled);
+}
+html.dark .el-checkbox__label { color: var(--el-text-color-primary); }
+html.dark .el-checkbox__inner { background-color: var(--el-fill-color-light); border-color: var(--el-border-color-darker); }
+
+html.dark .el-checkbox-button {
+  --el-checkbox-button-checked-bg-color: var(--el-fill-color-dark);
+  --el-checkbox-button-checked-border-color: var(--el-border-color-darker);
+  --el-checkbox-button-checked-text-color: var(--el-text-color-primary);
+}
+
+/* Radio */
+html.dark .el-radio {
+  --el-radio-text-color: var(--el-text-color-primary);
+  --el-radio-checked-text-color: var(--el-text-color-primary);
+  --el-radio-checked-bg-color: var(--el-fill-color-dark);
+  --el-radio-checked-border-color: var(--el-border-color-darker);
+  --el-radio-input-bg-color: var(--el-fill-color-light);
+  --el-radio-input-border-color: var(--el-border-color-darker);
+  --el-radio-input-border-color-hover: var(--el-border-color);
+}
+html.dark .el-radio__label { color: var(--el-text-color-primary); }
+html.dark .el-radio__inner { background-color: var(--el-fill-color-light); border-color: var(--el-border-color-darker); }
+
+html.dark .el-radio-button {
+  --el-radio-button-checked-bg-color: var(--el-fill-color-dark);
+  --el-radio-button-checked-border-color: var(--el-border-color-darker);
+  --el-radio-button-checked-text-color: var(--el-text-color-primary);
+}
+
+/* Switch */
+html.dark .el-switch__label { color: var(--el-text-color-primary); }
+
+/* Slider */
+html.dark .el-slider {
+  --el-slider-main-bg-color: var(--el-fill-color-dark);
+  --el-slider-runway-bg-color: var(--el-fill-color-light);
+  --el-slider-stop-bg-color: var(--el-border-color);
+  --el-slider-disabled-color: var(--el-text-color-disabled);
+}
+html.dark .el-slider__button { border-color: var(--el-fill-color-dark); }
+
+/* Rate */
+html.dark .el-rate {
+  --el-rate-fill-color: var(--el-fill-color-dark);
+  --el-rate-void-color: var(--el-border-color-dark);
+  --el-rate-text-color: var(--el-text-color-primary);
+  --el-rate-disabled-void-color: var(--el-border-color-lighter);
+}
+
+/* ColorPicker */
+html.dark .el-color-picker__panel { background: var(--el-bg-color); border-color: var(--el-border-color); }
+html.dark .el-color-picker {
+  --el-colorpicker-bg-color: var(--el-bg-color);
+}
+
+/* Transfer */
+html.dark .el-transfer {
+  --el-transfer-border-color: var(--el-border-color);
+  --el-transfer-panel-header-bg-color: var(--el-fill-color-light);
+}
+html.dark .el-transfer-panel {
+  background: var(--el-bg-color);
+  border-color: var(--el-border-color);
+}
+html.dark .el-transfer-panel__header { background: var(--el-fill-color-light); }
+html.dark .el-transfer-panel__item { color: var(--el-text-color-primary); }
+html.dark .el-transfer-panel__item:hover { background: var(--el-fill-color-light); }
+
+/* Cascader */
+html.dark .el-cascader {
+  --el-cascader-menu-text-color: var(--el-text-color-primary);
+  --el-cascader-menu-selected-text-color: var(--el-text-color-primary);
+  --el-cascader-menu-border: var(--el-border-color);
+  --el-cascader-menu-fill: var(--el-bg-color);
+  --el-cascader-node-color: var(--el-text-color-primary);
+  --el-cascader-node-background-hover: var(--el-fill-color-light);
+  --el-cascader-color: var(--el-text-color-primary);
+}
+html.dark .el-cascader-panel { background: var(--el-bg-color); }
+html.dark .el-cascader-node { color: var(--el-text-color-primary); }
+html.dark .el-cascader-node:hover { background: var(--el-fill-color-light); }
+html.dark .el-cascader-node.is-active { color: var(--el-color-primary); }
+html.dark .el-cascader-menu { border-color: var(--el-border-color); }
+
+/* === 5. Data === */
+html.dark .el-table {
+  --el-table-bg-color: var(--el-bg-color);
+  --el-table-tr-bg-color: var(--el-bg-color);
+  --el-table-header-bg-color: var(--el-fill-color-light);
+  --el-table-header-text-color: var(--el-text-color-primary);
+  --el-table-row-hover-bg-color: var(--el-fill-color);
+  --el-table-current-row-bg-color: var(--el-fill-color-light);
+  --el-table-expanded-cell-bg-color: var(--el-bg-color);
+  --el-table-border-color: var(--el-border-color-lighter);
+  --el-table-text-color: var(--el-text-color-primary);
+  --el-table-border: 1px solid var(--el-border-color-lighter);
+}
+html.dark .el-table .el-icon { color: var(--el-color-white) !important; }
+
+/* Tag: 仅 default 用灰色 */
+html.dark .el-tag--default {
+  --el-tag-bg-color: var(--el-fill-color-light);
+  --el-tag-border-color: var(--el-border-color);
+  --el-tag-text-color: var(--el-text-color-primary);
+}
+
+html.dark .el-pagination {
+  --el-pagination-bg-color: var(--el-bg-color);
+  --el-pagination-text-color: var(--el-text-color-primary);
+  --el-pagination-button-bg-color: var(--el-fill-color-light);
+  --el-pagination-button-color: var(--el-text-color-primary);
+  --el-pagination-button-disabled-bg-color: var(--el-fill-color-light);
+  --el-pagination-button-disabled-color: var(--el-text-color-disabled);
+  --el-pagination-hover-color: var(--el-color-primary);
+}
+html.dark .el-pagination__total,
+html.dark .el-pagination__jump { color: var(--el-text-color-primary); }
+
+/* Tree */
+html.dark .el-tree {
+  --el-tree-text-color: var(--el-text-color-primary);
+  --el-tree-node-hover-bg-color: var(--el-fill-color-light);
+  --el-tree-expand-icon-color: var(--el-text-color-secondary);
+  background: var(--el-bg-color);
+}
+html.dark .el-tree-node__content { color: var(--el-text-color-primary); }
+html.dark .el-tree-node__content:hover { background: var(--el-fill-color-light); }
+
+/* Badge */
+html.dark .el-badge {
+  --el-badge-bg-color: var(--el-fill-color-light);
+}
+html.dark .el-badge__content { background-color: var(--el-fill-color-light); color: var(--el-text-color-primary); }
+
+/* Avatar */
+html.dark .el-avatar {
+  --el-avatar-bg-color: var(--el-fill-color-light);
+  --el-avatar-text-color: var(--el-text-color-primary);
+}
+
+/* Progress */
+html.dark .el-progress__text { color: var(--el-text-color-primary); }
+html.dark .el-progress-bar__outer { background-color: var(--el-fill-color-light); }
+
+/* Skeleton */
+html.dark .el-skeleton {
+  --el-skeleton-color: var(--el-fill-color-light);
+  --el-skeleton-to-color: var(--el-fill-color);
+}
+html.dark .el-skeleton__item { background: var(--el-fill-color-light); }
+
+/* Empty */
+html.dark .el-empty {
+  --el-empty-fill-color: var(--el-text-color-placeholder);
+}
+html.dark .el-empty__description { color: var(--el-text-color-secondary); }
+
+/* Result */
+html.dark .el-result {
+  --el-result-color: var(--el-color-primary);
+}
+html.dark .el-result__title { color: var(--el-text-color-primary); }
+html.dark .el-result__subtitle { color: var(--el-text-color-secondary); }
+
+/* Descriptions */
+html.dark .el-descriptions__title { color: var(--el-text-color-primary); }
+html.dark .el-descriptions__label { color: var(--el-text-color-secondary); }
+html.dark .el-descriptions__content { color: var(--el-text-color-primary); }
+html.dark .el-descriptions__body { background-color: var(--el-bg-color); }
+html.dark .el-descriptions {
+  --el-descriptions-table-border: 1px solid var(--el-border-color-lighter);
+  --el-descriptions-item-bordered-label-background: var(--el-fill-color-light);
+}
+
+/* === 6. Navigation === */
+html.dark .el-menu {
+  --el-menu-bg-color: var(--el-bg-color);
+  --el-menu-text-color: var(--el-text-color-primary);
+  --el-menu-hover-bg-color: var(--el-fill-color-light);
+  --el-menu-hover-text-color: var(--el-text-color-primary);
+  --el-menu-active-color: var(--el-color-primary);
+  --el-menu-border-color: var(--el-border-color-lighter);
+}
+html.dark .el-sub-menu__title { color: var(--el-text-color-primary); }
+
+html.dark .el-tabs__item { color: var(--el-text-color-secondary); }
+html.dark .el-tabs__item.is-active { color: var(--el-color-primary); }
+html.dark .el-tabs__header { border-color: var(--el-border-color-lighter); }
+
+html.dark .el-breadcrumb__inner { color: var(--el-text-color-secondary); }
+html.dark .el-breadcrumb__inner.is-link:hover { color: var(--el-color-primary); }
+html.dark .el-breadcrumb__separator { color: var(--el-text-color-placeholder); }
+
+html.dark .el-dropdown-menu { background: var(--el-bg-color); }
+html.dark .el-dropdown-menu__item { color: var(--el-text-color-primary); }
+html.dark .el-dropdown-menu__item:hover { background: var(--el-fill-color-light); }
+html.dark .el-dropdown-menu__item.is-disabled { color: var(--el-text-color-disabled); }
+
+html.dark .el-step__title { color: var(--el-text-color-primary); }
+html.dark .el-step__description { color: var(--el-text-color-secondary); }
+html.dark .el-step.is-wait .el-step__head { color: var(--el-text-color-placeholder); border-color: var(--el-text-color-placeholder); }
+
+html.dark .el-anchor {
+  --el-anchor-bg-color: var(--el-bg-color);
+  --el-anchor-color: var(--el-text-color-secondary);
+  --el-anchor-active-color: var(--el-color-primary);
+  --el-anchor-hover-color: var(--el-text-color-primary);
+  --el-anchor-marker-bg-color: var(--el-color-primary);
+}
+
+html.dark .el-backtop {
+  --el-backtop-bg-color: var(--el-fill-color-light);
+  --el-backtop-hover-bg-color: var(--el-fill-color);
+  --el-backtop-text-color: var(--el-color-primary);
+}
+
+html.dark .el-segmented {
+  --el-segmented-bg-color: var(--el-fill-color-light);
+  --el-segmented-color: var(--el-text-color-secondary);
+  --el-segmented-item-active-bg-color: var(--el-fill-color-dark);
+  --el-segmented-item-hover-bg-color: var(--el-fill-color);
+  --el-segmented-item-hover-color: var(--el-text-color-primary);
+  --el-segmented-item-selected-bg-color: var(--el-fill-color-dark);
+  --el-segmented-item-selected-color: var(--el-text-color-primary);
+  --el-segmented-item-selected-disabled-bg-color: var(--el-fill-color-light);
+  --el-segmented-item-disabled-color: var(--el-text-color-disabled);
+}
+
+/* === 7. Feedback === */
+html.dark .el-alert {
+  --el-alert-bg-color: var(--el-bg-color);
+}
+html.dark .el-alert__title { color: var(--el-text-color-primary); }
+html.dark .el-alert__description { color: var(--el-text-color-secondary); }
+
+html.dark .el-dialog {
+  --el-dialog-bg-color: var(--el-bg-color);
+}
+html.dark .el-dialog__title { color: var(--el-text-color-primary); }
+
+html.dark .el-drawer {
+  --el-drawer-bg-color: var(--el-bg-color);
+}
+
+/* Popover / Popconfirm */
+html.dark .el-popover {
+  --el-popover-bg-color: var(--el-bg-color);
+  --el-popover-border-color: var(--el-border-color);
+  --el-popover-title-text-color: var(--el-text-color-primary);
+}
+html.dark .el-popper.is-light {
+  background: var(--el-bg-color) !important;
+  border-color: var(--el-border-color) !important;
+  color: var(--el-text-color-primary) !important;
+}
+html.dark .el-popper.is-light .el-popper__arrow::before {
+  background: var(--el-bg-color) !important;
+  border-color: var(--el-border-color) !important;
+}
+html.dark .el-popover__title { color: var(--el-text-color-primary); }
+
+/* Notification */
+html.dark .el-notification {
+  --el-notification-bg-color: var(--el-bg-color);
+  --el-notification-border-color: var(--el-border-color);
+  --el-notification-title-color: var(--el-text-color-primary);
+  --el-notification-content-color: var(--el-text-color-regular);
+  --el-notification-icon-color: var(--el-text-color-primary);
+  --el-notification-close-color: var(--el-text-color-secondary);
+  --el-notification-close-hover-color: var(--el-text-color-primary);
+}
+
+/* Message */
+html.dark .el-message {
+  --el-message-bg-color: var(--el-bg-color);
+  --el-message-border-color: var(--el-border-color);
+  --el-message-text-color: var(--el-text-color-primary);
+  --el-message-close-icon-color: var(--el-text-color-secondary);
+  --el-message-close-hover-color: var(--el-text-color-primary);
+}
+html.dark .el-message__content { color: var(--el-text-color-primary); }
+
+/* MessageBox */
+html.dark .el-message-box {
+  --el-messagebox-color: var(--el-text-color-primary);
+  --el-messagebox-title-color: var(--el-text-color-primary);
+  --el-messagebox-content-color: var(--el-text-color-regular);
+}
+
+/* Tooltip */
+html.dark .el-tooltip__popper.is-dark {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+html.dark .el-popper__arrow::before { background: var(--el-bg-color) !important; }
+
+/* Loading */
+html.dark .el-loading-mask { background-color: var(--el-bg-color); }
+html.dark .el-loading-text { color: var(--el-color-primary); }
+
+/* === 8. Data Display === */
+html.dark .el-calendar {
+  --el-calendar-selected-bg-color: var(--el-fill-color-light);
+  --el-calendar-border: var(--el-border-color-lighter);
+}
+html.dark .el-calendar__title { color: var(--el-text-color-primary); }
+html.dark .el-calendar__header { border-color: var(--el-border-color-lighter); }
+html.dark .el-calendar-table td { border-color: var(--el-border-color-lighter); }
+html.dark .el-calendar-table .el-calendar-day { color: var(--el-text-color-primary); }
+html.dark .el-calendar-table .el-calendar-day:hover { background: var(--el-fill-color-light); }
+
+/* Carousel */
+html.dark .el-carousel {
+  --el-carousel-indicator-out-color: var(--el-border-color);
+}
+html.dark .el-carousel__indicators .el-carousel__indicator .el-carousel__button {
+  background-color: var(--el-color-white);
+}
+
+/* Collapse */
+html.dark .el-collapse {
+  --el-collapse-border-color: var(--el-border-color);
+  --el-collapse-header-bg-color: var(--el-bg-color);
+  --el-collapse-header-text-color: var(--el-text-color-primary);
+  --el-collapse-content-bg-color: var(--el-bg-color);
+  --el-collapse-content-text-color: var(--el-text-color-primary);
+}
+
+/* Timeline */
+html.dark .el-timeline {
+  --el-timeline-node-color: var(--el-border-color-dark);
+}
+html.dark .el-timeline-item__content { color: var(--el-text-color-primary); }
+html.dark .el-timeline-item__timestamp { color: var(--el-text-color-secondary); }
+
+/* ImageViewer */
+html.dark .el-image-viewer__mask { background: var(--el-overlay-color); }
+html.dark .el-image-viewer__actions { background: var(--el-bg-color); }
+html.dark .el-image-viewer__actions__inner { color: var(--el-text-color-primary); }
+
+/* Statistic */
+html.dark .el-statistic {
+  --el-statistic-title-color: var(--el-text-color-secondary);
+  --el-statistic-content-color: var(--el-text-color-primary);
+}
+html.dark .el-statistic__title { color: var(--el-text-color-secondary); }
+html.dark .el-statistic__content { color: var(--el-text-color-primary); }
+
+/* Tour */
+html.dark .el-tour {
+  --el-tour-bg-color: var(--el-bg-color);
+  --el-tour-color: var(--el-text-color-primary);
+  --el-tour-text-color: var(--el-text-color-primary);
+  --el-tour-title-text-color: var(--el-text-color-primary);
+  --el-tour-close-color: var(--el-text-color-secondary);
+}
+
+/* Watermark */
+html.dark .el-watermark { color: var(--el-text-color-disabled); }
+
+/* Scrollbar */
+html.dark .el-scrollbar {
+  --el-scrollbar-bg-color: var(--el-fill-color-light);
+  --el-scrollbar-hover-bg-color: var(--el-fill-color);
+}
+
+/* === 9. Picker === */
+html.dark .el-date-editor {
+  --el-datepicker-bg-color: var(--el-bg-color);
+  --el-datepicker-text-color: var(--el-text-color-primary);
+  --el-datepicker-border-color: var(--el-border-color);
+  --el-datepicker-header-text-color: var(--el-text-color-primary);
+  --el-datepicker-hover-text-color: var(--el-color-primary);
+  --el-datepicker-active-color: var(--el-fill-color-dark);
+  --el-datepicker-icon-color: var(--el-text-color-secondary);
+  --el-datepicker-off-text-color: var(--el-text-color-placeholder);
+  --el-datepicker-inrange-bg-color: var(--el-fill-color-light);
+  --el-datepicker-inrange-hover-bg-color: var(--el-fill-color);
+  --el-datepicker-inner-border-color: var(--el-border-color-lighter);
+}
+html.dark .el-picker-panel {
+  background: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+}
+html.dark .el-date-picker__header-label { color: var(--el-text-color-primary); }
+html.dark .el-date-table th { color: var(--el-text-color-secondary); }
+html.dark .el-date-table td { color: var(--el-text-color-primary); }
+html.dark .el-date-table td.disabled .el-date-table-cell__text { color: var(--el-text-color-disabled); }
+html.dark .el-date-table td.available:hover { color: var(--el-color-primary); }
+html.dark .el-month-table td .cell,
+html.dark .el-year-table td .cell { color: var(--el-text-color-primary); }
+html.dark .el-month-table td .cell:hover,
+html.dark .el-year-table td .cell:hover { color: var(--el-color-primary); }
+
+html.dark .el-time-panel { background: var(--el-bg-color); }
+html.dark .el-time-spinner__item { color: var(--el-text-color-primary); }
+html.dark .el-time-spinner__item:hover { background: var(--el-fill-color-light); }
+html.dark .el-time-picker {
+  --el-timepicker-active-color: var(--el-fill-color-dark);
+  --el-timepicker-inner-border-color: var(--el-border-color-lighter);
+}
+
+/* === 10. Other === */
+html.dark .el-divider__text {
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-secondary);
+}
+
+html.dark .el-autocomplete-suggestion { background: var(--el-bg-color); }
+html.dark .el-autocomplete-suggestion__item { color: var(--el-text-color-primary); }
+html.dark .el-autocomplete-suggestion__item:hover { background: var(--el-fill-color-light); }
+
+/* Upload */
+html.dark .el-upload-dragger {
+  background: var(--el-fill-color-lighter);
+  border-color: var(--el-border-color);
+}
+html.dark .el-upload-list__item-name { color: var(--el-text-color-primary); }
+
+/* Mention */
+html.dark .el-mention {
+  --el-mention-bg-color: var(--el-bg-color);
+  --el-mention-option-color: var(--el-text-color-primary);
+  --el-mention-option-selected-color: var(--el-text-color-primary);
+  --el-mention-option-disabled-color: var(--el-text-color-disabled);
+}
+
+html.dark .el-affix { background: var(--el-bg-color); }
+html.dark .el-space { color: var(--el-text-color-primary); }
+html.dark .el-infinite-scroll { color: var(--el-text-color-primary); }
+
+/* Scrollbar */
+html.dark ::-webkit-scrollbar-thumb { background: var(--el-border-color); }

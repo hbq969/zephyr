@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    {
+      // tsconfig.node.json是专门用来配置vite.config.ts文件的编译规则
+      "path": "./tsconfig.node.json"
+    },
+    {
+      // tsconfig.app.json则是用来定义项目中其他文件的ts编译规则
+      "path": "./tsconfig.app.json"
+    }
+  ],
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noImplicitAny": false
+  }
+}

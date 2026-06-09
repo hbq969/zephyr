@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao">
+
+  <update id="createModelConfigsTable">
+    create table if not exists model_configs (
+      id varchar(64) primary key,
+      user_name varchar(64) not null,
+      name varchar(128) not null,
+      base_url varchar(512),
+      api_key_encrypted text,
+      is_default smallint default 0,
+      created_at bigint,
+      updated_at bigint
+    );
+    create index if not exists idx_mc_user on model_configs(user_name);
+  </update>
+
+</mapper>

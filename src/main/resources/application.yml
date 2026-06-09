@@ -1,0 +1,245 @@
+server:
+  port: 30733
+  servlet:
+    context-path: /zephyr
+    session:
+      cookie:
+        http-only: true
+        max-age: ${spring.mvc.interceptors.login.cookie-max-age-sec}
+        secure: false
+        same-site: strict
+        path: /
+        name: zephyr-sid
+      timeout: 7200m
+  tomcat:
+    accesslog:
+      enabled: true
+      prefix: access
+
+mybatis:
+  mapper-locations:
+    - classpath*:mappers/*.xml
+    - classpath*:com/github/hbq969/**/mapper/common/*Mapper.xml
+    - classpath*:com/github/hbq969/**/mapper/embedded/*Mapper.xml
+  config-location: classpath:jpaConfig-embedded.xml
+mybatis-plus:
+  mapper-locations: ${mybatis.mapper-locations}
+  config-location: ${mybatis.config-location}
+
+spring:
+  application:
+    name: zephyr
+  main:
+    allow-bean-definition-overriding: true
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    enabled: false
+  mvc:
+    interceptors:
+      mdc:
+        enabled: true
+      resource-handler-registry:
+        entries:
+          - handlers: /hbq969-common/**
+            locations: classpath:/static/hbq969-common/
+          - handlers: /hbq969-dict/**
+            locations: classpath:/static/hbq969-dict/
+          - handlers: /hbq969-tabula/**
+            locations: classpath:/static/hbq969-tabula/
+          - handlers: /${spring.mvc.interceptors.login.ui-output-dir}/**
+            locations: classpath:/static/${spring.mvc.interceptors.login.ui-output-dir}/
+          - handlers: /zephyr-ui/**
+            locations: classpath:/static/zephyr-ui/
+          - handlers: /**
+            locations:
+              - classpath:/static/
+              - classpath:/
+        enabled: true
+      login:
+        enabled: true
+        session-key: zephyr-sid
+        cookie-max-age-sec: 1800
+        include-urls:
+          - "/**"
+        exclude-urls:
+          - "/**/*.js"
+          - "/**/*.css"
+          - "/**/*.png"
+          - "/**/*.jpg"
+          - "/**/*.map"
+          - "/**/*.ico"
+          - "/**/error"
+          - "/**/error"
+          - "/common/health"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/index.html"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/**/login"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/i18n/lang"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/i18n/lang/data"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/**/getPublicKey"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/system/captcha"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/system/captcha/verify"
+          - "/${spring.mvc.interceptors.login.ui-output-dir}/**/forgot-password/**"
+        sm-initial-script:
+          language: zh-CN
+          charset: utf-8
+        auth:
+          # basic认证
+          base:
+            enabled: false
+          # API Key认证
+          api-key:
+            enabled: true
+            name: X-HSM-API-KEY
+            login-app: aqyy-portal-login
+            reload-delay: 5
+            reload-time: 5
+            reload-time-unit: MINUTES
+          # 单点登录
+          sso:
+            enabled: true
+            sso-url-is-gw: true
+            check-enabled: false
+            sso-url: https://localhost:30131/aqyy-portal-login
+            cookie-token-name: aqyy-portal-login-sid
+            gray-header-name: profile
+            expire-time-mills: 1800000
+        # 角色、账号主动同步，只需要login模块开启
+        role-sync:
+          enabled: false
+        # 角色、账号被动拉取同步，非login模块开启
+        role-sync-pull:
+          enabled: true
+        forgot-password:
+          enabled: true
+          admin-contact: "请联系管理员: hbq969@gmail.com"
+        # 所有权信息
+        copyright: Copyright © 2024 hbq969. All rights reserved.
+        # 静态资源输出目录
+        ui-output-dir: ui
+        # 二级菜单分组大小
+        group-menu-size: 4
+        # 默认系统布局
+        main-layout: main
+        # 首页
+        home-url: /system/Under
+        logo-svg: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="white"/><path d="M5 2 L5 18 M15 2 L15 18 M5 10 L15 10" stroke="black" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        favicon-path: /${spring.mvc.interceptors.login.ui-output-dir}/ui/favicon.ico
+        # login-page-svg:
+        # 是否支持复杂密码
+        complex-pass: true
+        # 账号、密码有效期扫描检查周期
+        account-scan-cron: "0 30 0 * * ?"
+        # 账号、密码过期提前多少天通知预警
+        account-expire-notify-days: 15
+        # 账号登录失败检查清理周期
+        login-fail-scan-cron: "*/30 * * * * ?"
+        login-fail-times: 3
+        login-fail-timeout-mills: 300000
+        # 是否支持同账号多会话登录
+        multi-user-login: true
+        captcha-bypass:
+          enabled: true
+          header-name: X-SM-Test
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    dynamic:
+      enabled: true
+      base-packages: com.github.hbq969,com.github.hbq969.ai.zephyr
+      default-lookup-key: hikari
+    hikari:
+      jdbc-url: jdbc:h2:file:${user.dir}/.h2/zephyr/db;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
+      driver-class-name: org.h2.Driver
+      username: foo
+      password: bar
+      maximum-pool-size: 20
+      minimum-idle: 5
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+knife4j:
+  enable: true
+  production: false
+  basic:
+    enable: false
+    username: ${spring.application.name}
+    password: 123456
+  setting:
+    language: zh_cn
+
+swagger:
+  base-package: com
+  api-info:
+    title: web应用Restful API
+    description: web应用Restful API
+    termsOfService: http://127.0.0.1:${server.port}
+    contact:
+      name: hbq969
+      url: https://github.com/hbq969
+      email: hbq969@gmail.com
+    license:
+      name: MIT
+      url: https://opensource.org/license/mit
+    version: 1.0.0
+
+dict:
+  enabled: true
+  reload:
+    cron: 0 */30 * * * *
+  map-key-prefix: fmt
+
+encrypt:
+  config:
+    enabled: true
+  restful:
+    enabled: true
+    aes:
+      charset: utf-8
+      show-log: true
+      key: E793C71D5EAB4385
+      iv: 8AE506C91AFB4AAC
+    rsa:
+      charset: utf-8
+      show-log: true
+      public-key: MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCe7L2gjYAmFCW8Q8S5kW7F064t/np+sP84PKLRsuZho3TZIjryGSyq8reNTm2Zrz0pKzddR0Rh6wUzP9xSAsQXH0uC6J5/WbmFhFW0k8zgkXSKktirs2BDuObEYZwJLng41yhP694H9sVBVhyqzy90Qx/dJWWa2vXHp2I+jlLELQIDAQAB
+      private-key: MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAJ7svaCNgCYUJbxDxLmRbsXTri3+en6w/zg8otGy5mGjdNkiOvIZLKryt41ObZmvPSkrN11HRGHrBTM/3FICxBcfS4Lonn9ZuYWEVbSTzOCRdIqS2KuzYEO45sRhnAkueDjXKE/r3gf2xUFWHKrPL3RDH90lZZra9cenYj6OUsQtAgMBAAECgYAvY3xv4YGy2RMffj2s79bOGn63rEgueuy/giUyzluwBaOUE4bsJeGR3+onspkv2HcuTXqmz9duMzxLueEiezypBU1UHv6PTSTWqEQUQ6eNZDwPgD1AbX7U1uTreG6lRezkhAE4X5RvuXqBgxMUeO4FVPOKCzX7e6Kp/i/UDkp56QJBAPo3Tnjm7V1RsmvjOji0OeEnv3MItcS4rEuvkTLVxKYwvmyqCQaHdCXkVsDcqrPI11neFk+KUBOzoPlfOa8b218CQQCimTQXcL9yYdqFli579Bak25Y4+w0H5RrMAqNTvbr5l4ofzPNVaT2r6Eqwpb2p7Bkw7b2GSXQ0nX01BcsFVBfzAkEAx6iwNmtWxts0+0ADKlItyUtVSm6N1J7j5TUAMMdBNre4i68Wqp4VgVL2IskycWl25eAAf5HHmiEA91wUBHW/EwJAO0+rQsmr7CtprMUFm82D3QsElzBspm6aAcUMkuVoqNbwWX1HXeaPyn9nj1xF/Q/UeJagRbXRn8e6/nZogj8UpQJAJS9dCro6Mtl9ROwdob3aOhQg3J1/whtoO/815oh3ST5P6ZtIICE64cZGpwU1ZC9RW8bdnaZ+wmp1f+qAkF1whA==
+    advice-packages:
+      - com.github.hbq969.code
+      - com.github.hbq969.ai.zephyr
+
+advice:
+  log:
+    enabled: true
+  restful-limit:
+    enabled: true
+
+tabula:
+  enabled: false
+  create-table: false
+
+operlog:
+  enabled: false
+  policy: embedded
+  table-name: log_hbq969
+  use-default-collect-policy: true
+  thread-num: 1
+  queue-capacity: 5000
+  batch-size: 50
+  batch-timeout-mills: 5000
+
+management:
+  endpoint:
+    refresh:
+      enabled: true
+  endpoints:
+    enabled-by-default: false
+    jmx:
+      exposure:
+        exclude: "*"
+    web:
+      base-path: "/dn3i1vx4"
+      exposure:
+        include: "refresh"
