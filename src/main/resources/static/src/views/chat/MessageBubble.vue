@@ -21,7 +21,11 @@ const md = new MarkdownIt({
   }
 })
 
-const rendered = computed(() => props.message.role === 'assistant' ? md.render(props.message.content) : '')
+const rendered = computed(() => {
+  if (props.message.role !== 'assistant') return ''
+  if (props.isLast) return '' // streaming or just finished, show raw below
+  return md.render(props.message.content)
+})
 const streaming = computed(() => props.isLast)
 </script>
 
@@ -43,7 +47,8 @@ const streaming = computed(() => props.isLast)
       <div v-for="tc in message.toolCalls" :key="tc.name" class="mb-2">
         <ToolCallCard :tool="tc" />
       </div>
-      <div v-if="message.content" class="markdown-body" v-html="rendered"></div>
+      <div v-if="message.content && isLast" class="stream-text">{{ message.content }}</div>
+      <div v-else-if="message.content" class="markdown-body" v-html="rendered"></div>
     </div>
   </div>
 </template>
@@ -55,6 +60,7 @@ const streaming = computed(() => props.isLast)
 .user-bubble { background: var(--el-fill-color-light); color: var(--el-text-color-primary); border-radius: 12px 12px 4px 12px; }
 .ai-bubble { background: transparent; border-radius: 12px 12px 12px 4px; color: var(--el-text-color-regular); padding-top: 0; }
 .mb-2 { margin-bottom: 8px; }
+.stream-text { white-space: pre-wrap; word-break: break-word; line-height: 1.65; }
 
 .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-top: 8px; }
 .ai-avatar { width: 28px; height: 28px; border-radius: 8px; background: rgba(204,120,92,0.12); display: flex; align-items: center; justify-content: center; color: var(--el-color-primary); font-size: 14px; flex-shrink: 0; }
