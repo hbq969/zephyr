@@ -4,9 +4,16 @@ import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/store/settings'
 import { msg } from '@/utils/Utils'
 import { Icon } from '@iconify/vue'
+import MarkdownIt from 'markdown-it'
 
 const router = useRouter()
 const store = useSettingsStore()
+
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
+function renderMarkdown(text: string) {
+  if (!text) return ''
+  return md.render(text)
+}
 
 const currentFilter = ref('all')
 const expandedName = ref<string | null>(null)
@@ -202,7 +209,7 @@ onMounted(() => { store.loadMemories() })
           </div>
         </div>
         <div v-if="expandedName === m.name" class="card-expand">
-          <div class="card-expand-body" v-html="detailCache[m.name] || '加载中...'"></div>
+          <div class="card-expand-body markdown-body" v-html="renderMarkdown(detailCache[m.name] || '')"></div>
           <div class="card-expand-footer">
             <span>创建于 {{ fmtTime(m.createdAt) }}</span>
             <span>·</span>
@@ -300,6 +307,15 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
   border-top: 1px solid var(--el-border-color);
   font-size: 14px; color: var(--el-text-color-regular); line-height: 1.65;
 }
+.card-expand-body :deep(p) { margin: 6px 0; }
+.card-expand-body :deep(ul), .card-expand-body :deep(ol) { padding-left: 20px; margin: 6px 0; }
+.card-expand-body :deep(li) { margin: 3px 0; }
+.card-expand-body :deep(a) { color: var(--el-color-primary); }
+.card-expand-body :deep(code) { background: var(--el-fill-color); padding: 1px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--el-color-primary-dark-2); }
+.card-expand-body :deep(pre) { background: #181715; color: #faf9f5; border-radius: 8px; padding: 14px; margin: 8px 0; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.55; }
+.card-expand-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+.card-expand-body :deep(strong) { font-weight: 600; color: var(--el-text-color-primary); }
+.card-expand-body :deep(h3), .card-expand-body :deep(h4) { font-family: Georgia, serif; font-weight: 400; margin: 10px 0 4px; color: var(--el-text-color-primary); }
 .card-expand-footer {
   display: flex; align-items: center; gap: 8px;
   margin-top: 10px; font-size: 12px; color: var(--el-text-color-placeholder);
