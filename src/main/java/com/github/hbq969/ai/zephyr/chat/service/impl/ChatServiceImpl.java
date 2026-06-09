@@ -57,12 +57,13 @@ public class ChatServiceImpl implements ChatService {
 
         executor.execute(() -> {
             try {
+                String cid = conversationId;
                 long now = System.currentTimeMillis() / 1000;
                 // 1. 确保会话存在（首次对话自动创建）
-                if (conversationId == null || conversationId.isEmpty()) {
-                    conversationId = UUID.fastUUID().toString(true).substring(0, 12);
+                if (cid == null || cid.isEmpty()) {
+                    cid = UUID.fastUUID().toString(true).substring(0, 12);
                     ConversationEntity conv = new ConversationEntity();
-                    conv.setId(conversationId);
+                    conv.setId(cid);
                     conv.setUserName(userName);
                     conv.setTitle(message.length() > 30 ? message.substring(0, 30) : message);
                     conv.setCreatedAt(now);
@@ -70,20 +71,20 @@ public class ChatServiceImpl implements ChatService {
                     chatDao.insertConversation(conv);
                     // 通知前端新会话ID
                     emitter.send(SseEmitter.event().name("message")
-                            .data(ChatEvent.builder().type("meta").content(conversationId).build()));
+                            .data(ChatEvent.builder().type("meta").content(cid).build()));
                 }
 
                 // 2. 持久化 user 消息
                 MessageEntity userMsg = new MessageEntity();
                 userMsg.setId(UUID.fastUUID().toString(true).substring(0, 12));
-                userMsg.setConversationId(conversationId);
+                userMsg.setConversationId(cid);
                 userMsg.setRole("user");
                 userMsg.setContent(message);
                 userMsg.setCreatedAt(now);
                 chatDao.insertMessage(userMsg);
 
                 // 3. 组装上下文
-                ContextBuilder.Context ctx = contextBuilder.build(userName, conversationId);
+                ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
                 List<Map<String, Object>> messages = ctx.getMessages();
                 messages.add(Map.of("role", "user", "content", message));
 
@@ -108,7 +109,7 @@ public class ChatServiceImpl implements ChatService {
                         messages.add(assistantMsg);
 
                         // 4b. 持久化 assistant 消息
-                        persistAssistantMessage(conversationId, result, now);
+                        persistAssistantMessage(cid, result, now);
 
                         // 4c. 分发工具调用
                         List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName);
@@ -119,7 +120,7 @@ public class ChatServiceImpl implements ChatService {
                             LlmResult.ToolCall tc = result.getToolCalls().get(i);
                             MessageEntity toolMsg = new MessageEntity();
                             toolMsg.setId(UUID.fastUUID().toString(true).substring(0, 12));
-                            toolMsg.setConversationId(conversationId);
+                            toolMsg.setConversationId(cid);
                             toolMsg.setRole("tool");
                             toolMsg.setContent(toolResults.get(i).get("content").toString());
                             toolMsg.setToolCallId(tc.getId());
@@ -128,7 +129,7 @@ public class ChatServiceImpl implements ChatService {
                         }
                     } else {
                         // 5. 正常结束
-                        persistAssistantMessage(conversationId, result, now);
+                        persistAssistantMessage(cid, result, now);
                         emitter.send(SseEmitter.event().name("message")
                                 .data(ChatEvent.builder().type("done").build()));
                         emitter.complete();
@@ -154,10 +155,10 @@ public class ChatServiceImpl implements ChatService {
         return emitter;
     }
 
-    private void persistAssistantMessage(String conversationId, LlmResult result, long now) {
+    private void persistAssistantMessage(String cid, LlmResult result, long now) {
         MessageEntity msg = new MessageEntity();
         msg.setId(cn.hutool.core.lang.UUID.fastUUID().toString(true).substring(0, 12));
-        msg.setConversationId(conversationId);
+        msg.setConversationId(cid);
         msg.setRole("assistant");
         msg.setContent(result.getContent());
         msg.setThinking(result.getThinking());
@@ -175,9 +176,9 @@ public class ChatServiceImpl implements ChatService {
         chatDao.insertMessage(msg);
 
         // 更新会话时间
-        ConversationEntity conv = chatDao.queryConversationById(conversationId);
+        ConversationEntity conv = chatDao.queryConversationById(cid);
         if (conv != null) {
-            chatDao.updateConversationTitle(conversationId, conv.getTitle(),
+            chatDao.updateConversationTitle(cid, conv.getTitle(),
                     System.currentTimeMillis() / 1000, conv.getUserName());
         }
     }
@@ -256,8 +257,8 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Map<String, Object> contextUsage(String userName, String conversationId) {
-        ContextBuilder.Context ctx = contextBuilder.build(userName, conversationId);
+    public Map<String, Object> contextUsage(String userName, String cid) {
+        ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
         int sysTokens = estimateTokens(ctx.getSystemPrompt());
         int histTokens = 0;
         int skillTokens = 0;
