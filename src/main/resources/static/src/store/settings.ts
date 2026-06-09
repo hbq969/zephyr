@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ModelConfig, McpServer, McpTool, SkillConfig } from '@/types/chat'
+import type { ModelConfig, McpServer, McpTool, SkillConfig, MemoryItem } from '@/types/chat'
 import axios from '@/network'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -14,6 +14,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const mcpServers = ref<McpServer[]>([])
   const mcpToolCount = ref(0)
   const skills = ref<SkillConfig[]>([])
+  const memories = ref<MemoryItem[]>([])
   const contextUsed = ref(53248)
   const contextTotal = ref(131072)
 
@@ -198,8 +199,55 @@ export const useSettingsStore = defineStore('settings', () => {
     return res.data
   }
 
+  // === Memory API 方法 ===
+
+  async function loadMemories(type?: string) {
+    try {
+      const params = type ? { type } : {}
+      const res = await axios({ url: '/memory/list', method: 'get', params })
+      if (res.data.state === 'OK' && Array.isArray(res.data.body)) {
+        memories.value = res.data.body.map((m: any) => ({
+          name: m.name,
+          type: m.type,
+          description: m.description,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt
+        }))
+      }
+    } catch (_) {}
+  }
+
+  async function loadMemoryDetail(name: string): Promise<MemoryItem | null> {
+    try {
+      const res = await axios({ url: '/memory/detail', method: 'get', params: { name } })
+      if (res.data.state === 'OK') {
+        const m = res.data.body
+        return { name: m.name, type: m.type, description: m.description, content: m.content, createdAt: m.createdAt, updatedAt: m.updatedAt }
+      }
+    } catch (_) {}
+    return null
+  }
+
+  async function createMemory(name: string, type: string, content: string) {
+    const res = await axios({ url: '/memory/create', method: 'post', data: { name, type, content } })
+    if (res.data.state === 'OK') return true
+    return false
+  }
+
+  async function updateMemory(oldName: string, name: string, type: string, content: string) {
+    const res = await axios({ url: '/memory/update', method: 'post', data: { oldName, name, type, content } })
+    if (res.data.state === 'OK') return true
+    return false
+  }
+
+  async function deleteMemories(names: string[]) {
+    const res = await axios({ url: '/memory/delete', method: 'post', data: { names: names.join(',') } })
+    if (res.data.state === 'OK') return true
+    return false
+  }
+
   return {
-    currentModel, models, mcpServers, mcpToolCount, skills,
+    currentModel, models, mcpServers, mcpToolCount, skills, memories,
     contextUsed, contextTotal, contextPercent,
     setModel, addModel,
     loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote,
@@ -207,6 +255,7 @@ export const useSettingsStore = defineStore('settings', () => {
     connectMcpServer, disconnectMcpServer,
     loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, loadMcpToolCount,
     loadSkills, installSkill, uploadSkill, uninstallSkill, toggleSkill,
-    syncScanSkills, syncInstallSkills
+    syncScanSkills, syncInstallSkills,
+    loadMemories, loadMemoryDetail, createMemory, updateMemory, deleteMemories
   }
 })
