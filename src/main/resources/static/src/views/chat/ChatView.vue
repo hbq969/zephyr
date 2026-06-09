@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useConversationsStore } from '@/store/conversations'
 import { useChatStore } from '@/store/chat'
 import { useSettingsStore } from '@/store/settings'
@@ -55,6 +55,28 @@ function onSend(text: string) {
     chatStore.streaming = false
   })
 }
+
+function restoreConversation(id: string) {
+  axios({ url: `/conversations/${id}/messages`, method: 'get' })
+    .then(res => {
+      if (res.data.state === 'OK') {
+        const msgs = (res.data.body || []).map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content || '',
+          thinking: m.thinking || '',
+          toolCalls: m.toolCalls || [],
+          timestamp: m.timestamp
+        }))
+        chatStore.clearMessages()
+        msgs.forEach((m: any) => chatStore.addMessage(m))
+      }
+    })
+}
+
+watch(() => convStore.currentId, (newId) => {
+  if (newId) restoreConversation(newId)
+})
 
 onMounted(() => {
   axios({ url: '/conversations/list', method: 'get' })
