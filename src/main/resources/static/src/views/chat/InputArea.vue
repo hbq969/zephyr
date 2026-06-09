@@ -274,16 +274,20 @@ export default { inheritAttrs: false }
 
 /* 能力二级菜单 */
 .ability-menu { min-width: 180px; }
+.ability-menu::-webkit-scrollbar { width: 1px; }
+.ability-menu::-webkit-scrollbar-thumb { background: transparent; }
 .ability-parent { justify-content: space-between; position: relative; }
 .ability-parent.active { background: var(--el-fill-color-light); color: var(--el-color-primary); }
 .sub-arrow { font-size: 12px; color: var(--el-text-color-placeholder); flex-shrink: 0; }
 
 .sub-dropdown {
-  position: absolute; left: 100%; top: 0;
+  position: absolute; left: 100%; bottom: 0;
   background: var(--el-bg-color); border: 1px solid var(--el-border-color);
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
   min-width: 240px; max-height: 320px; overflow-y: auto; overflow-x: hidden; padding: 4px; z-index: 110;
 }
+.sub-dropdown::-webkit-scrollbar { width: 1px; }
+.sub-dropdown::-webkit-scrollbar-thumb { background: transparent; }
 .sub-group-label {
   font-size: 11px; color: var(--el-text-color-placeholder);
   padding: 6px 10px 2px; text-transform: uppercase; letter-spacing: 0.3px;
