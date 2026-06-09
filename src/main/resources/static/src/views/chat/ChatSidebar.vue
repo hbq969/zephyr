@@ -29,6 +29,7 @@ function confirmRename(id: string) {
 }
 
 function cancelRename() { renameId.value = null }
+function closeMenu() { openMenuId.value = null }
 function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
 </script>
 
@@ -94,6 +95,9 @@ function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
         <Icon icon="lucide:ellipsis" class="chevron-icon" />
       </div>
     </div>
+    <Teleport to="body">
+      <div v-if="openMenuId" class="menu-mask" @click="closeMenu"></div>
+    </Teleport>
   </aside>
 </template>
 
@@ -129,14 +133,14 @@ export default { emits: ['newChat', 'openSettings'] }
 .conv-item.active { background: var(--el-fill-color); }
 .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--el-text-color-primary); }
 .rename-input { flex: 1; border: 1px solid var(--el-color-primary); border-radius: 4px; padding: 2px 6px; font-size: 14px; background: var(--el-bg-color); color: var(--el-text-color-primary); outline: none; font-family: inherit; }
-.menu-btn { opacity: 0; cursor: pointer; color: var(--el-text-color-secondary); flex-shrink: 0; font-size: 15px; transition: opacity 0.15s; position: relative; }
-.conv-item:hover .menu-btn { opacity: 1; }
+.menu-btn { cursor: pointer; color: var(--el-text-color-secondary); flex-shrink: 0; font-size: 15px; position: relative; }
 
 .conv-menu { position: absolute; right: 0; top: 100%; z-index: 100; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); min-width: 100px; padding: 4px; }
 .conv-menu-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--el-text-color-regular); transition: background 0.1s; }
 .conv-menu-item:hover { background: var(--el-fill-color-light); }
 .conv-menu-item.danger { color: var(--el-color-danger); }
 .conv-menu-item.danger:hover { background: rgba(198,69,69,0.08); }
+.menu-mask { position: fixed; inset: 0; z-index: 99; }
 
 .sidebar-footer { padding: 4px 10px; border-top: none; display: flex; align-items: center; position: relative; }
 .sidebar-footer::before { content: ''; position: absolute; bottom: 100%; left: 0; right: 0; height: 48px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--el-bg-color) 80%); }
