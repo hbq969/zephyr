@@ -9,6 +9,11 @@ import InputArea from './InputArea.vue'
 import StatusBar from './StatusBar.vue'
 import CommandPalette from './CommandPalette.vue'
 import SettingsPanel from './SettingsPanel.vue'
+import ResumePanel from './ResumePanel.vue'
+import ContextPanel from './ContextPanel.vue'
+import McpListPanel from './McpListPanel.vue'
+import SkillsListPanel from './SkillsListPanel.vue'
+import MemoryListPanel from './MemoryListPanel.vue'
 import { Icon } from '@iconify/vue'
 import axios from '@/network'
 
@@ -16,6 +21,22 @@ const convStore = useConversationsStore()
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const showSettings = ref(false)
+const showResume = ref(false)
+const showContext = ref(false)
+const showMcpList = ref(false)
+const showSkillsList = ref(false)
+const showMemoryList = ref(false)
+
+function onSlashCommand(cmd: string) {
+  switch (cmd) {
+    case 'mcp': showMcpList.value = true; break
+    case 'skills': showSkillsList.value = true; break
+    case 'memory': showMemoryList.value = true; break
+    case 'resume': showResume.value = true; break
+    case 'context': showContext.value = true; break
+    case 'help': break
+  }
+}
 
 onMounted(() => {
   axios({ url: '/conversations/list', method: 'get' })
@@ -49,10 +70,15 @@ onMounted(() => {
       </div>
       <ChatArea />
       <CommandPalette />
-      <InputArea />
+      <InputArea @slash-command="onSlashCommand" />
       <StatusBar />
     </div>
     <SettingsPanel :visible="showSettings" @close="showSettings = false" />
+    <ResumePanel :visible="showResume" @close="showResume = false" />
+    <ContextPanel :visible="showContext" @close="showContext = false" />
+    <McpListPanel :visible="showMcpList" @close="showMcpList = false" />
+    <SkillsListPanel :visible="showSkillsList" @close="showSkillsList = false" />
+    <MemoryListPanel :visible="showMemoryList" @close="showMemoryList = false" />
   </div>
 </template>
 
