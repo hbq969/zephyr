@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.chat.dao.ChatDao">
+
+  <update id="createConversationsTable">
+    create table if not exists conversations (
+      id varchar(64) primary key,
+      user_name varchar(64) not null,
+      title varchar(256) not null,
+      created_at bigint,
+      updated_at bigint
+    );
+    create index if not exists idx_conv_user on conversations(user_name);
+    create index if not exists idx_conv_updated on conversations(updated_at desc);
+  </update>
+
+  <update id="createMessagesTable">
+    create table if not exists messages (
+      id varchar(64) primary key,
+      conversation_id varchar(64) not null,
+      role varchar(16) not null,
+      content text,
+      thinking text,
+      tool_calls_json text,
+      tool_call_id varchar(128),
+      created_at bigint
+    );
+    create index if not exists idx_msg_conv on messages(conversation_id);
+    create index if not exists idx_msg_created on messages(created_at);
+  </update>
+
+</mapper>
