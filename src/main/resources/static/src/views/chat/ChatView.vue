@@ -80,7 +80,7 @@ function restoreConversation(id: string) {
 }
 
 watch(() => convStore.currentId, (newId) => {
-  if (newId) restoreConversation(newId)
+  if (newId && !chatStore.streaming) restoreConversation(newId)
 })
 
 onMounted(() => {
