@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, onUpdated, nextTick } from 'vue'
+import { computed, onMounted, onUpdated, onBeforeUnmount, nextTick, watch, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { Message } from '@/types/chat'
 import ThinkingBlock from './ThinkingBlock.vue'
@@ -21,12 +21,36 @@ const md = new MarkdownIt({
   }
 })
 
-const rendered = computed(() => {
-  if (props.message.role !== 'assistant') return ''
-  if (props.isLast) return '' // streaming or just finished, show raw below
-  return md.render(props.message.content)
-})
 const streaming = computed(() => props.isLast)
+const mdBodyRef = ref<HTMLElement>()
+let rafId = 0
+let lastRendered = ''
+
+function renderMarkdown() {
+  if (!mdBodyRef.value) return
+  const html = props.message.role === 'assistant' ? md.render(props.message.content) : ''
+  if (html !== lastRendered) {
+    lastRendered = html
+    mdBodyRef.value.innerHTML = html
+    nextTick(setupCodeBlocks)
+  }
+}
+
+// rAF throttled rendering during streaming
+watch(() => props.message.content, () => {
+  if (props.isLast) {
+    cancelAnimationFrame(rafId)
+    rafId = requestAnimationFrame(renderMarkdown)
+  } else {
+    renderMarkdown()
+  }
+})
+
+onMounted(() => {
+  if (!props.isLast) renderMarkdown()
+})
+
+onBeforeUnmount(() => cancelAnimationFrame(rafId))
 
 function setupCodeBlocks() {
   nextTick(() => {
@@ -72,8 +96,7 @@ onUpdated(setupCodeBlocks)
       <div v-for="tc in message.toolCalls" :key="tc.name" class="mb-2">
         <ToolCallCard :tool="tc" />
       </div>
-      <div v-if="message.content && isLast" class="stream-text">{{ message.content }}</div>
-      <div v-else-if="message.content" class="markdown-body" v-html="rendered"></div>
+      <div v-if="message.content" ref="mdBodyRef" class="markdown-body"></div>
     </div>
   </div>
 </template>
@@ -82,11 +105,9 @@ onUpdated(setupCodeBlocks)
 .msg-row { padding: 14px 24px; max-width: 820px; margin: 0 auto; }
 .msg-row.user { display: flex; justify-content: flex-end; }
 .msg-bubble { max-width: 88%; border-radius: 12px; padding: 12px 16px; font-size: var(--chat-font-size, 16px); line-height: 1.65; }
-.stream-text { font-size: var(--chat-font-size, 16px); }
 .user-bubble { background: var(--el-fill-color-light); color: var(--el-text-color-primary); border-radius: 12px 12px 4px 12px; }
 .ai-bubble { background: transparent; border-radius: 12px 12px 12px 4px; color: var(--el-text-color-regular); padding-top: 0; }
 .mb-2 { margin-bottom: 8px; }
-.stream-text { white-space: pre-wrap; word-break: break-word; line-height: 1.65; }
 
 .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding-top: 8px; }
 .ai-avatar { width: 28px; height: 28px; border-radius: 8px; background: rgba(204,120,92,0.12); display: flex; align-items: center; justify-content: center; color: var(--el-color-primary); font-size: 14px; flex-shrink: 0; }
