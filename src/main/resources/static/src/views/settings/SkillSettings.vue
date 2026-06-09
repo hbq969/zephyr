@@ -24,6 +24,9 @@ const syncing = ref(false)
 const uninstallTarget = ref<SkillConfig | null>(null)
 const showUninstallConfirm = ref(false)
 
+const detailSkill = ref<SkillConfig | null>(null)
+const showDetail = ref(false)
+
 onMounted(async () => { await store.loadSkills() })
 
 const installMethods = [
@@ -139,6 +142,16 @@ async function doUninstall() {
   uninstallTarget.value = null
 }
 
+function showSkillDetail(skill: SkillConfig) {
+  detailSkill.value = skill
+  showDetail.value = true
+}
+
+function closeDetail() {
+  showDetail.value = false
+  detailSkill.value = null
+}
+
 function goBack() { window.history.back() }
 </script>
 
@@ -165,7 +178,7 @@ function goBack() { window.history.back() }
     </div>
 
     <div v-else class="skill-list">
-      <div v-for="s in store.skills" :key="s.id ?? s.skillName" class="skill-card">
+      <div v-for="s in store.skills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
         <div class="skill-icon" :class="s.source">
           <Icon :icon="s.source === 'builtin' ? 'lucide:star' : s.source === 'git' ? 'lucide:git-branch' : s.source === 'sync' ? 'lucide:refresh-cw' : s.source === 'upload' ? 'lucide:package' : 'lucide:puzzle'" width="18" />
         </div>
@@ -283,7 +296,7 @@ function goBack() { window.history.back() }
     <!-- 平台同步面板 -->
     <Teleport to="body">
       <div v-if="showSyncPanel" class="modal-overlay" @click.self="showSyncPanel = false">
-        <div class="modal" style="width: 560px">
+        <div class="modal" style="width: 720px; max-width: calc(100vw - 48px)">
           <div class="modal-header">
             <h2>平台同步</h2>
             <button class="btn-icon" @click="showSyncPanel = false"><Icon icon="lucide:x" width="18" /></button>
@@ -315,8 +328,8 @@ function goBack() { window.history.back() }
               <div v-for="s in syncSkills.filter(s => s.platform === currentPlatform)" :key="s.skillName" class="sync-skill-row" @click="selectedSyncSkills.has(s.skillName) ? selectedSyncSkills.delete(s.skillName) : selectedSyncSkills.add(s.skillName)">
                 <input type="checkbox" :checked="selectedSyncSkills.has(s.skillName)" class="sync-checkbox" @click.stop />
                 <div class="sync-skill-info">
-                  <span class="sync-skill-name">{{ s.displayName || s.skillName }}</span>
-                  <span v-if="s.description" class="sync-skill-desc">{{ s.description }}</span>
+                  <span class="sync-skill-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.displayName || s.skillName }}</span>
+                  <span v-if="s.description" class="sync-skill-desc" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px">{{ s.description }}</span>
                   <span v-if="s.version" class="badge badge-version">v{{ s.version }}</span>
                 </div>
               </div>
@@ -370,6 +383,57 @@ function goBack() { window.history.back() }
         </div>
       </div>
     </Teleport>
+
+    <!-- Skill 详情弹窗 -->
+    <Teleport to="body">
+      <div v-if="showDetail && detailSkill" class="modal-overlay" @click.self="closeDetail">
+        <div class="modal" style="width: 560px">
+          <div class="modal-header">
+            <h2>{{ detailSkill.displayName || detailSkill.skillName }}</h2>
+            <button class="btn-icon" @click="closeDetail"><Icon icon="lucide:x" width="18" /></button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">名称</span>
+                <span class="detail-value">{{ detailSkill.skillName }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">来源</span>
+                <span class="detail-value"><span class="badge badge-source" :class="'src-' + detailSkill.source">{{ sourceTag[detailSkill.source] ?? detailSkill.source }}</span></span>
+              </div>
+              <div class="detail-item" v-if="detailSkill.version">
+                <span class="detail-label">版本</span>
+                <span class="detail-value font-mono">v{{ detailSkill.version }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">状态</span>
+                <span class="detail-value" :style="{ color: detailSkill.enabled ? 'var(--el-color-success)' : 'var(--el-text-color-placeholder)' }">{{ detailSkill.enabled ? '已启用' : '已禁用' }}</span>
+              </div>
+              <div class="detail-item" v-if="detailSkill.sourceUrl">
+                <span class="detail-label">来源地址</span>
+                <span class="detail-value font-mono" style="word-break:break-all">{{ detailSkill.sourceUrl }}</span>
+              </div>
+              <div class="detail-item" v-if="detailSkill.installPath">
+                <span class="detail-label">安装路径</span>
+                <span class="detail-value font-mono" style="word-break:break-all">{{ detailSkill.installPath }}</span>
+              </div>
+              <div class="detail-item" v-if="detailSkill.createdAt">
+                <span class="detail-label">安装时间</span>
+                <span class="detail-value">{{ new Date(detailSkill.createdAt * 1000).toLocaleString() }}</span>
+              </div>
+            </div>
+            <div v-if="detailSkill.description" class="detail-desc-block">
+              <span class="detail-label">描述</span>
+              <p class="detail-desc-text">{{ detailSkill.description }}</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" @click="closeDetail">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -399,7 +463,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weigh
 .empty-desc { font-size: 14px; color: var(--el-text-color-secondary); max-width: 420px; margin: 0 auto 24px; }
 
 .skill-list { display: flex; flex-direction: column; gap: 10px; }
-.skill-card { background: var(--el-fill-color-lighter); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; transition: box-shadow 200ms; }
+.skill-card { background: var(--el-fill-color-lighter); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; transition: box-shadow 200ms; cursor: pointer; }
 .skill-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
 .skill-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
 .skill-icon.builtin { background: var(--el-text-color-primary); }
@@ -488,6 +552,15 @@ h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weigh
   .skill-page { padding: 24px 16px 64px; }
   h1 { font-size: 28px; }
 }
+
+/* Detail dialog */
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.detail-item { display: flex; flex-direction: column; gap: 2px; }
+.detail-label { font-size: 11px; color: var(--el-text-color-placeholder); text-transform: uppercase; letter-spacing: 0.5px; }
+.detail-value { font-size: 14px; color: var(--el-text-color-primary); }
+.detail-value.font-mono { font-family: monospace; font-size: 12px; }
+.detail-desc-block { border-top: 1px solid var(--el-border-color-lighter); padding-top: 12px; }
+.detail-desc-text { font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.6; margin: 6px 0 0; white-space: pre-wrap; }
 </style>
 
 <style>
