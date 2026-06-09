@@ -1,13 +1,26 @@
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/settings'
+import { useConversationsStore } from '@/store/conversations'
+import { useChatStore } from '@/store/chat'
 import { Icon } from '@iconify/vue'
+import axios from '@/network'
+import SlashMenu from './SlashMenu.vue'
 
-const emit = defineEmits<{ send: [text: string] }>()
+const emit = defineEmits<{
+  send: [text: string]
+  slashCommand: [cmd: string]
+}>()
 const text = ref('')
 const inputRef = ref<HTMLTextAreaElement>()
 const settingsStore = useSettingsStore()
+const convStore = useConversationsStore()
+const chatStore = useChatStore()
 const showModelList = ref(false)
+const showSlashMenu = ref(false)
+const mcpCount = ref(0)
+const skillCount = ref(0)
+const memoryCount = ref(0)
 
 function onInput() {
   const el = inputRef.value
@@ -40,11 +53,58 @@ async function selectModel(name: string) {
 }
 
 function closeModelList() { showModelList.value = false }
+
+watch(text, (val) => {
+  if (val === '/') {
+    showSlashMenu.value = true
+    fetchSlashCounts()
+  } else {
+    showSlashMenu.value = false
+  }
+})
+
+function fetchSlashCounts() {
+  axios({ url: '/mcp/server/list', method: 'get' }).then(res => {
+    if (res.data.state === 'OK') mcpCount.value = res.data.body.length
+  }).catch(() => {})
+  axios({ url: '/skill/list', method: 'get' }).then(res => {
+    if (res.data.state === 'OK') skillCount.value = res.data.body.length
+  }).catch(() => {})
+  axios({ url: '/memory/list', method: 'get' }).then(res => {
+    if (res.data.state === 'OK') memoryCount.value = res.data.body.length
+  }).catch(() => {})
+}
+
+function onSlashSelect(cmd: string) {
+  showSlashMenu.value = false
+  text.value = ''
+  if (cmd === '/model') {
+    showModelList.value = !showModelList.value
+  } else if (cmd === '/clear') {
+    chatStore.clearMessages()
+  } else {
+    emit('slashCommand', cmd.replace('/', ''))
+  }
+}
+
+function closeSlashMenu() {
+  showSlashMenu.value = false
+  text.value = ''
+}
 </script>
 
 <template>
   <div class="input-section">
     <div class="input-container">
+      <SlashMenu
+        :visible="showSlashMenu"
+        :models="settingsStore.models"
+        :mcpCount="mcpCount"
+        :skillCount="skillCount"
+        :memoryCount="memoryCount"
+        @close="closeSlashMenu"
+        @select="onSlashSelect"
+      />
       <textarea
         ref="inputRef"
         class="input-textarea"
