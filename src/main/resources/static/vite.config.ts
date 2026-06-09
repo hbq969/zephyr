@@ -17,7 +17,7 @@ export default defineConfig({
   plugins: [
     // 预加载组件
     Components({
-      resolvers: [ElementPlusResolver()]
+      resolvers: [ElementPlusResolver({ importStyle: false })]
     }),
     vue(),
     vueDevTools(),
