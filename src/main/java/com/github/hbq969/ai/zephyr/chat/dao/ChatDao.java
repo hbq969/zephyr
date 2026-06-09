@@ -17,7 +17,7 @@ public interface ChatDao {
 
     List<ConversationEntity> queryConversations(@Param("userName") String userName);
     void insertConversation(ConversationEntity entity);
-    void updateConversationTitle(@Param("id") String id, @Param("title") String title, @Param("userName") String userName);
+    void updateConversationTitle(@Param("id") String id, @Param("title") String title, @Param("updatedAt") Long updatedAt, @Param("userName") String userName);
     void deleteConversation(@Param("id") String id, @Param("userName") String userName);
     ConversationEntity queryConversationById(@Param("id") String id);
 
