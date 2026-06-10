@@ -8,7 +8,6 @@ const props = defineProps<{
 }>()
 
 const collapsed = ref(true)
-watch(() => props.animating, (v) => { if (v) collapsed.value = false })
 
 const hasContent = computed(() => props.content && props.content.length > 0)
 
@@ -45,7 +44,7 @@ onBeforeUnmount(stopEffect)
       </span>
       <Icon :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" class="chevron" />
     </div>
-    <div v-if="hasContent && collapsed" class="thinking-preview">{{ preview }}</div>
+    <div v-if="hasContent && collapsed && animating" class="thinking-preview">{{ preview }}</div>
     <div v-if="hasContent && !collapsed" class="thinking-body">{{ content }}</div>
   </div>
 </template>
