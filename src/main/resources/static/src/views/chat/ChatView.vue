@@ -35,12 +35,6 @@ function newChat() {
 }
 
 function onSend(text: string) {
-  // 本地命令拦截 — 不发送到后端
-  if (text === '/clear') {
-    chatStore.clearMessages()
-    convStore.currentId = null
-    return
-  }
   if (text === '/context') {
     axios({ url: '/chat/context-usage', method: 'get', params: { conversationId: convStore.currentId } })
       .then(res => {
@@ -88,9 +82,13 @@ function onSend(text: string) {
             convStore.currentId = event.content
             refreshConversationList()
           } else if (event.type === 'clear') {
+            const oldCid = convStore.currentId
             chatStore.clearMessages()
             convStore.currentId = null
-            chatStore.streaming = false
+            if (oldCid) convStore.removeConversation(oldCid)
+            // 不在这里设 streaming = false，让 done 事件处理
+            // 否则 refreshConversationList 中的 setConversations 会触发
+            // currentId watcher → restoreConversation 加载其他对话的消息
           } else if (event.type === 'done') {
             chatStore.pruneEmptyAssistant()
             refreshConversationList()

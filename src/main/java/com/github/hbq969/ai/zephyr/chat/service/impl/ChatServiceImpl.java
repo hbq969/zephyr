@@ -205,6 +205,7 @@ public class ChatServiceImpl implements ChatService {
         switch (cmdName) {
             case "clear" -> {
                 chatDao.deleteMessagesByConvId(cid);
+                chatDao.deleteConversation(cid, userName);
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("clear").build()));
                 emitter.send(SseEmitter.event().name("message")

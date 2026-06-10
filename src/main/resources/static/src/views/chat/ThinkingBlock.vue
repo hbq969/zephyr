@@ -57,7 +57,7 @@ onBeforeUnmount(stopEffect)
 .thinking-header { display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; font-size: 13px; color: var(--el-text-color-secondary); user-select: none; }
 .thinking-header:hover { color: var(--el-text-color-primary); }
 
-.thinking-text { display: inline-flex; align-items: center; }
+.thinking-text { display: inline-flex; align-items: baseline; }
 .brain-icon { color: var(--el-color-primary); font-size: 16px; flex-shrink: 0; margin-right: 4px; }
 
 .chevron { transition: transform 0.2s; font-size: 14px; color: var(--el-text-color-placeholder); flex-shrink: 0; margin-left: 4px; }
@@ -68,15 +68,22 @@ onBeforeUnmount(stopEffect)
 
 <!-- @keyframes 放在非 scoped 块，避免 Vue 3 的 scoped 哈希重命名问题 -->
 <style>
+.dot-anim {
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: baseline;
+  margin-left: 2px;
+}
 .dot-anim i {
   font-style: normal;
+  font-weight: 700;
   animation: dotBounce 1.4s ease-in-out infinite;
 }
-.dot-anim i:nth-child(1) { animation-delay: 0s; }
-.dot-anim i:nth-child(2) { animation-delay: 0.2s; }
-.dot-anim i:nth-child(3) { animation-delay: 0.4s; }
+.dot-anim i:nth-child(1) { color: #cc785c; animation-delay: 0s; }
+.dot-anim i:nth-child(2) { color: #e8a55a; animation-delay: 0.2s; }
+.dot-anim i:nth-child(3) { color: #6366f1; animation-delay: 0.4s; }
 @keyframes dotBounce {
-  0%, 80%, 100% { opacity: 0; transform: translateY(0); }
+  0%, 80%, 100% { opacity: 0.15; transform: translateY(0); }
   40% { opacity: 1; transform: translateY(-2px); }
 }
 </style>
