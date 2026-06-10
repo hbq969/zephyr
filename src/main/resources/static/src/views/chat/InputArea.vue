@@ -7,8 +7,7 @@ import axios from '@/network'
 
 const emit = defineEmits<{ send: [text: string]; stop: [] }>()
 const chatStore = useChatStore()
-const text = ref('')
-const inputRef = ref<HTMLTextAreaElement>()
+const inputRef = ref<HTMLDivElement>()
 const settingsStore = useSettingsStore()
 const showModelList = ref(false)
 const showAbility = ref(false)
@@ -33,20 +32,66 @@ const actionItems = [
 
 function onInput() {
   const el = inputRef.value
-  if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px' }
+  if (el) {
+    if (el.innerText.trim() === '') {
+      el.innerHTML = ''
+    }
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend() }
+  const el = inputRef.value
+  if (!el) return
+  // Backspace 删除 tag：光标在文本节点开头且前一个兄弟是 tag
+  if (e.key === 'Backspace') {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      if (range.collapsed && range.startOffset === 0) {
+        const prev = range.startContainer.previousSibling
+        if (prev && prev.nodeType === Node.ELEMENT_NODE && (prev as Element).classList.contains('cmd-tag')) {
+          e.preventDefault()
+          prev.remove()
+          el.dispatchEvent(new Event('input', { bubbles: true }))
+          return
+        }
+      }
+    }
+  }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSend() }
 }
 
 function doSend() {
-  const msg = text.value.trim()
-  if (!msg) return
-  emit('send', msg)
-  text.value = ''
   const el = inputRef.value
-  if (el) { el.style.height = 'auto' }
+  if (!el) return
+
+  const parts: string[] = []
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      parts.push(child.textContent || '')
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const elem = child as Element
+      if (elem.classList.contains('cmd-tag')) {
+        const type = elem.getAttribute('data-type')
+        const name = elem.getAttribute('data-name')
+        if (type && name) {
+          const prefix = type === 'mcp' ? 'MCP' : 'Skill'
+          parts.push(prefix + '/' + name)
+        }
+      } else if (elem.tagName === 'BR') {
+        parts.push('\n')
+      } else {
+        parts.push(elem.textContent || '')
+      }
+    }
+  }
+
+  const msg = parts.join('').trim()
+  if (!msg) return
+
+  emit('send', msg)
+  el.innerHTML = ''
+  el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
 function toggleModelList() {
@@ -96,20 +141,68 @@ async function loadSkills() {
 }
 
 function insertCommand(cmd: string) {
+  // 会话/操作命令：直接发送
+  if (cmd.startsWith('/')) {
+    emit('send', cmd)
+    closeAll()
+    return
+  }
+  // 兼容：其他命令作为纯文本插入
   const el = inputRef.value
   if (el) {
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    const before = text.value.substring(0, start)
-    const after = text.value.substring(end)
-    text.value = before + cmd + ' ' + after
-    setTimeout(() => {
-      el.focus()
-      el.selectionStart = el.selectionEnd = start + cmd.length + 1
-    })
-  } else {
-    text.value += cmd + ' '
+    el.focus()
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0)
+      range.deleteContents()
+      range.insertNode(document.createTextNode(cmd + ' '))
+      range.collapse(false)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
   }
+  closeAll()
+}
+
+function insertTag(type: 'mcp' | 'skill', name: string) {
+  const el = inputRef.value
+  if (!el) return
+
+  el.focus()
+
+  const sel = window.getSelection()
+  if (!sel) return
+
+  if (sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  }
+
+  const prefix = type === 'mcp' ? 'MCP' : 'Skill'
+  const tag = document.createElement('span')
+  tag.contentEditable = 'false'
+  tag.className = `cmd-tag cmd-tag--${type}`
+  tag.setAttribute('data-type', type)
+  tag.setAttribute('data-name', name)
+  tag.innerHTML = `<span class="cmd-tag__prefix">${prefix}</span><span class="cmd-tag__sep">/</span><span class="cmd-tag__name">${name}</span>`
+
+  const range = sel.getRangeAt(0)
+  range.deleteContents()
+  range.insertNode(tag)
+
+  const space = document.createTextNode(' ')
+  range.setStartAfter(tag)
+  range.collapse(true)
+  tag.after(space)
+  range.setStartAfter(space)
+  range.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(range)
+
+  el.dispatchEvent(new Event('input', { bubbles: true }))
   closeAll()
 }
 
@@ -120,20 +213,25 @@ function closeAll() {
   showAction.value = false
   hoveredAbility.value = ''
 }
+
+function hasContent() {
+  const el = inputRef.value
+  if (!el) return false
+  return el.innerText.trim().length > 0
+}
 </script>
 
 <template>
   <div class="input-section">
     <div class="input-container">
-      <textarea
+      <div
         ref="inputRef"
         class="input-textarea"
-        v-model="text"
-        placeholder="给 zephyr 发送消息...  Enter 发送 · Shift+Enter 换行"
-        rows="1"
-        @input="onInput"
+        contenteditable="true"
         @keydown="onKeydown"
-      ></textarea>
+        @input="onInput"
+        data-placeholder="Ctrl+Enter 发送 · Enter 换行"
+      ></div>
       <div class="input-toolbar">
         <div class="input-left">
           <!-- 模型切换 -->
@@ -165,7 +263,7 @@ function closeAll() {
                     <template v-if="mcpGroups.length > 0">
                       <template v-for="g in mcpGroups" :key="g.server">
                         <div class="sub-group-label">{{ g.server }}</div>
-                        <div v-for="t in g.tools" :key="t.name" class="pick-option sub-option" @click="insertCommand('/' + t.name)">
+                        <div v-for="t in g.tools" :key="t.name" class="pick-option sub-option" @click="insertTag('mcp', t.name)">
                           <span class="cmd-name">{{ t.name }}</span>
                           <span class="cmd-desc" v-if="t.desc">{{ t.desc }}</span>
                         </div>
@@ -175,7 +273,7 @@ function closeAll() {
                   </template>
                   <template v-if="it.key === 'skills'">
                     <template v-if="skillList.length > 0">
-                      <div v-for="s in skillList" :key="s.name" class="pick-option sub-option" @click="insertCommand('/' + s.name)">
+                      <div v-for="s in skillList" :key="s.name" class="pick-option sub-option" @click="insertTag('skill', s.name)">
                         <span class="cmd-name">{{ s.name }}</span>
                         <span class="cmd-desc" v-if="s.desc">{{ s.desc }}</span>
                       </div>
@@ -218,9 +316,9 @@ function closeAll() {
           </button>
           <button
             class="send-btn"
-            :class="{ stop: chatStore.streaming, 'has-text': !chatStore.streaming && text.trim() }"
+            :class="{ stop: chatStore.streaming, 'has-text': !chatStore.streaming && hasContent() }"
             @click="chatStore.streaming ? $emit('stop') : doSend()"
-            :disabled="!chatStore.streaming && !text.trim()"
+            :disabled="!chatStore.streaming && !hasContent()"
             :title="chatStore.streaming ? '停止输出' : '发送'"
           >
             <Icon :icon="chatStore.streaming ? 'lucide:square' : 'lucide:arrow-up'" class="send-icon" />
@@ -247,7 +345,11 @@ export default { inheritAttrs: false }
 .input-container:focus-within { border-color: var(--el-color-primary); }
 
 .input-textarea { width: 100%; resize: none; border: none; background: transparent; color: var(--el-text-color-primary); font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; padding: 6px 0; max-height: 160px; min-height: 40px; outline: none; line-height: 1.6; }
-.input-textarea::placeholder { color: var(--el-text-color-placeholder); }
+.input-textarea[data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: var(--el-text-color-placeholder);
+  pointer-events: none;
+}
 
 .input-toolbar { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
 
@@ -323,4 +425,33 @@ export default { inheritAttrs: false }
 .send-btn.stop { background: var(--el-color-danger) !important; box-shadow: 0 0 0 0 rgba(198,69,69,0.4); animation: stopPulse 1.5s ease-in-out infinite; }
 @keyframes stopPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(198,69,69,0.4); } 50% { box-shadow: 0 0 0 8px rgba(198,69,69,0); } }
 .send-btn.stop .send-icon { color: #fff; font-size: 12px; }
+
+/* tag 标签 */
+.cmd-tag {
+  display: inline-block;
+  vertical-align: middle;
+  background: #efe9de;
+  border: 1px solid #e6dfd8;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+  margin: 0 1px;
+  line-height: 1.6;
+}
+.cmd-tag__prefix { font-weight: 600; }
+.cmd-tag--mcp .cmd-tag__prefix { color: #5db8a6; }
+.cmd-tag--skill .cmd-tag__prefix { color: #e8a55a; }
+.cmd-tag__sep { color: #8e8b82; margin: 0 1px; }
+.cmd-tag__name { color: #141413; }
+
+/* tag 暗黑模式 */
+html.dark .cmd-tag {
+  background-color: var(--el-fill-color-light);
+  border-color: var(--el-border-color);
+}
+html.dark .cmd-tag__name { color: var(--el-text-color-primary); }
 </style>
