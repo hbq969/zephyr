@@ -204,6 +204,7 @@ public class ChatServiceImpl implements ChatService {
         // 内置命令：直接处理，不走 LLM
         switch (cmdName) {
             case "clear" -> {
+                chatDao.deleteMessagesByConvId(cid);
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("clear").build()));
                 emitter.send(SseEmitter.event().name("message")

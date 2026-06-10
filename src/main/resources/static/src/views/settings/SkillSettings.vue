@@ -316,7 +316,7 @@ function goBack() { window.history.back() }
                   <span class="upload-hint">{{ langData.skillMgmt_uploadFormat }}</span>
                 </template>
               </div>
-              <input ref="fileInput" type="file" accept=".zip,.tar.gz,.tgz" @change="onFileChange" style="display:none" />
+              <input ref="fileInput" type="file" accept=".zip,.tar.gz,.tgz,.md" @change="onFileChange" style="display:none" />
               <div class="upload-note">{{ langData.skillMgmt_uploadNote }}</div>
             </template>
 

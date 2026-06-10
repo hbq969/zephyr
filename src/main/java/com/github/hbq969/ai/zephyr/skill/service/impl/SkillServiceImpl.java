@@ -52,43 +52,37 @@ public class SkillServiceImpl implements SkillService {
         String path = body.getOrDefault("path", "");
         String branch = body.getOrDefault("branch", "main");
 
-        String skillName;
+        Path srcDir;
         Path tmpDir = null;
         try {
             switch (source) {
                 case "git":
                     tmpDir = Files.createTempDirectory("skill-git-");
                     runGitClone(url, branch, tmpDir);
-                    skillName = detectSkillName(tmpDir);
+                    srcDir = findSkillRoot(tmpDir);
                     break;
                 case "url":
                     tmpDir = Files.createTempDirectory("skill-url-");
                     downloadAndExtract(url, tmpDir);
-                    skillName = detectSkillName(tmpDir);
+                    srcDir = findSkillRoot(tmpDir);
                     break;
                 case "local":
-                    skillName = detectSkillName(Paths.get(path));
+                    srcDir = findSkillRoot(Paths.get(path));
                     break;
                 default:
                     throw new IllegalArgumentException("不支持的安装方式: " + source);
             }
 
+            String skillName = detectSkillName(srcDir);
             Path destDir = Paths.get(SKILLS_HOME, skillName);
 
-            if ("local".equals(source)) {
-                deleteAndCopyDir(Paths.get(path), destDir);
-            } else {
-                deleteAndCopyDir(tmpDir, destDir);
-            }
-
+            // DB 查重必须在文件复制之前，避免已安装时留下孤儿文件
             SkillConfigEntity existing = skillDao.queryBySkillName(skillName, userName);
             if (existing != null) {
-                if ("local".equals(source)) {
-                    // already copied, clean up
-                }
                 throw new RuntimeException("Skill " + skillName + " 已安装");
             }
 
+            deleteAndCopyDir(srcDir, destDir);
             return insertSkillConfig(destDir, skillName, source, url, userName);
         } catch (IOException e) {
             throw new RuntimeException("安装失败: " + e.getMessage(), e);
@@ -101,12 +95,21 @@ public class SkillServiceImpl implements SkillService {
     @Transactional
     public SkillVO upload(MultipartFile file, String userName) {
         String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || (!originalFilename.endsWith(".zip")
-                && !originalFilename.endsWith(".tar.gz") && !originalFilename.endsWith(".tgz"))) {
-            throw new IllegalArgumentException("仅支持 .zip、.tar.gz、.tgz 格式");
+        if (originalFilename == null) {
+            throw new IllegalArgumentException("文件名为空");
+        }
+        boolean isArchive = originalFilename.endsWith(".zip")
+                || originalFilename.endsWith(".tar.gz") || originalFilename.endsWith(".tgz");
+        boolean isSkillMd = originalFilename.endsWith(".md");
+        if (!isArchive && !isSkillMd) {
+            throw new IllegalArgumentException("仅支持 .zip、.tar.gz、.tgz、.md 格式");
         }
         if (file.getSize() > 10 * 1024 * 1024) {
             throw new IllegalArgumentException("文件大小不能超过 10MB");
+        }
+
+        if (isSkillMd) {
+            return uploadSkillMd(file, originalFilename, userName);
         }
 
         Path tmpDir = null;
@@ -116,7 +119,37 @@ public class SkillServiceImpl implements SkillService {
             file.transferTo(tmpFile);
 
             ZipUtil.unzip(tmpFile, tmpDir.toFile());
-            String skillName = detectSkillName(tmpDir);
+            Path skillRoot = findSkillRoot(tmpDir);
+            String skillName = detectSkillName(skillRoot);
+
+            SkillConfigEntity existing = skillDao.queryBySkillName(skillName, userName);
+            if (existing != null) {
+                throw new RuntimeException("Skill " + skillName + " 已安装");
+            }
+
+            Path destDir = Paths.get(SKILLS_HOME, skillName);
+            deleteAndCopyDir(skillRoot, destDir);
+
+            return insertSkillConfig(destDir, skillName, "upload", originalFilename, userName);
+        } catch (IOException e) {
+            throw new RuntimeException("上传失败: " + e.getMessage(), e);
+        } finally {
+            if (tmpDir != null) FileUtil.del(tmpDir.toFile());
+        }
+    }
+
+    private SkillVO uploadSkillMd(MultipartFile file, String originalFilename, String userName) {
+        Path tmpDir = null;
+        try {
+            tmpDir = Files.createTempDirectory("skill-md-");
+            Path tmpFile = tmpDir.resolve("SKILL.md");
+            file.transferTo(tmpFile.toFile());
+
+            Map<String, String> meta = parseSkillMd(tmpFile);
+            String skillName = meta.get("name");
+            if (skillName == null || skillName.isEmpty()) {
+                throw new IllegalArgumentException("SKILL.md 的 frontmatter 中缺少 name 字段");
+            }
 
             SkillConfigEntity existing = skillDao.queryBySkillName(skillName, userName);
             if (existing != null) {
@@ -242,6 +275,25 @@ public class SkillServiceImpl implements SkillService {
         entity.setUpdatedAt(now);
         skillDao.insert(entity);
         return SkillVO.fromEntity(entity);
+    }
+
+    /**
+     * 在解压/克隆后的目录中定位真正的 skill 根目录（直接包含 SKILL.md 的目录）。
+     * 处理 zip 包内包含顶层文件夹的常见情况（右击文件夹压缩）。
+     */
+    private Path findSkillRoot(Path dir) {
+        if (Files.exists(dir.resolve("SKILL.md"))) {
+            return dir;
+        }
+        File[] subDirs = dir.toFile().listFiles(File::isDirectory);
+        if (subDirs != null) {
+            for (File subDir : subDirs) {
+                if (Files.exists(subDir.toPath().resolve("SKILL.md"))) {
+                    return subDir.toPath();
+                }
+            }
+        }
+        return dir;
     }
 
     private String detectSkillName(Path dir) {

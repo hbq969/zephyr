@@ -198,6 +198,7 @@ async function loadSkills() {
     if (res.data.state === 'OK') {
       skillList.value = (res.data.body as any[]).filter((s: any) => s.enabled === 1 || s.enabled === true)
         .map((s: any) => ({ name: s.skillName || s.displayName, desc: s.description }))
+        .sort((a, b) => a.name.localeCompare(b.name))
     }
     skillLoaded.value = true
   } catch (_) {}
