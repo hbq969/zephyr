@@ -12,6 +12,13 @@ watch(() => props.animating, (v) => { if (v) collapsed.value = false })
 
 const hasContent = computed(() => props.content && props.content.length > 0)
 
+const preview = computed(() => {
+  if (!hasContent.value) return ''
+  const lines = props.content.split('\n')
+  if (lines.length <= 3) return props.content
+  return lines.slice(-3).join('\n')
+})
+
 let rafId = 0
 
 function stopEffect() {
@@ -38,6 +45,7 @@ onBeforeUnmount(stopEffect)
       </span>
       <Icon :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" class="chevron" />
     </div>
+    <div v-if="hasContent && collapsed" class="thinking-preview">{{ preview }}</div>
     <div v-if="hasContent && !collapsed" class="thinking-body">{{ content }}</div>
   </div>
 </template>
@@ -51,6 +59,8 @@ onBeforeUnmount(stopEffect)
 .brain-icon { color: var(--el-color-primary); font-size: 16px; flex-shrink: 0; margin-right: 4px; }
 
 .chevron { transition: transform 0.2s; font-size: 14px; color: var(--el-text-color-placeholder); flex-shrink: 0; margin-left: 4px; }
+.thinking-preview { padding: 4px 0 4px 22px; font-size: 13px; color: var(--el-text-color-placeholder); line-height: 1.65; border-left: 2px solid var(--el-border-color); margin-left: 7px; white-space: pre-wrap; word-break: break-word; max-height: 72px; overflow: hidden; position: relative; }
+.thinking-preview::after { content: ''; position: absolute; bottom: 0; left: 22px; right: 0; height: 36px; background: linear-gradient(to bottom, transparent, var(--el-bg-color)); pointer-events: none; }
 .thinking-body { padding: 8px 0 8px 22px; font-size: 13px; color: var(--el-text-color-placeholder); line-height: 1.65; border-left: 2px solid var(--el-border-color); margin-left: 7px; white-space: pre-wrap; word-break: break-word; }
 </style>
 
