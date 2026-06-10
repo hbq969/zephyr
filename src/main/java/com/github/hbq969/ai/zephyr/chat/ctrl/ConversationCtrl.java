@@ -29,7 +29,7 @@ public class ConversationCtrl {
     @Operation(summary = "获取会话列表")
     @RequestMapping(path = "/list", method = RequestMethod.GET)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "conversations_list", apiDesc = "会话管理_获取会话列表")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "conversations_list", apiDesc = "会话管理_获取会话列表")
     public ReturnMessage<?> list() {
         return ReturnMessage.success(conversationService.list(userName()));
     }
@@ -37,7 +37,7 @@ public class ConversationCtrl {
     @Operation(summary = "新建会话")
     @RequestMapping(path = "/create", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "conversations_create", apiDesc = "会话管理_新建会话")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "conversations_create", apiDesc = "会话管理_新建会话")
     public ReturnMessage<?> create(@RequestBody Map<String, String> body) {
         return ReturnMessage.success(conversationService.create(body, userName()));
     }
@@ -45,7 +45,7 @@ public class ConversationCtrl {
     @Operation(summary = "重命名会话")
     @RequestMapping(path = "/rename", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "conversations_rename", apiDesc = "会话管理_重命名会话")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "conversations_rename", apiDesc = "会话管理_重命名会话")
     public ReturnMessage<?> rename(@RequestBody Map<String, String> body) {
         conversationService.rename(body, userName());
         return ReturnMessage.success("ok");
@@ -54,7 +54,7 @@ public class ConversationCtrl {
     @Operation(summary = "删除会话")
     @RequestMapping(path = "/delete", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "conversations_delete", apiDesc = "会话管理_删除会话")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "conversations_delete", apiDesc = "会话管理_删除会话")
     public ReturnMessage<?> delete(@RequestBody Map<String, String> body) {
         conversationService.delete(body.get("id"), userName());
         return ReturnMessage.success("ok");
@@ -63,7 +63,7 @@ public class ConversationCtrl {
     @Operation(summary = "获取会话历史消息")
     @RequestMapping(path = "/{id}/messages", method = RequestMethod.GET)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "conversations_messages", apiDesc = "会话管理_获取会话历史消息")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "conversations_messages", apiDesc = "会话管理_获取会话历史消息")
     public ReturnMessage<?> messages(@PathVariable String id) {
         return ReturnMessage.success(conversationService.getMessages(id, userName()));
     }

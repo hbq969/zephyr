@@ -1,10 +1,12 @@
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
+import { getLangData } from '@/i18n/locale'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
 import type { SkillConfig } from '@/types/chat'
 
 const store = useSettingsStore()
+const langData = getLangData()
 
 const showInstallDialog = ref(false)
 const installMethod = ref<'git' | 'url' | 'local' | 'upload' | 'sync' | 'marketplace'>('git')
@@ -30,12 +32,12 @@ const showDetail = ref(false)
 onMounted(async () => { await store.loadSkills() })
 
 const installMethods = [
-  { key: 'git', label: 'Git', icon: 'lucide:git-branch' },
-  { key: 'url', label: 'URL', icon: 'lucide:link' },
-  { key: 'local', label: '本地', icon: 'lucide:folder' },
-  { key: 'upload', label: '上传', icon: 'lucide:upload' },
-  { key: 'sync', label: '平台同步', icon: 'lucide:refresh-cw' },
-  { key: 'marketplace', label: '市场', icon: 'lucide:store' },
+  { key: 'git', label: langData.skillMgmt_source_git, icon: 'lucide:git-branch' },
+  { key: 'url', label: langData.skillMgmt_source_url, icon: 'lucide:link' },
+  { key: 'local', label: langData.skillMgmt_source_local, icon: 'lucide:folder' },
+  { key: 'upload', label: langData.skillMgmt_source_upload, icon: 'lucide:upload' },
+  { key: 'sync', label: langData.skillMgmt_source_sync, icon: 'lucide:refresh-cw' },
+  { key: 'marketplace', label: langData.skillMgmt_source_marketplace, icon: 'lucide:store' },
 ] as const
 
 const platformInfo: Record<string, { icon: string; color: string }> = {
@@ -45,8 +47,8 @@ const platformInfo: Record<string, { icon: string; color: string }> = {
 }
 
 const sourceTag: Record<string, string> = {
-  builtin: '内置', git: 'Git', url: 'URL', local: '本地',
-  upload: '上传', sync: '平台同步', marketplace: '市场',
+  builtin: langData.skillMgmt_source_builtin, git: langData.skillMgmt_source_git, url: langData.skillMgmt_source_url, local: langData.skillMgmt_source_local,
+  upload: langData.skillMgmt_source_upload, sync: langData.skillMgmt_source_sync, marketplace: langData.skillMgmt_source_marketplace,
 }
 
 function openInstallDialog() {
@@ -160,20 +162,20 @@ function goBack() { window.history.back() }
     <div class="page-header">
       <div>
         <button class="back-btn" @click="goBack"><Icon icon="lucide:chevron-left" /></button>
-        <h1>Skill 管理</h1>
+        <h1>{{ langData.skillMgmt_title }}</h1>
       </div>
       <button v-if="store.skills.length > 0" class="btn-primary" @click="openInstallDialog">
-        <Icon icon="lucide:plus" /> 安装 Skill
+        <Icon icon="lucide:plus" /> {{ langData.skillMgmt_installSkill }}
       </button>
     </div>
-    <p class="subtitle">管理已安装的 Skills，支持 Git、URL、本地、上传、平台同步多种安装方式</p>
+    <p class="subtitle">{{ langData.skillMgmt_subtitle }}</p>
 
     <div v-if="store.skills.length === 0" class="empty-state">
       <Icon icon="lucide:puzzle" width="48" style="color: var(--el-text-color-placeholder)" />
-      <h3 class="empty-title">还没有安装 Skill</h3>
-      <p class="empty-desc">从 Git 仓库、URL、本地目录安装，或上传压缩包。也可以从 Claude Code / Codex / OpenCode 同步已有的 Skill。</p>
+      <h3 class="empty-title">{{ langData.skillMgmt_noSkill }}</h3>
+      <p class="empty-desc">{{ langData.skillMgmt_noSkillDesc }}</p>
       <button class="btn-primary" @click="openInstallDialog">
-        <Icon icon="lucide:plus" /> 安装第一个 Skill
+        <Icon icon="lucide:plus" /> {{ langData.skillMgmt_installFirstSkill }}
       </button>
     </div>
 
@@ -191,11 +193,11 @@ function goBack() { window.history.back() }
           </div>
         </div>
         <div class="skill-actions" @click.stop>
-          <label class="toggle-switch" :title="s.enabled ? '禁用' : '启用'">
+          <label class="toggle-switch" :title="s.enabled ? langData.skillMgmt_disabled : langData.skillMgmt_enabled">
             <input type="checkbox" :checked="s.enabled" @change="doToggle(s)" />
             <span class="toggle-slider"></span>
           </label>
-          <button class="btn-icon" @click="confirmUninstall(s)" title="卸载">
+          <button class="btn-icon" @click="confirmUninstall(s)" :title="langData.skillMgmt_uninstall">
             <Icon icon="lucide:trash-2" width="15" />
           </button>
         </div>
@@ -207,7 +209,7 @@ function goBack() { window.history.back() }
       <div v-if="showInstallDialog" class="modal-overlay" @click.self="showInstallDialog = false">
         <div class="modal">
           <div class="modal-header">
-            <h2>安装 Skill</h2>
+            <h2>{{ langData.skillMgmt_installSkill }}</h2>
             <button class="btn-icon" @click="showInstallDialog = false"><Icon icon="lucide:x" width="18" /></button>
           </div>
           <div class="modal-body">
@@ -225,26 +227,26 @@ function goBack() { window.history.back() }
 
             <template v-if="installMethod === 'git'">
               <div class="form-group">
-                <label class="form-label">Git 仓库地址</label>
-                <input class="form-input" v-model="gitUrl" placeholder="https://github.com/user/skill-repo.git" />
+                <label class="form-label">{{ langData.skillMgmt_gitRepoUrl }}</label>
+                <input class="form-input" v-model="gitUrl" :placeholder="langData.skillMgmt_gitRepoUrlPlaceholder" />
               </div>
               <div class="form-group">
-                <label class="form-label">分支（可选）</label>
+                <label class="form-label">{{ langData.skillMgmt_branch }}</label>
                 <input class="form-input" v-model="gitBranch" placeholder="main" />
               </div>
             </template>
 
             <template v-if="installMethod === 'url'">
               <div class="form-group">
-                <label class="form-label">下载链接</label>
-                <input class="form-input" v-model="downloadUrl" placeholder="https://example.com/skill.zip 或 .md 文件链接" />
+                <label class="form-label">{{ langData.skillMgmt_downloadUrl }}</label>
+                <input class="form-input" v-model="downloadUrl" :placeholder="langData.skillMgmt_downloadUrlPlaceholder" />
               </div>
             </template>
 
             <template v-if="installMethod === 'local'">
               <div class="form-group">
-                <label class="form-label">本地路径</label>
-                <input class="form-input" v-model="localPath" placeholder="/path/to/skill/directory" />
+                <label class="form-label">{{ langData.skillMgmt_localPath }}</label>
+                <input class="form-input" v-model="localPath" :placeholder="langData.skillMgmt_localPathPlaceholder" />
               </div>
             </template>
 
@@ -256,37 +258,37 @@ function goBack() { window.history.back() }
                 </div>
                 <template v-else>
                   <Icon icon="lucide:upload" width="32" style="color: var(--el-text-color-placeholder)" />
-                  <p>拖拽压缩包到此处，或点击选择</p>
-                  <span class="upload-hint">支持 .zip、.tar.gz、.tgz 格式，最大 10MB</span>
+                  <p>{{ langData.skillMgmt_uploadHint }}</p>
+                  <span class="upload-hint">{{ langData.skillMgmt_uploadFormat }}</span>
                 </template>
               </div>
               <input ref="fileInput" type="file" accept=".zip,.tar.gz,.tgz" @change="onFileChange" style="display:none" />
-              <div class="upload-note">压缩包内需包含 SKILL.md 文件作为 skill 入口</div>
+              <div class="upload-note">{{ langData.skillMgmt_uploadNote }}</div>
             </template>
 
             <template v-if="installMethod === 'sync'">
               <div class="form-group">
-                <label class="form-label">点击安装按钮后扫描本地平台</label>
-                <p class="form-hint">将扫描 Claude Code / Codex / OpenCode 中已安装的 Skill</p>
+                <label class="form-label">{{ langData.skillMgmt_scanPlatform }}</label>
+                <p class="form-hint">{{ langData.skillMgmt_scanPlatformHint }}</p>
               </div>
             </template>
 
             <template v-if="installMethod === 'marketplace'">
               <div class="form-group">
-                <label class="form-label">市场搜索（即将上线）</label>
-                <p class="form-hint">敬请期待</p>
+                <label class="form-label">{{ langData.skillMgmt_marketComing }}</label>
+                <p class="form-hint">{{ langData.skillMgmt_marketHint }}</p>
               </div>
             </template>
           </div>
           <div class="modal-footer">
-            <button class="btn-secondary" @click="showInstallDialog = false">取消</button>
+            <button class="btn-secondary" @click="showInstallDialog = false">{{ langData.btnCancel }}</button>
             <button
               v-if="installMethod !== 'marketplace'"
               class="btn-primary"
               @click="doInstall"
               :disabled="installing"
             >
-              {{ installing ? '安装中...' : installMethod === 'sync' ? '扫描平台' : '安装' }}
+              {{ installing ? langData.skillMgmt_installing : installMethod === 'sync' ? langData.skillMgmt_scanPlatformBtn : langData.skillMgmt_installSkill }}
             </button>
           </div>
         </div>
@@ -298,12 +300,12 @@ function goBack() { window.history.back() }
       <div v-if="showSyncPanel" class="modal-overlay" @click.self="showSyncPanel = false">
         <div class="modal" style="width: 720px; max-width: calc(100vw - 48px)">
           <div class="modal-header">
-            <h2>平台同步</h2>
+            <h2>{{ langData.skillMgmt_platformSync }}</h2>
             <button class="btn-icon" @click="showSyncPanel = false"><Icon icon="lucide:x" width="18" /></button>
           </div>
           <div class="modal-body">
             <div v-if="!currentPlatform">
-              <p style="font-size:13px;color:var(--el-text-color-secondary);margin:0 0 16px">选择要同步的平台</p>
+              <p style="font-size:13px;color:var(--el-text-color-secondary);margin:0 0 16px">{{ langData.skillMgmt_selectPlatform }}</p>
               <div
                 v-for="platform in ['claude-code', 'codex', 'opencode']"
                 :key="platform"
@@ -317,13 +319,13 @@ function goBack() { window.history.back() }
                   <span class="platform-name">{{ platform === 'claude-code' ? 'Claude Code' : platform === 'codex' ? 'Codex' : 'OpenCode' }}</span>
                   <span class="platform-path">~{{ platform === 'claude-code' ? '/.claude' : platform === 'codex' ? '/.codex' : '/.opencode' }}/skills/</span>
                 </div>
-                <span class="platform-count">{{ syncSkills.filter(s => s.platform === platform).length }} 个</span>
+                <span class="platform-count">{{ langData.settingsPanel_skillCount.replace('{count}', syncSkills.filter(s => s.platform === platform).length) }}</span>
                 <Icon icon="lucide:chevron-right" width="16" style="color:var(--el-text-color-placeholder)" />
               </div>
             </div>
             <div v-else>
               <button class="back-link" @click="currentPlatform = ''">
-                <Icon icon="lucide:chevron-left" width="14" /> 返回
+                <Icon icon="lucide:chevron-left" width="14" /> {{ langData.skillMgmt_back }}
               </button>
               <div v-for="s in syncSkills.filter(s => s.platform === currentPlatform)" :key="s.skillName" class="sync-skill-row" @click="selectedSyncSkills.has(s.skillName) ? selectedSyncSkills.delete(s.skillName) : selectedSyncSkills.add(s.skillName)">
                 <input type="checkbox" :checked="selectedSyncSkills.has(s.skillName)" class="sync-checkbox" @click.stop />
@@ -334,15 +336,15 @@ function goBack() { window.history.back() }
                 </div>
               </div>
               <div class="sync-footer">
-                <button class="btn-link" @click="toggleSelectAll">全选 / 取消全选</button>
-                <span class="select-count">已选 {{ selectedSyncSkills.size }} 个</span>
+                <button class="btn-link" @click="toggleSelectAll">{{ langData.skillMgmt_selectAll }}</button>
+                <span class="select-count">{{ langData.skillMgmt_selected.replace('{count}', selectedSyncSkills.size) }}</span>
               </div>
             </div>
           </div>
           <div class="modal-footer" v-if="currentPlatform">
-            <button class="btn-secondary" @click="currentPlatform = ''">返回</button>
+            <button class="btn-secondary" @click="currentPlatform = ''">{{ langData.skillMgmt_back }}</button>
             <button class="btn-primary" @click="doSyncInstall" :disabled="syncing || selectedSyncSkills.size === 0">
-              {{ syncing ? '同步中...' : `同步 ${selectedSyncSkills.size} 个 Skill` }}
+              {{ syncing ? langData.skillMgmt_syncing : langData.skillMgmt_syncSkills.replace('{count}', selectedSyncSkills.size) }}
             </button>
           </div>
         </div>
@@ -354,31 +356,31 @@ function goBack() { window.history.back() }
       <div v-if="showUninstallConfirm && uninstallTarget" class="modal-overlay" @click.self="showUninstallConfirm = false">
         <div class="modal" style="width: 440px">
           <div class="modal-header">
-            <h2>卸载 Skill</h2>
+            <h2>{{ langData.skillMgmt_uninstallTitle }}</h2>
             <button class="btn-icon" @click="showUninstallConfirm = false"><Icon icon="lucide:x" width="18" /></button>
           </div>
           <div class="modal-body">
             <div class="warn-title">
               <Icon icon="lucide:alert-triangle" width="18" style="color:var(--el-color-danger)" />
-              <span>此操作将同时删除以下内容：</span>
+              <span>{{ langData.skillMgmt_uninstallWarnTitle }}</span>
             </div>
             <div class="warn-box">
               <div class="warn-item">
                 <span class="warn-num">1</span>
-                <span>数据库记录</span>
-                <span class="warn-detail">skill_configs 表</span>
+                <span>{{ langData.skillMgmt_uninstallWarn1Label }}</span>
+                <span class="warn-detail">{{ langData.skillMgmt_uninstallWarn1Detail }}</span>
               </div>
               <div class="warn-item">
                 <span class="warn-num">2</span>
-                <span>磁盘文件</span>
+                <span>{{ langData.skillMgmt_uninstallWarn2Label }}</span>
                 <span class="warn-detail" style="font-family:monospace">~/.zephyr/skills/{{ uninstallTarget.skillName }}/</span>
               </div>
             </div>
-            <p class="uninstall-msg">确定要卸载 <strong>{{ uninstallTarget.displayName || uninstallTarget.skillName }}</strong> 吗？此操作不可撤销。</p>
+            <p class="uninstall-msg" v-html="langData.skillMgmt_uninstallMsg.replace('{name}', `<strong>${uninstallTarget.displayName || uninstallTarget.skillName}</strong>`)"></p>
           </div>
           <div class="modal-footer">
-            <button class="btn-secondary" @click="showUninstallConfirm = false">取消</button>
-            <button class="btn-danger" @click="doUninstall">卸载</button>
+            <button class="btn-secondary" @click="showUninstallConfirm = false">{{ langData.btnCancel }}</button>
+            <button class="btn-danger" @click="doUninstall">{{ langData.skillMgmt_uninstall }}</button>
           </div>
         </div>
       </div>
@@ -395,41 +397,41 @@ function goBack() { window.history.back() }
           <div class="modal-body">
             <div class="detail-grid">
               <div class="detail-item">
-                <span class="detail-label">名称</span>
+                <span class="detail-label">{{ langData.skillMgmt_name }}</span>
                 <span class="detail-value">{{ detailSkill.skillName }}</span>
               </div>
               <div class="detail-item">
-                <span class="detail-label">来源</span>
+                <span class="detail-label">{{ langData.skillMgmt_source }}</span>
                 <span class="detail-value"><span class="badge badge-source" :class="'src-' + detailSkill.source">{{ sourceTag[detailSkill.source] ?? detailSkill.source }}</span></span>
               </div>
               <div class="detail-item" v-if="detailSkill.version">
-                <span class="detail-label">版本</span>
+                <span class="detail-label">{{ langData.skillMgmt_version }}</span>
                 <span class="detail-value font-mono">v{{ detailSkill.version }}</span>
               </div>
               <div class="detail-item">
-                <span class="detail-label">状态</span>
-                <span class="detail-value" :style="{ color: detailSkill.enabled ? 'var(--el-color-success)' : 'var(--el-text-color-placeholder)' }">{{ detailSkill.enabled ? '已启用' : '已禁用' }}</span>
+                <span class="detail-label">{{ langData.skillMgmt_status }}</span>
+                <span class="detail-value" :style="{ color: detailSkill.enabled ? 'var(--el-color-success)' : 'var(--el-text-color-placeholder)' }">{{ detailSkill.enabled ? langData.skillMgmt_enabled : langData.skillMgmt_disabled }}</span>
               </div>
               <div class="detail-item" v-if="detailSkill.sourceUrl">
-                <span class="detail-label">来源地址</span>
+                <span class="detail-label">{{ langData.skillMgmt_sourceUrl }}</span>
                 <span class="detail-value font-mono" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ detailSkill.sourceUrl }}</span>
               </div>
               <div class="detail-item" v-if="detailSkill.installPath">
-                <span class="detail-label">安装路径</span>
+                <span class="detail-label">{{ langData.skillMgmt_installPath }}</span>
                 <span class="detail-value font-mono" style="white-space:nowrap">{{ detailSkill.installPath }}</span>
               </div>
               <div class="detail-item" v-if="detailSkill.createdAt">
-                <span class="detail-label">安装时间</span>
+                <span class="detail-label">{{ langData.skillMgmt_installTime }}</span>
                 <span class="detail-value">{{ new Date(detailSkill.createdAt * 1000).toLocaleString() }}</span>
               </div>
             </div>
             <div v-if="detailSkill.description" class="detail-desc-block">
-              <span class="detail-label">描述</span>
+              <span class="detail-label">{{ langData.skillMgmt_description }}</span>
               <p class="detail-desc-text">{{ detailSkill.description }}</p>
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn-secondary" @click="closeDetail">关闭</button>
+            <button class="btn-secondary" @click="closeDetail">{{ langData.skillMgmt_close }}</button>
           </div>
         </div>
       </div>

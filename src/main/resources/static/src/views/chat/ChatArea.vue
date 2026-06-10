@@ -4,8 +4,10 @@ import { useChatStore } from '@/store/chat'
 import { useConversationsStore } from '@/store/conversations'
 import MessageBubble from './MessageBubble.vue'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
 
 const chatStore = useChatStore()
+const langData = getLangData()
 const convStore = useConversationsStore()
 const areaRef = ref<HTMLElement>()
 
@@ -59,7 +61,7 @@ watch(
     <div v-if="chatStore.messages.length === 0" class="empty-state">
       <div class="empty-icon">z</div>
       <p class="empty-title">zephyr</p>
-      <p class="empty-sub">开始一段新的对话</p>
+      <p class="empty-sub">{{ langData.chatArea_emptySub }}</p>
     </div>
     <MessageBubble v-for="(msg, i) in chatStore.messages" :key="msg.id" :message="msg" :isLast="i === chatStore.messages.length - 1 && chatStore.streaming" />
   </div>

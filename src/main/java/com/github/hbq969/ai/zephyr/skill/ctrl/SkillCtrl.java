@@ -28,7 +28,7 @@ public class SkillCtrl {
     @Operation(summary = "已安装Skill列表")
     @RequestMapping(path = "/list", method = RequestMethod.GET)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_list", apiDesc = "Skill管理_已安装Skill列表")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_list", apiDesc = "Skill管理_已安装Skill列表")
     public ReturnMessage<?> list() {
         return ReturnMessage.success(skillService.list(userName()));
     }
@@ -36,7 +36,7 @@ public class SkillCtrl {
     @Operation(summary = "安装Skill")
     @RequestMapping(path = "/install", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_install", apiDesc = "Skill管理_安装Skill")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_install", apiDesc = "Skill管理_安装Skill")
     public ReturnMessage<?> install(@RequestBody Map<String, String> body) {
         return ReturnMessage.success(skillService.install(body, userName()));
     }
@@ -44,7 +44,7 @@ public class SkillCtrl {
     @Operation(summary = "上传压缩包安装Skill")
     @RequestMapping(path = "/upload", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_upload", apiDesc = "Skill管理_上传压缩包安装Skill")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_upload", apiDesc = "Skill管理_上传压缩包安装Skill")
     public ReturnMessage<?> upload(@RequestParam("file") MultipartFile file) {
         return ReturnMessage.success(skillService.upload(file, userName()));
     }
@@ -52,7 +52,7 @@ public class SkillCtrl {
     @Operation(summary = "扫描本地平台可同步的Skill")
     @RequestMapping(path = "/sync-scan", method = RequestMethod.GET)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_syncScan", apiDesc = "Skill管理_扫描本地平台可同步的Skill")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_syncScan", apiDesc = "Skill管理_扫描本地平台可同步的Skill")
     public ReturnMessage<?> syncScan() {
         return ReturnMessage.success(skillService.syncScan(userName()));
     }
@@ -60,7 +60,7 @@ public class SkillCtrl {
     @Operation(summary = "执行平台同步安装")
     @RequestMapping(path = "/sync-install", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_syncInstall", apiDesc = "Skill管理_执行平台同步安装")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_syncInstall", apiDesc = "Skill管理_执行平台同步安装")
     public ReturnMessage<?> syncInstall(@RequestBody Map<String, String> body) {
         return ReturnMessage.success(skillService.syncInstall(body, userName()));
     }
@@ -68,7 +68,7 @@ public class SkillCtrl {
     @Operation(summary = "启用/禁用Skill")
     @RequestMapping(path = "/toggle", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_toggle", apiDesc = "Skill管理_启用/禁用Skill")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_toggle", apiDesc = "Skill管理_启用/禁用Skill")
     public ReturnMessage<?> toggle(@RequestBody Map<String, String> body) {
         skillService.toggle(body.get("id"), Integer.parseInt(body.get("enabled")), userName());
         return ReturnMessage.success("ok");
@@ -77,7 +77,7 @@ public class SkillCtrl {
     @Operation(summary = "卸载Skill")
     @RequestMapping(path = "/uninstall", method = RequestMethod.POST)
     @ResponseBody
-    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体接口", apiKey = "skill_uninstall", apiDesc = "Skill管理_卸载Skill")
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "skill_uninstall", apiDesc = "Skill管理_卸载Skill")
     public ReturnMessage<?> uninstall(@RequestBody Map<String, String> body) {
         skillService.uninstall(body.get("id"), userName());
         return ReturnMessage.success("ok");

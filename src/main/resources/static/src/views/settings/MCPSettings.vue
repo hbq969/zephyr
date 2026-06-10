@@ -4,8 +4,10 @@ import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
 import { ElMessageBox } from 'element-plus'
 import type { McpTool } from '@/types/chat'
+import { getLangData } from '@/i18n/locale'
 
 const store = useSettingsStore()
+const langData = getLangData()
 
 const showServerForm = ref(false)
 const editServerId = ref<string | null>(null)
@@ -135,10 +137,14 @@ async function toggleTool(toolId: string, enabled: boolean, serverId: string) {
 
 function confirmDeleteServer(id: string, name: string) {
   ElMessageBox.confirm(
-    `删除服务器 "${name}" 及其所有工具？`,
-    '确认删除',
-    { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    langData.mcpMgmt_confirmDeleteMsg.replace('{name}', name),
+    langData.mcpMgmt_confirmDeleteTitle,
+    { confirmButtonText: langData.btnDelete, cancelButtonText: langData.btnCancel, type: 'warning' }
   ).then(() => deleteServer(id)).catch(() => {})
+}
+
+function toolsCount(count: number): string {
+  return langData.mcpMgmt_toolsCount.replace('{count}', String(count))
 }
 </script>
 
@@ -149,20 +155,20 @@ function confirmDeleteServer(id: string, name: string) {
         <button class="back-btn" @click="$router.push('/chat')">
           <Icon icon="lucide:chevron-left" />
         </button>
-        <h1>MCP 管理</h1>
+        <h1>{{ langData.mcpMgmt_title }}</h1>
       </div>
       <button v-if="store.mcpServers.length > 0" class="btn-primary" @click="openAddServer">
-        <Icon icon="lucide:plus" /> 添加服务器
+        <Icon icon="lucide:plus" /> {{ langData.mcpMgmt_addServer }}
       </button>
     </div>
-    <p class="subtitle">配置 MCP 服务器，管理可用的工具</p>
+    <p class="subtitle">{{ langData.mcpMgmt_subtitle }}</p>
 
     <div v-if="store.mcpServers.length === 0" class="empty-state">
       <Icon icon="lucide:server" width="48" style="color: var(--el-text-color-placeholder)" />
-      <h3 class="empty-title">还没有 MCP 服务器</h3>
-      <p class="empty-desc">添加一个 MCP 服务器配置，连接后可以自动发现其提供的工具。</p>
+      <h3 class="empty-title">{{ langData.mcpMgmt_noServer }}</h3>
+      <p class="empty-desc">{{ langData.mcpMgmt_noServerDesc }}</p>
       <button class="btn-primary" @click="openAddServer">
-        <Icon icon="lucide:plus" /> 添加第一个服务器
+        <Icon icon="lucide:plus" /> {{ langData.mcpMgmt_addFirstServer }}
       </button>
     </div>
 
@@ -183,7 +189,7 @@ function confirmDeleteServer(id: string, name: string) {
               <span class="badge badge-transport">{{ s.transport }}</span>
               <span class="badge badge-status" :class="'badge-' + s.status">
                 <span class="status-dot" :class="s.status"></span>
-                {{ s.status === 'connected' ? '已连接' : s.status === 'error' ? '连接失败' : '未连接' }}
+                {{ s.status === 'connected' ? langData.mcpMgmt_connected : s.status === 'error' ? langData.mcpMgmt_connectFailed : langData.mcpMgmt_disconnected }}
               </span>
             </div>
             <div class="server-detail">
@@ -192,16 +198,16 @@ function confirmDeleteServer(id: string, name: string) {
             </div>
           </div>
           <div class="server-actions" @click.stop>
-            <button class="btn-icon" @click="openEditServer(s)" title="编辑">
+            <button class="btn-icon" @click="openEditServer(s)" :title="langData.btnEdit">
               <Icon icon="lucide:pencil" width="15" />
             </button>
-            <button v-if="s.status === 'connected'" class="btn-icon" @click="disconnectServer(s.id!)" title="断开">
+            <button v-if="s.status === 'connected'" class="btn-icon" @click="disconnectServer(s.id!)" :title="langData.mcpMgmt_disconnectTooltip">
               <Icon icon="lucide:unplug" width="15" />
             </button>
-            <button v-else class="btn-icon" @click="connectServer(s.id!)" title="连接">
+            <button v-else class="btn-icon" @click="connectServer(s.id!)" :title="langData.mcpMgmt_connectTooltip">
               <Icon icon="lucide:plug" width="15" />
             </button>
-            <button class="btn-icon" @click="confirmDeleteServer(s.id!, s.name)" title="删除" style="color:var(--el-color-danger)">
+            <button class="btn-icon" @click="confirmDeleteServer(s.id!, s.name)" :title="langData.btnDelete" style="color:var(--el-color-danger)">
               <Icon icon="lucide:trash-2" width="15" />
             </button>
             <Icon icon="lucide:chevron-down" class="expand-chevron" width="20" />
@@ -209,10 +215,10 @@ function confirmDeleteServer(id: string, name: string) {
         </div>
 
         <div class="tools-panel">
-          <div v-if="loadingTools[s.id!]" class="tools-loading">加载中...</div>
+          <div v-if="loadingTools[s.id!]" class="tools-loading">{{ langData.inputArea_loading }}</div>
           <template v-else-if="serverTools[s.id!]?.length">
             <div class="tools-header">
-              <span>{{ serverTools[s.id!].length }} 个工具</span>
+              <span>{{ toolsCount(serverTools[s.id!].length) }}</span>
             </div>
             <div v-for="t in serverTools[s.id!]" :key="t.id" class="tool-row">
               <div class="tool-dot" :class="t.source"></div>
@@ -221,29 +227,29 @@ function confirmDeleteServer(id: string, name: string) {
                 <span v-if="t.description" class="tool-desc">{{ t.description }}</span>
               </div>
               <span class="tool-source" :class="t.source">
-                {{ t.source === 'discovered' ? '自动发现' : '手动添加' }}
+                {{ t.source === 'discovered' ? langData.mcpMgmt_autoDiscovered : langData.mcpMgmt_manualAdd }}
               </span>
               <label class="toggle-switch">
                 <input type="checkbox" :checked="t.enabled" @change="toggleTool(t.id!, ($event.target as HTMLInputElement).checked, s.id!)" />
                 <span class="toggle-slider"></span>
               </label>
-              <button class="btn-icon-sm" @click="deleteTool(t.id!, s.id!)" title="删除">
+              <button class="btn-icon-sm" @click="deleteTool(t.id!, s.id!)" :title="langData.btnDelete">
                 <Icon icon="lucide:x" width="13" />
               </button>
             </div>
           </template>
           <div v-else class="tools-empty">
-            {{ s.status === 'connected' ? '暂无工具，手动添加或重新连接' : '未连接，连接后可自动发现工具' }}
+            {{ s.status === 'connected' ? langData.mcpMgmt_noToolsConnected : langData.mcpMgmt_noToolsDisconnected }}
           </div>
 
           <div v-if="addingToolFor === s.id" class="add-tool-row">
-            <input v-model="newToolName" placeholder="工具名称" />
-            <input v-model="newToolDesc" placeholder="描述（可选）" />
-            <button class="btn-primary btn-sm" @click="addTool(s.id!)">添加</button>
-            <button class="btn-secondary btn-sm" @click="addingToolFor = null">取消</button>
+            <input v-model="newToolName" :placeholder="langData.mcpMgmt_toolName" />
+            <input v-model="newToolDesc" :placeholder="langData.mcpMgmt_toolDesc" />
+            <button class="btn-primary btn-sm" @click="addTool(s.id!)">{{ langData.btnAdd }}</button>
+            <button class="btn-secondary btn-sm" @click="addingToolFor = null">{{ langData.btnCancel }}</button>
           </div>
           <button v-else class="add-tool-btn" @click.stop="addingToolFor = s.id!; newToolName = ''; newToolDesc = ''">
-            <Icon icon="lucide:plus" width="14" /> 手动添加工具
+            <Icon icon="lucide:plus" width="14" /> {{ langData.mcpMgmt_addToolManually }}
           </button>
         </div>
       </div>
@@ -253,18 +259,18 @@ function confirmDeleteServer(id: string, name: string) {
       <div v-if="showServerForm" class="modal-overlay" @click.self="showServerForm = false">
         <div class="modal">
           <div class="modal-header">
-            <h2>{{ editServerId ? '编辑服务器' : '添加 MCP 服务器' }}</h2>
+            <h2>{{ editServerId ? langData.mcpMgmt_editServer : langData.mcpMgmt_addMcpServer }}</h2>
             <button class="btn-icon" @click="showServerForm = false">
               <Icon icon="lucide:x" width="18" />
             </button>
           </div>
           <div class="modal-body">
             <div class="form-group">
-              <label class="form-label">服务器名称</label>
-              <input class="form-input" v-model="serverName" placeholder="例如 filesystem、github-api" />
+              <label class="form-label">{{ langData.mcpMgmt_serverName }}</label>
+              <input class="form-input" v-model="serverName" :placeholder="langData.mcpMgmt_serverNamePlaceholder" />
             </div>
             <div class="form-group">
-              <label class="form-label">传输方式</label>
+              <label class="form-label">{{ langData.mcpMgmt_transport }}</label>
               <div class="transport-toggle">
                 <button :class="{ active: serverTransport === 'stdio' }" @click="serverTransport = 'stdio'">stdio</button>
                 <button :class="{ active: serverTransport === 'http' }" @click="serverTransport = 'http'">HTTP</button>
@@ -272,32 +278,32 @@ function confirmDeleteServer(id: string, name: string) {
             </div>
             <template v-if="serverTransport === 'stdio'">
               <div class="form-group">
-                <label class="form-label">启动命令</label>
-                <input class="form-input" v-model="serverCommand" placeholder="npx / uvx / python" />
+                <label class="form-label">{{ langData.mcpMgmt_startCommand }}</label>
+                <input class="form-input" v-model="serverCommand" :placeholder="langData.mcpMgmt_startCommandPlaceholder" />
               </div>
               <div class="form-group">
-                <label class="form-label">参数</label>
-                <textarea class="form-textarea" v-model="serverArgs" placeholder="每行一个参数" rows="3"></textarea>
+                <label class="form-label">{{ langData.mcpMgmt_args }}</label>
+                <textarea class="form-textarea" v-model="serverArgs" :placeholder="langData.mcpMgmt_argsPlaceholder" rows="3"></textarea>
               </div>
               <div class="form-group">
-                <label class="form-label">环境变量</label>
-                <textarea class="form-textarea" v-model="serverEnvVars" placeholder="KEY=VALUE&#10;每行一个（可选）" rows="2"></textarea>
+                <label class="form-label">{{ langData.mcpMgmt_envVars }}</label>
+                <textarea class="form-textarea" v-model="serverEnvVars" :placeholder="langData.mcpMgmt_envVarsPlaceholder" rows="2"></textarea>
               </div>
             </template>
             <template v-else>
               <div class="form-group">
-                <label class="form-label">服务器 URL</label>
-                <input class="form-input" v-model="serverUrl" placeholder="https://mcp.example.com/api/v1" />
+                <label class="form-label">{{ langData.mcpMgmt_serverUrl }}</label>
+                <input class="form-input" v-model="serverUrl" :placeholder="langData.mcpMgmt_serverUrlPlaceholder" />
               </div>
               <div class="form-group">
-                <label class="form-label">自定义请求头</label>
-                <textarea class="form-textarea" v-model="serverHeaders" placeholder="KEY=VALUE&#10;每行一个（可选）" rows="2"></textarea>
+                <label class="form-label">{{ langData.mcpMgmt_customHeaders }}</label>
+                <textarea class="form-textarea" v-model="serverHeaders" :placeholder="langData.mcpMgmt_customHeadersPlaceholder" rows="2"></textarea>
               </div>
             </template>
           </div>
           <div class="modal-footer">
-            <button class="btn-secondary" @click="showServerForm = false">取消</button>
-            <button class="btn-primary" @click="saveServer">保存</button>
+            <button class="btn-secondary" @click="showServerForm = false">{{ langData.btnCancel }}</button>
+            <button class="btn-primary" @click="saveServer">{{ langData.btnSave }}</button>
           </div>
         </div>
       </div>

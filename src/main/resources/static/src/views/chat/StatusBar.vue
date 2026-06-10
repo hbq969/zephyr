@@ -3,6 +3,9 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/settings'
 import { useChatStore } from '@/store/chat'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
+
+const langData = getLangData()
 
 const settingsStore = useSettingsStore()
 const chatStore = useChatStore()
@@ -101,7 +104,7 @@ const duration = computed(() => {
       <span>{{ settingsStore.currentModel }}</span>
     </div>
 
-    <div class="ctx-group">
+    <div v-if="settingsStore.contextLoaded" class="ctx-group">
       <div class="ctx-bar">
         <div class="ctx-fill" :style="{ width: ctxPercent + '%', background: ctxColor }"></div>
       </div>

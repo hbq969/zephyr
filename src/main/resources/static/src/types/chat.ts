@@ -100,6 +100,7 @@ export interface ModelConfig {
   apiKey?: string
   isDefault: boolean
   maxContextTokens?: number
+  params?: string
 }
 
 // === Memory ===

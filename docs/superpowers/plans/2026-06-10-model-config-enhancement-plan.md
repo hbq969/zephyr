@@ -1,3 +1,365 @@
+# 模型配置增强 实施计划
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**目标：** 为模型配置增加拉取模型名称、模型参数配置、API Key 掩码显示修复、请求超时参数四项功能。
+
+**架构：** 后端新增 `/fetch-models` 接口调用 provider API 拉取模型列表，`model_configs` 表加 `params TEXT` 列存储 JSON 参数，前端 ModelSettings.vue 重构表单为双区块布局（基本配置 + 模型参数），修复编辑时 API Key 丢失问题。
+
+**技术栈：** SpringBoot 3.5.4 + MyBatis + Vue3 + TypeScript + Element Plus
+
+---
+
+## Task 1: 后端 — ModelConfigEntity 加 params 字段
+
+**文件：**
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/entity/ModelConfigEntity.java`
+
+- [ ] **Step 1: Entity 加 params 属性**
+
+```java
+@Data
+public class ModelConfigEntity {
+    private String id;
+    private String userName;
+    private String name;
+    private String baseUrl;
+    private String apiKeyEncrypted;
+    private Integer isDefault;
+    private Long createdAt;
+    private Long updatedAt;
+    private Long maxContextTokens;
+    private String params;
+}
+```
+
+## Task 2: 后端 — Mapper XML 三方言 DDL 加 params 列
+
+**文件：**
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/embedded/ModelConfigMapper.xml`
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/mysql/ModelConfigMapper.xml`
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/postgresql/ModelConfigMapper.xml`
+
+- [ ] **Step 1: embedded DDL 加 params 列**
+
+在 `<update id="createModelConfigsTable">` 的 `updated_at bigint` 后面加一行：
+```xml
+      params text,
+```
+注意保持缩进一致。
+
+- [ ] **Step 2: mysql DDL 加 params 列**（同上）
+
+- [ ] **Step 3: postgresql DDL 加 params 列**（同上）
+
+- [ ] **Step 4: 编译验证**
+
+```bash
+mvn compile -DskipTests
+```
+
+## Task 3: 后端 — common Mapper XML 加 params 字段
+
+**文件：**
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/common/ModelConfigMapper.xml`
+
+- [ ] **Step 1: select 语句加 params**
+
+修改 `queryByUserName`：
+```xml
+<select id="queryByUserName" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
+  select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, params
+  from model_configs
+  where user_name = #{userName}
+  order by created_at desc
+</select>
+```
+
+- [ ] **Step 2: queryById 加 params**
+
+```xml
+<select id="queryById" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
+  select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, params
+  from model_configs where id = #{id}
+</select>
+```
+
+- [ ] **Step 3: insert 加 params**
+
+```xml
+<insert id="insert">
+  insert into model_configs (id, user_name, name, base_url, api_key_encrypted, max_context_tokens, params, is_default, created_at, updated_at)
+  values (#{id}, #{userName}, #{name}, #{baseUrl}, #{apiKeyEncrypted}, #{maxContextTokens}, #{params}, #{isDefault}, #{createdAt}, #{updatedAt})
+</insert>
+```
+
+- [ ] **Step 4: update 加 params，同时修复 api_key_encrypted 空值覆盖问题**
+
+```xml
+<update id="update">
+  update model_configs
+  set name = #{name}, base_url = #{baseUrl}, updated_at = #{updatedAt}
+  <if test="apiKeyEncrypted != null and apiKeyEncrypted != ''">, api_key_encrypted = #{apiKeyEncrypted}</if>
+  <if test="maxContextTokens != null">, max_context_tokens = #{maxContextTokens}</if>
+  <if test="params != null">, params = #{params}</if>
+  where id = #{id} and user_name = #{userName}
+</update>
+```
+
+> 原来的 update 无条件 set `api_key_encrypted = #{apiKeyEncrypted}`，当用户留空 API Key 编辑时会覆盖为 null。改为 `<if>` 条件判断后，只有用户明确输入新 Key 才更新。
+
+- [ ] **Step 5: 编译验证**
+
+```bash
+mvn compile -DskipTests
+```
+
+## Task 4: 后端 — SQL 增量脚本加 ALTER TABLE
+
+**文件：**
+- 修改: `src/main/resources/zephyr-zh-CN.sql`
+- 修改: `src/main/resources/zephyr-en-US.sql`
+- 修改: `src/main/resources/zephyr-ja-JP.sql`
+
+- [ ] **Step 1: 三语言 SQL 各加一行**
+
+在文件末尾追加：
+```sql
+alter table model_configs add column if not exists params text;
+```
+
+## Task 5: 后端 — Service 新增 fetchModels 方法
+
+**文件：**
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/service/ModelConfigService.java`
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/service/impl/ModelConfigServiceImpl.java`
+
+- [ ] **Step 1: Service 接口加方法声明**
+
+在 `ModelConfigService.java` 加：
+```java
+List<Map<String, Object>> fetchModels(Map<String, String> body);
+```
+
+- [ ] **Step 2: ServiceImpl 实现 fetchModels**
+
+在 `ModelConfigServiceImpl.java` 加方法：
+```java
+@Override
+public List<Map<String, Object>> fetchModels(Map<String, String> body) {
+    String baseUrl = body.get("baseUrl");
+    String apiKey = body.get("apiKey");
+    if (baseUrl == null || baseUrl.isBlank() || apiKey == null || apiKey.isBlank()) {
+        return List.of();
+    }
+    try {
+        String url = baseUrl.replaceAll("/$", "") + "/v1/models";
+        okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
+        okhttp3.Request req = new okhttp3.Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer " + apiKey)
+                .get()
+                .build();
+        okhttp3.Response resp = client.newCall(req).execute();
+        if (!resp.isSuccessful()) { resp.close(); return List.of(); }
+        String respBody = resp.body() != null ? resp.body().string() : "";
+        resp.close();
+        com.google.gson.JsonObject json = new com.google.gson.Gson().fromJson(respBody, com.google.gson.JsonObject.class);
+        List<Map<String, Object>> models = new java.util.ArrayList<>();
+        if (json.has("data")) {
+            for (var item : json.getAsJsonArray("data")) {
+                var obj = item.getAsJsonObject();
+                if (obj.has("id")) {
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("id", obj.get("id").getAsString());
+                    models.add(m);
+                }
+            }
+        }
+        return models;
+    } catch (Exception e) {
+        log.info("拉取模型列表失败: {}", e.getMessage());
+        return List.of();
+    }
+}
+```
+
+- [ ] **Step 3: 编译验证**
+
+```bash
+mvn compile -DskipTests
+```
+
+## Task 6: 后端 — Controller 新增 /fetch-模型 接口，create/update 透传 params
+
+**文件：**
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/ctrl/ModelConfigCtrl.java`
+- 修改: `src/main/java/com/github/hbq969/ai/zephyr/config/service/impl/ModelConfigServiceImpl.java`
+
+- [ ] **Step 1: Controller 加 fetchModels 端点**
+
+在 `ModelConfigCtrl.java` 加：
+```java
+@Operation(summary = "拉取模型列表")
+@RequestMapping(path = "/fetch-models", method = RequestMethod.POST)
+@ResponseBody
+@SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "modelConfig_fetchModels", apiDesc = "模型配置_拉取模型列表")
+public ReturnMessage<?> fetchModels(@RequestBody Map<String, String> body) {
+    List<Map<String, Object>> models = modelConfigService.fetchModels(body);
+    return ReturnMessage.success(models);
+}
+```
+
+- [ ] **Step 2: ServiceImpl create 方法加 params 处理**
+
+在 `create()` 方法中 `entity.setUpdatedAt(...)` 之前加：
+```java
+String params = body.get("params");
+entity.setParams(params != null && !params.isBlank() ? params : null);
+```
+
+- [ ] **Step 3: ServiceImpl update 方法加 params 处理**
+
+在 `update()` 方法中 `entity.setUpdatedAt(...)` 之前加：
+```java
+String params = body.get("params");
+entity.setParams(params != null ? params : null);
+```
+
+- [ ] **Step 4: 编译验证**
+
+```bash
+mvn compile -DskipTests
+```
+
+## Task 7: 前端 — 类型定义加 params 和 fetchModels
+
+**文件：**
+- 修改: `src/main/resources/static/src/types/chat.ts`
+- 修改: `src/main/resources/static/src/store/settings.ts`
+
+- [ ] **Step 1: ModelConfig 类型加 params**
+
+```typescript
+export interface ModelConfig {
+  id?: string
+  name: string
+  baseUrl?: string
+  apiKey?: string
+  isDefault: boolean
+  maxContextTokens?: number
+  params?: string
+}
+```
+
+- [ ] **Step 2: store loadModels 加 params 映射**
+
+修改 `settings.ts` 中 `loadModels()` 的 map：
+```typescript
+const list: ModelConfig[] = res.data.body.map((m: any) => ({
+  id: m.id,
+  name: m.name,
+  baseUrl: m.baseUrl,
+  isDefault: m.isDefault === 1,
+  apiKey: m.apiKeyEncrypted,
+  maxContextTokens: m.maxContextTokens,
+  params: m.params
+}))
+```
+
+- [ ] **Step 3: store 加 fetchModels 方法**
+
+在 `detectCtxRaw` 方法后面加：
+```typescript
+async function fetchModels(baseUrl: string, apiKey: string) {
+  const res = await axios({ url: '/model-config/fetch-models', method: 'post', data: { baseUrl, apiKey } })
+  if (res.data.state === 'OK' && Array.isArray(res.data.body)) {
+    return res.data.body as { id: string }[]
+  }
+  return []
+}
+```
+
+- [ ] **Step 4: store 导出加 fetchModels**
+
+在 return 块中 `detectCtxRaw` 后面加 `fetchModels`
+
+- [ ] **Step 5: 修改 addModelRemote 和 updateModelRemote 传 params**
+
+```typescript
+async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
+  const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params } })
+  if (res.data.state === 'OK') await loadModels()
+}
+
+async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
+  await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params } })
+  await loadModels()
+}
+```
+
+## Task 8: 前端 — i18n 加新 key
+
+**文件：**
+- 修改: `src/main/resources/static/src/i18n/locale.ts`
+
+- [ ] **Step 1: zh-CN 加键**
+
+在 `modelConfig_contextLabel` 后加：
+```typescript
+"modelConfig_fetchModels": "拉取模型列表",
+"modelConfig_fetchFail": "拉取失败，请手动输入",
+"modelConfig_keySet": "已设置 API Key，无需修改可留空",
+"modelConfig_params": "模型参数",
+"modelConfig_addParam": "添加参数",
+"modelConfig_paramName": "参数名",
+"modelConfig_paramValue": "参数值",
+```
+
+- [ ] **Step 2: en-US 加键**
+
+```typescript
+"modelConfig_fetchModels": "Fetch model list",
+"modelConfig_fetchFail": "Fetch failed, please input manually",
+"modelConfig_keySet": "API Key is set, leave blank to keep unchanged",
+"modelConfig_params": "Model Parameters",
+"modelConfig_addParam": "Add parameter",
+"modelConfig_paramName": "Param name",
+"modelConfig_paramValue": "Param value",
+```
+
+- [ ] **Step 3: ja-JP 加键**
+
+```typescript
+"modelConfig_fetchModels": "モデル一覧を取得",
+"modelConfig_fetchFail": "取得失敗、手動入力してください",
+"modelConfig_keySet": "API Key設定済み、変更不要なら空欄で",
+"modelConfig_params": "モデルパラメータ",
+"modelConfig_addParam": "パラメータ追加",
+"modelConfig_paramName": "パラメータ名",
+"modelConfig_paramValue": "パラメータ値",
+```
+
+## Task 9: 前端 — ModelSettings.vue 全面改造
+
+**文件：**
+- 修改: `src/main/resources/static/src/views/settings/ModelSettings.vue`
+
+**改动要点：**
+1. 新增拉取模型按钮及下拉选择交互
+2. 表单拆为"基本配置"和"模型参数"两个独立区块
+3. 模型名称移到 API Key 下方
+4. 7 个预设参数 + 自定义参数支持增删
+5. 编辑时 API Key 显示掩码
+
+> 由于该文件改动较大（约 200+ 行），用完整替换方式写入新内容。
+
+- [ ] **Step 1: 完整替换 ModelSettings.vue**
+
+```vue
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/settings'
@@ -106,7 +468,7 @@ function startEdit(m: any) {
 function cancelForm() { resetForm() }
 
 function onApiKeyFocus() {
-  if (hasExistingKey.value && apiKeyShown.value !== '') {
+  if (hasExistingKey.value && apiKeyShown.value === '••••••••') {
     apiKeyShown.value = ''
   }
 }
@@ -116,6 +478,8 @@ function onApiKeyBlur() {
     apiKeyShown.value = '••••••••'
   }
 }
+
+function onApiKeyInput() { /* user typing */ }
 
 function clearApiKey() {
   hasExistingKey.value = false
@@ -128,9 +492,9 @@ function apiKeyDisplayValue(): string {
 }
 
 async function fetchModels() {
-  if (!baseUrl.value.trim() || (!apiKey.value && !hasExistingKey.value)) { msg(langData.modelConfig_fetchFail, 'warning'); return }
+  if (!baseUrl.value.trim() || !apiKey.value) { msg(langData.modelConfig_fetchFail, 'warning'); return }
   fetching.value = true
-  const models = await settingsStore.fetchModels(baseUrl.value.trim(), apiKey.value, editId.value || undefined)
+  const models = await settingsStore.fetchModels(baseUrl.value.trim(), apiKey.value)
   fetching.value = false
   if (models.length > 0) {
     const sel = document.getElementById('modelSelect') as HTMLSelectElement | null
@@ -157,27 +521,17 @@ function onModelSelect(val: string) {
 }
 
 async function detectCtx() {
-  if (!baseUrl.value.trim() || (!apiKey.value && !hasExistingKey.value)) return
+  if (!baseUrl.value.trim() || !apiKey.value) return
   detecting.value = true
   detectMsg.value = ''
-  if (editId.value) {
-    const res = await settingsStore.detectContextRemote(editId.value)
-    if (res?.state === 'OK' && res.body) {
-      maxCtx.value = String(res.body)
-      detectMsg.value = langData.modelConfig_detectSuccess
-    } else {
-      detectMsg.value = langData.modelConfig_detectFail
-    }
-  } else {
-    const res = await settingsStore.detectCtxRaw(name.value.trim(), baseUrl.value.trim(), apiKey.value)
-    if (res?.state === 'OK' && res.body) {
-      maxCtx.value = String(res.body)
-      detectMsg.value = langData.modelConfig_detectSuccess
-    } else {
-      detectMsg.value = langData.modelConfig_detectFail
-    }
-  }
+  const res = await settingsStore.detectCtxRaw(name.value.trim(), baseUrl.value.trim(), apiKey.value)
   detecting.value = false
+  if (res?.state === 'OK' && res.body) {
+    maxCtx.value = String(res.body)
+    detectMsg.value = langData.modelConfig_detectSuccess
+  } else {
+    detectMsg.value = langData.modelConfig_detectFail
+  }
 }
 
 async function removeModel(id: string) { await settingsStore.deleteModelRemote(id) }
@@ -207,6 +561,7 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
       <h2>{{ langData.modelConfig_title }}</h2>
     </div>
     <div class="page-body">
+      <!-- 模型列表 -->
       <div v-for="m in settingsStore.models" :key="m.name" class="setting-row">
         <div class="row-left">
           <Icon icon="lucide:cpu" class="row-icon" />
@@ -224,7 +579,10 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
         </div>
       </div>
 
+      <!-- 表单 -->
       <div v-if="showForm" class="form-area">
+
+        <!-- ====== 基本配置 ====== -->
         <div class="section-title">基本配置</div>
         <div class="config-block">
           <div class="field">
@@ -237,8 +595,8 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
               <input
                 class="field-input" type="password"
                 :value="apiKeyDisplayValue()"
-                :style="{ color: hasExistingKey && apiKeyShown !== '' ? 'var(--el-text-color-placeholder)' : 'var(--el-text-color-primary)' }"
-                @input="apiKey = ($event.target as HTMLInputElement).value"
+                :style="{ color: hasExistingKey && apiKeyShown === '••••••••' ? 'var(--el-text-color-placeholder)' : 'var(--el-text-color-primary)' }"
+                @input="apiKey = ($event.target as HTMLInputElement).value; onApiKeyInput()"
                 @focus="onApiKeyFocus()"
                 @blur="onApiKeyBlur()"
                 :placeholder="hasExistingKey ? '' : 'sk-xxxxxxxx'"
@@ -275,12 +633,13 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           </div>
         </div>
 
+        <!-- ====== 模型参数 ====== -->
         <div class="section-title">{{ langData.modelConfig_params }}</div>
         <div class="config-block">
           <div v-for="(p, i) in params" :key="p.key + i" class="param-row">
             <div class="param-name">
               <span :class="{ 'is-custom': !p.isPreset }">{{ p.key }}</span>
-              <span v-if="p.tip" class="tip-icon" :data-tip="p.tip">?</span>
+              <span v-if="p.tip" class="tip-icon" :title="p.tip">?</span>
             </div>
             <input class="field-input param-value" v-model="p.value" spellcheck="false" />
             <button class="param-delete" @click="removeParam(i)" title="删除">
@@ -303,10 +662,12 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           </button>
         </div>
 
+        <!-- 操作按钮 -->
         <div class="form-actions">
           <button class="btn btn-sec" @click="cancelForm">{{ langData.btnCancel }}</button>
           <button class="btn btn-pri" @click="add">{{ editId ? langData.btnSave : langData.btnAdd }}</button>
         </div>
+
       </div>
       <button v-else class="add-btn" @click="showForm = true; initParams()"><Icon icon="lucide:plus" />{{ langData.modelConfig_addModel }}</button>
     </div>
@@ -336,6 +697,7 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .add-btn { display: flex; align-items: center; gap: 6px; margin-top: 16px; padding: 8px 14px; border-radius: 8px; border: 1px dashed var(--el-border-color); background: transparent; cursor: pointer; font-size: 13px; color: var(--el-color-primary); font-family: inherit; width: 100%; justify-content: center; }
 .add-btn:hover { background: var(--el-fill-color-light); }
 
+/* 表单区块 */
 .form-area { margin-top: 16px; }
 .section-title { font-family: Georgia, serif; font-size: 18px; font-weight: 400; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 20px 0 12px; }
 .section-title:first-child { margin-top: 0; }
@@ -354,13 +716,13 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .fetch-select { flex: 1; height: 40px; padding: 0 12px; border: 1px solid var(--el-color-primary); border-radius: 8px; background: var(--el-bg-color); color: var(--el-text-color-primary); font-family: inherit; font-size: 14px; outline: none; appearance: none; padding-right: 36px; cursor: pointer; }
 .key-hint { font-size: 12px; color: var(--el-color-success); }
 
+/* 模型参数 */
 .param-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 .param-row:not(:last-child) { border-bottom: 1px solid var(--el-border-color-lighter); }
 .param-name { width: 150px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
 .param-name span { font-size: 13px; font-weight: 500; color: var(--el-text-color-primary); font-family: "JetBrains Mono", monospace; }
 .param-name .is-custom { color: var(--el-text-color-secondary); font-style: italic; }
-.tip-icon { width: 16px; height: 16px; border-radius: 50%; background: var(--el-fill-color-light); color: var(--el-text-color-placeholder); cursor: help; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; font-family: Georgia, serif; flex-shrink: 0; position: relative; }
-.tip-icon:hover::after { content: attr(data-tip); position: absolute; left: 22px; top: 50%; transform: translateY(-50%); background: #181715; color: #faf9f5; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 400; font-family: Inter, sans-serif; white-space: nowrap; z-index: 1000; pointer-events: none; }
+.tip-icon { width: 16px; height: 16px; border-radius: 50%; background: var(--el-fill-color-light); color: var(--el-text-color-placeholder); cursor: help; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; font-family: Georgia, serif; flex-shrink: 0; }
 .param-value { height: 32px !important; font-size: 13px !important; font-family: "JetBrains Mono", monospace !important; flex: 1; }
 .param-delete { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-placeholder); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; transition: all 0.15s; }
 .param-delete:hover { background: rgba(198,69,69,0.08); color: var(--el-color-danger); }
@@ -371,6 +733,7 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .add-param-row .param-val { flex: 1; height: 32px; font-size: 13px; }
 .add-param-confirm { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--el-color-primary); background: var(--el-color-primary); color: #fff; font-size: 12px; font-family: inherit; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
 
+/* 底栏 */
 .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 .btn { padding: 6px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 500; }
 .btn-sec { background: var(--el-fill-color); color: var(--el-text-color-primary); }
@@ -379,3 +742,82 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
+```
+
+## Task 10: 端到端验证
+
+- [ ] **Step 1: 构建后端**
+
+```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home
+mvn clean package -DskipTests
+cp -rf src/main/resources/*.yml target/classes/
+cp -rf src/main/resources/*.xml target/classes/
+cp -rf src/main/resources/*.sql target/classes/
+```
+
+- [ ] **Step 2: 构建前端**
+
+```bash
+cd src/main/resources/static
+npm run build
+mkdir -p ../../../target/classes/static && cp -rf zephyr-ui ../../../target/classes/static/
+```
+
+- [ ] **Step 3: 启动后端**
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=me
+```
+
+- [ ] **Step 4: curl 测试 fetch-models 接口**
+
+```bash
+curl -u admin:1 -H "X-SM-Test: 1" -H "Content-Type: application/json" -X POST \
+  "http://localhost:30733/zephyr/zephyr-ui/model-config/fetch-models" \
+  -d '{"baseUrl":"https://api.openai.com","apiKey":"sk-test"}'
+```
+预期：返回模型列表或空列表
+
+- [ ] **Step 5: curl 测试 create 含 params**
+
+```bash
+curl -u admin:1 -H "X-SM-Test: 1" -H "Content-Type: application/json" -X POST \
+  "http://localhost:30733/zephyr/zephyr-ui/model-config/create" \
+  -d '{"name":"test-model","baseUrl":"https://api.test.com","apiKey":"sk-123","params":"{\"temperature\":0.5}"}'
+```
+
+- [ ] **Step 6: curl 测试 list 确认 params 回显**
+
+```bash
+curl -u admin:1 -H "X-SM-Test: 1" \
+  "http://localhost:30733/zephyr/zephyr-ui/model-config/list"
+```
+预期：返回数据中包含 `"params":"{\"temperature\":0.5}"`
+
+- [ ] **Step 7: curl 测试 update 留空 apiKey 不丢失**
+
+```bash
+curl -u admin:1 -H "X-SM-Test: 1" -H "Content-Type: application/json" -X POST \
+  "http://localhost:30733/zephyr/zephyr-ui/model-config/update" \
+  -d '{"id":"<模型ID>","name":"test-model","baseUrl":"https://api.test.com","apiKey":"","params":"{}"}'
+```
+再执行 list，确认 apiKeyEncrypted 不是 null
+
+- [ ] **Step 8: 浏览器打开验证**
+
+```bash
+open http://localhost:30733/zephyr/zephyr-ui/index.html
+```
+验证：模型配置页面，新建/编辑表单布局正确，拉取按钮交互正常，API Key 掩码显示正常，参数增删正常。
+
+## Task 11: 清理 mock 文件
+
+**文件：**
+- 删除: `mock-model-config.html`
+
+- [ ] **Step 1: 删除 mock 文件**
+
+```bash
+rm /Users/hbq/Codes/me/github/zephyr/mock-model-config.html
+```

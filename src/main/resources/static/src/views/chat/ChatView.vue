@@ -10,12 +10,14 @@ import StatusBar from './StatusBar.vue'
 import CommandPalette from './CommandPalette.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
 import axios from '@/network'
 
 const convStore = useConversationsStore()
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const showSettings = ref(false)
+const langData = getLangData()
 let abortController: AbortController | null = null
 let msgIdCounter = 0
 function nextMsgId() { return 'm' + (++msgIdCounter) }
@@ -44,13 +46,13 @@ function onSend(text: string) {
       .then(res => {
         if (res.data.state === 'OK') {
           const info = res.data.body
-          chatStore.addMessage({ id: nextMsgId(), role: 'system', content: '上下文使用情况:\n' + JSON.stringify(info, null, 2), timestamp: Date.now() / 1000 })
+          chatStore.addMessage({ id: nextMsgId(), role: 'system', content: langData.context_usageInfo + JSON.stringify(info, null, 2), timestamp: Date.now() / 1000 })
         }
       })
     return
   }
   if (text === '/help') {
-    chatStore.addMessage({ id: nextMsgId(), role: 'system', content: '可用命令:\n\n/clear — 清空当前对话\n/context — 查看上下文占比\n/resume — 恢复之前的对话\n/help — 查看帮助\n\nCtrl+Enter 发送 · Enter 换行', timestamp: Date.now() / 1000 })
+    chatStore.addMessage({ id: nextMsgId(), role: 'system', content: langData.context_helpTitle, timestamp: Date.now() / 1000 })
     return
   }
 
@@ -95,7 +97,7 @@ function onSend(text: string) {
             settingsStore.loadContextUsage(convStore.currentId)
             chatStore.streaming = false
           } else if (event.type === 'error') {
-            chatStore.appendToken('\n\n[错误] ' + (event.content || '请求失败'))
+            chatStore.appendToken('\n\n' + langData.context_errorPrefix + (event.content || langData.context_requestFailed))
             chatStore.streaming = false
           }
         } catch (_) {}
@@ -103,7 +105,7 @@ function onSend(text: string) {
     }
   }).catch((err: any) => {
     if (err?.code !== 'ERR_CANCELED' && err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
-      chatStore.appendToken('\n\n[请求失败]')
+      chatStore.appendToken('\n\n' + langData.context_requestFailed)
     }
     chatStore.streaming = false
   })
@@ -179,18 +181,18 @@ onMounted(() => {
     <ChatSidebar @open-settings="showSettings = true" @new-chat="newChat" />
     <div class="main-area">
       <div class="top-toolbar" :class="{ show: convStore.sidebarCollapsed }">
-        <button class="tb-btn" @click="convStore.toggleSidebar()" title="展开侧边栏">
+        <button class="tb-btn" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_expandTooltip">
           <Icon icon="lucide:panel-left-open" />
         </button>
         <span class="tb-logo" @click="convStore.toggleSidebar()">zephyr</span>
         <span class="tb-divider"></span>
-        <button class="tb-btn" title="新对话" @click="newChat">
+        <button class="tb-btn" :title="langData.chatSidebar_newChat" @click="newChat">
           <Icon icon="lucide:square-pen" />
         </button>
-        <button class="tb-btn" title="搜索会话">
+        <button class="tb-btn" :title="langData.chatSidebar_searchConv">
           <Icon icon="lucide:search" />
         </button>
-        <button class="tb-btn" title="历史会话">
+        <button class="tb-btn" :title="langData.chatSidebar_historyConv">
           <Icon icon="lucide:history" />
         </button>
       </div>

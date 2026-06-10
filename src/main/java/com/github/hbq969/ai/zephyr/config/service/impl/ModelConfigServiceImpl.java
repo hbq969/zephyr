@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -54,6 +56,8 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         if (maxCtx != null && !maxCtx.isBlank()) {
             entity.setMaxContextTokens(Long.parseLong(maxCtx));
         }
+        String params = body.get("params");
+        entity.setParams(params != null && !params.isBlank() ? params : null);
         entity.setIsDefault(0);
         entity.setCreatedAt(System.currentTimeMillis() / 1000);
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
@@ -80,7 +84,7 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         // 按 ID 探测并回存
         ModelConfigEntity entity = modelConfigDao.queryById(id);
         if (entity == null) return null;
-        Long tokens = detectMaxContextTokens(entity, entity.getApiKeyEncrypted());
+        Long tokens = detectMaxContextTokens(entity, decryptApiKey(entity.getApiKeyEncrypted()));
         if (tokens != null) {
             modelConfigDao.updateMaxContextTokens(id, tokens, System.currentTimeMillis() / 1000, userName);
         }
@@ -103,6 +107,8 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         if (maxCtx != null && !maxCtx.isBlank()) {
             entity.setMaxContextTokens(Long.parseLong(maxCtx));
         }
+        String params = body.get("params");
+        entity.setParams(params != null ? params : null);
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         modelConfigDao.update(entity);
     }
@@ -124,9 +130,68 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         return AESUtil.encrypt(plain, aesKey, aesIv, StandardCharsets.UTF_8);
     }
 
+    private String decryptApiKey(String encrypted) {
+        if (encrypted == null || encrypted.isBlank()) return "";
+        return AESUtil.decrypt(encrypted, aesKey, aesIv, StandardCharsets.UTF_8);
+    }
+
     private String maskApiKey(String key) {
         if (key.length() <= 8) return "****";
         return key.substring(0, 3) + "****" + key.substring(key.length() - 4);
+    }
+
+    @Override
+    public List<Map<String, Object>> fetchModels(Map<String, String> body) {
+        String baseUrl = body.get("baseUrl");
+        String apiKey = body.get("apiKey");
+        String id = body.get("id");
+
+        // 编辑模式：传了模型 id 但没传 apiKey，用已存的 key
+        if (id != null && !id.isBlank() && (apiKey == null || apiKey.isBlank())) {
+            ModelConfigEntity existing = modelConfigDao.queryById(id);
+            if (existing != null) {
+                apiKey = decryptApiKey(existing.getApiKeyEncrypted());
+                if (baseUrl == null || baseUrl.isBlank()) {
+                    baseUrl = existing.getBaseUrl();
+                }
+            }
+        }
+
+        if (baseUrl == null || baseUrl.isBlank() || apiKey == null || apiKey.isBlank()) {
+            return List.of();
+        }
+        try {
+            String url = baseUrl.replaceAll("/$", "") + "/v1/models";
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+            okhttp3.Request req = new okhttp3.Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .get()
+                    .build();
+            okhttp3.Response resp = client.newCall(req).execute();
+            if (!resp.isSuccessful()) { resp.close(); return List.of(); }
+            String respBody = resp.body() != null ? resp.body().string() : "";
+            resp.close();
+            com.google.gson.JsonObject json = new com.google.gson.Gson().fromJson(respBody, com.google.gson.JsonObject.class);
+            List<Map<String, Object>> models = new ArrayList<>();
+            if (json.has("data")) {
+                for (var item : json.getAsJsonArray("data")) {
+                    var obj = item.getAsJsonObject();
+                    if (obj.has("id")) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", obj.get("id").getAsString());
+                        models.add(m);
+                    }
+                }
+            }
+            return models;
+        } catch (Exception e) {
+            log.info("拉取模型列表失败: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private Long detectMaxContextTokens(ModelConfigEntity entity, String apiKey) {

@@ -3,7 +3,9 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
 
+const langData = getLangData()
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
@@ -30,7 +32,7 @@ function toggleDark() {
     <div v-if="visible" class="sp-overlay" @click="emit('close')"></div>
     <div v-if="visible" class="sp-card">
       <div class="sp-header">
-        <span class="sp-title">设置</span>
+        <span class="sp-title">{{ langData.settingsPanel_title }}</span>
         <button class="sp-close" @click="emit('close')">
           <Icon icon="lucide:x" />
         </button>
@@ -38,32 +40,32 @@ function toggleDark() {
       <div class="sp-body">
         <div class="sp-item" @click="goTo('/settings/model')">
           <Icon icon="lucide:cpu" class="sp-item-icon" />
-          <span>当前模型</span>
+          <span>{{ langData.settingsPanel_currentModel }}</span>
           <span class="sp-value">{{ settingsStore.currentModel }}</span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
         <div class="sp-item" @click="goTo('/settings/mcp')">
           <Icon icon="lucide:plug" class="sp-item-icon" />
-          <span>MCP 管理</span>
-          <span class="sp-value">{{ settingsStore.mcpServers.length > 0 ? settingsStore.mcpServers.length + ' 个' : '无' }}</span>
+          <span>{{ langData.settingsPanel_mcpMgmt }}</span>
+          <span class="sp-value">{{ settingsStore.mcpServers.length > 0 ? langData.settingsPanel_mcpCount.replace('{count}', settingsStore.mcpServers.length) : langData.settingsPanel_noMcp }}</span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
         <div class="sp-item" @click="goTo('/settings/skills')">
           <Icon icon="lucide:puzzle" class="sp-item-icon" />
-          <span>Skill 管理</span>
-          <span class="sp-value">{{ settingsStore.skills.filter((s: any) => s.enabled).length }} 个</span>
+          <span>{{ langData.settingsPanel_skillMgmt }}</span>
+          <span class="sp-value">{{ langData.settingsPanel_skillCount.replace('{count}', settingsStore.skills.filter((s: any) => s.enabled).length) }}</span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
         <div class="sp-item" @click="goTo('/settings/memory')">
           <Icon icon="lucide:hard-drive" class="sp-item-icon" />
-          <span>记忆管理</span>
-          <span class="sp-value">{{ settingsStore.memories.length > 0 ? '用户 ' + settingsStore.memories.filter((m: any) => m.type === 'user').length + '  项目 ' + settingsStore.memories.filter((m: any) => m.type === 'project').length : '无' }}</span>
+          <span>{{ langData.settingsPanel_memoryMgmt }}</span>
+          <span class="sp-value">{{ settingsStore.memories.length > 0 ? langData.settingsPanel_memorySummary.replace('{user}', settingsStore.memories.filter((m: any) => m.type === 'user').length).replace('{project}', settingsStore.memories.filter((m: any) => m.type === 'project').length) : langData.settingsPanel_noMemory }}</span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
         <div class="sp-divider"></div>
         <div class="sp-item" @click="toggleDark()">
           <Icon icon="lucide:moon" class="sp-item-icon" />
-          <span>暗黑模式</span>
+          <span>{{ langData.settingsPanel_darkMode }}</span>
           <span
             class="sp-switch"
             :class="{ on: isDark }"
@@ -72,7 +74,7 @@ function toggleDark() {
         </div>
       </div>
       <div class="sp-footer">
-        <button class="sp-btn" @click="emit('close')">关闭</button>
+        <button class="sp-btn" @click="emit('close')">{{ langData.settingsPanel_close }}</button>
       </div>
     </div>
   </Teleport>

@@ -1,16 +1,33 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useConversationsStore } from '@/store/conversations'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
 import axios from '@/network'
 
 const convStore = useConversationsStore()
 const settingsStore = useSettingsStore()
+const langData = getLangData()
 
 const openMenuId = ref<string | null>(null)
 const renameId = ref<string | null>(null)
 const renameText = ref('')
+const username = ref('admin')
+const avatarText = ref('A')
+
+function fetchUserInfo() {
+  axios({ url: '/chat/whoami', method: 'get' })
+    .then(res => {
+      if (res.data.state === 'OK' && res.data.body) {
+        username.value = res.data.body.username || 'admin'
+        avatarText.value = res.data.body.avatar || 'A'
+      }
+    })
+    .catch(() => {})
+}
+
+onMounted(fetchUserInfo)
 
 function deleteConversation(id: string) {
   axios({ url: '/conversations/delete', method: 'post', data: { id } })
@@ -47,14 +64,14 @@ function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
     <div class="sidebar-header">
       <span class="logo">zephyr</span>
       <span class="spacer"></span>
-      <button class="btn-icon" @click="convStore.toggleSidebar()" title="折叠侧边栏">
+      <button class="btn-icon" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_collapseTooltip">
         <Icon icon="lucide:panel-left-close" />
       </button>
     </div>
 
     <div class="new-chat-btn" @click="$emit('newChat')">
       <Icon icon="lucide:square-pen" />
-      <span>开启新对话</span>
+      <span>{{ langData.chatSidebar_newChat }}</span>
     </div>
 
     <div class="sidebar-body">
@@ -84,10 +101,10 @@ function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
                 <Icon icon="lucide:ellipsis" />
                 <div v-if="openMenuId === conv.id" class="conv-menu">
                   <div class="conv-menu-item" @click.stop="startRename(conv.id, conv.title)">
-                    <Icon icon="lucide:pencil" />重命名
+                    <Icon icon="lucide:pencil" />{{ langData.chatSidebar_rename }}
                   </div>
                   <div class="conv-menu-item danger" @click.stop="deleteConversation(conv.id)">
-                    <Icon icon="lucide:trash-2" />删除
+                    <Icon icon="lucide:trash-2" />{{ langData.chatSidebar_delete }}
                   </div>
                 </div>
               </span>
@@ -99,8 +116,8 @@ function selectAndCloseSidebar(id: string) { convStore.selectConversation(id) }
 
     <div class="sidebar-footer">
       <div class="user-row" @click="$emit('openSettings')">
-        <div class="avatar">A</div>
-        <span class="uname">admin</span>
+        <div class="avatar">{{ avatarText }}</div>
+        <span class="uname">{{ username }}</span>
         <Icon icon="lucide:ellipsis" class="chevron-icon" />
       </div>
     </div>

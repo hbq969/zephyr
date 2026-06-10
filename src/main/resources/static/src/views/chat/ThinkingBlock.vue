@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
+
+const langData = getLangData()
 
 const props = defineProps<{
   content: string
@@ -36,10 +39,10 @@ onBeforeUnmount(stopEffect)
     <div class="thinking-header" @click="collapsed = !collapsed">
       <span class="thinking-text">
         <template v-if="animating">
-          思考中<span class="dot-anim"><i>.</i><i>.</i><i>.</i></span>
+          {{ langData.thinkingBlock_thinking }}<span class="dot-anim"><i>.</i><i>.</i><i>.</i></span>
         </template>
         <template v-else>
-          <Icon icon="lucide:brain" class="brain-icon" /> 已深度思考
+          <Icon icon="lucide:brain" class="brain-icon" /> {{ langData.thinkingBlock_deepThought }}
         </template>
       </span>
       <Icon :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" class="chevron" />

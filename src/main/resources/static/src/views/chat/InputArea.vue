@@ -4,6 +4,7 @@ import { useSettingsStore } from '@/store/settings'
 import { useChatStore } from '@/store/chat'
 import { Icon } from '@iconify/vue'
 import axios from '@/network'
+import { getLangData } from '@/i18n/locale'
 
 const emit = defineEmits<{ send: [text: string]; stop: [] }>()
 const chatStore = useChatStore()
@@ -17,32 +18,65 @@ const hoveredAbility = ref('')
 const hasInput = ref(false)
 const mcpGroups = ref<{ server: string; tools: { name: string; desc: string }[] }[]>([])
 const skillList = ref<{ name: string; desc: string }[]>([])
+const mcpLoading = ref(false)
+const mcpLoaded = ref(false)
+const skillLoading = ref(false)
+const skillLoaded = ref(false)
+
+const langData = getLangData()
 
 const abilityItems = [
   { key: 'mcp', label: 'MCP' },
   { key: 'skills', label: 'Skills' },
 ]
 const sessionItems = [
-  { cmd: '/context', label: '上下文占比' },
+  { cmd: '/context', label: langData.inputArea_contextUsage },
 ]
 const actionItems = [
-  { cmd: '/clear', label: '清空当前对话' },
-  { cmd: '/help', label: '查看帮助' },
+  { cmd: '/clear', label: langData.cmd_clearChat },
+  { cmd: '/help', label: langData.cmd_viewHelp },
 ]
+
+const MAX_UNDO = 50
+const undoStack: string[] = []
+
+function pushUndo() {
+  const el = inputRef.value
+  if (!el) return
+  undoStack.push(el.innerHTML)
+  if (undoStack.length > MAX_UNDO) undoStack.shift()
+}
 
 function onInput() {
   const el = inputRef.value
   if (el) {
-    if (el.innerText.trim() === '') {
-      el.innerHTML = ''
+    // 不清空 innerHTML，避免破坏 undo 历史
+    if (!el.textContent || el.textContent.trim() === '') {
+      hasInput.value = false
+    } else {
+      hasInput.value = true
     }
+    return
   }
-  hasInput.value = !!el && (el.textContent || '').trim().length > 0
+  hasInput.value = false
 }
 
 function onKeydown(e: KeyboardEvent) {
   const el = inputRef.value
   if (!el) return
+  // Ctrl+Z 撤销
+  if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    e.preventDefault()
+    if (undoStack.length > 0) {
+      el.innerHTML = undoStack.pop()!
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    return
+  }
+  // 保存当前状态用于撤销（排除功能键）
+  if (!e.ctrlKey && !e.metaKey && !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Escape','Tab','Shift','Alt','Control','Meta','CapsLock','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'].includes(e.key)) {
+    pushUndo()
+  }
   // Backspace 删除 tag：光标在文本节点开头且前一个兄弟是 tag
   if (e.key === 'Backspace') {
     const sel = window.getSelection()
@@ -52,6 +86,7 @@ function onKeydown(e: KeyboardEvent) {
         const prev = range.startContainer.previousSibling
         if (prev && prev.nodeType === Node.ELEMENT_NODE && (prev as Element).classList.contains('cmd-tag')) {
           e.preventDefault()
+          pushUndo()
           prev.remove()
           el.dispatchEvent(new Event('input', { bubbles: true }))
           return
@@ -64,6 +99,7 @@ function onKeydown(e: KeyboardEvent) {
 
 function onPaste(e: ClipboardEvent) {
   e.preventDefault()
+  pushUndo()
   const text = e.clipboardData?.getData('text/plain')
   if (!text) return
   const sel = window.getSelection()
@@ -110,6 +146,7 @@ function doSend() {
   emit('send', msg)
   el.innerHTML = ''
   hasInput.value = false
+  undoStack.length = 0
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
@@ -129,11 +166,13 @@ function closeModelList() { showModelList.value = false }
 
 function onAbilityHover(key: string) {
   hoveredAbility.value = key
-  if (key === 'mcp' && mcpGroups.value.length === 0) loadMcpTools()
-  if (key === 'skills' && skillList.value.length === 0) loadSkills()
+  if (key === 'mcp' && !mcpLoaded.value) loadMcpTools()
+  if (key === 'skills' && !skillLoaded.value) loadSkills()
 }
 
 async function loadMcpTools() {
+  if (mcpLoading.value) return
+  mcpLoading.value = true
   try {
     const res = await axios({ url: '/mcp/server/list', method: 'get' })
     if (res.data.state !== 'OK') return
@@ -146,17 +185,23 @@ async function loadMcpTools() {
     )
     const results = await Promise.all(toolReqs)
     mcpGroups.value = results.filter(g => g.tools.length > 0)
+    mcpLoaded.value = true
   } catch (_) {}
+  finally { mcpLoading.value = false }
 }
 
 async function loadSkills() {
+  if (skillLoading.value) return
+  skillLoading.value = true
   try {
     const res = await axios({ url: '/skill/list', method: 'get' })
     if (res.data.state === 'OK') {
       skillList.value = (res.data.body as any[]).filter((s: any) => s.enabled === 1 || s.enabled === true)
         .map((s: any) => ({ name: s.skillName || s.displayName, desc: s.description }))
     }
+    skillLoaded.value = true
   } catch (_) {}
+  finally { skillLoading.value = false }
 }
 
 function insertCommand(cmd: string) {
@@ -187,6 +232,7 @@ function insertTag(type: 'mcp' | 'skill', name: string) {
   const el = inputRef.value
   if (!el) return
 
+  pushUndo()
   el.focus()
 
   const sel = window.getSelection()
@@ -245,13 +291,13 @@ function closeAll() {
         @keydown="onKeydown"
         @input="onInput"
         @paste="onPaste"
-        data-placeholder="Ctrl+Enter 发送 · Enter 换行"
+        :data-placeholder="langData.inputArea_placeholder"
       ></div>
       <div class="input-toolbar">
         <div class="input-left">
           <!-- 模型切换 -->
           <div class="tool-pick" @click.stop="toggleModelList">
-            <span>{{ settingsStore.models.length ? settingsStore.currentModel : '无' }}</span>
+            <span>{{ settingsStore.models.length ? settingsStore.currentModel : langData.inputArea_noModel }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showModelList" class="pick-dropdown" @click.stop>
               <div v-for="m in settingsStore.models" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
@@ -263,7 +309,7 @@ function closeAll() {
 
           <!-- 能力（二级菜单） -->
           <div class="tool-pick" @click.stop="closeAll(); showAbility = !showAbility">
-            <span>能力</span>
+            <span>{{ langData.inputArea_abilities }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showAbility" class="pick-dropdown ability-menu" @click.stop>
               <div v-for="it in abilityItems" :key="it.key"
@@ -284,7 +330,8 @@ function closeAll() {
                         </div>
                       </template>
                     </template>
-                    <div v-else class="sub-loading">加载中...</div>
+                    <div v-else-if="mcpLoading" class="sub-loading">{{ langData.inputArea_loading }}</div>
+                    <div v-else class="sub-loading">{{ langData.inputArea_noSkills }}</div>
                   </template>
                   <template v-if="it.key === 'skills'">
                     <template v-if="skillList.length > 0">
@@ -293,7 +340,8 @@ function closeAll() {
                         <span class="cmd-desc" v-if="s.desc">{{ s.desc }}</span>
                       </div>
                     </template>
-                    <div v-else class="sub-loading">暂无技能</div>
+                    <div v-else-if="skillLoading" class="sub-loading">{{ langData.inputArea_loading }}</div>
+                    <div v-else class="sub-loading">{{ langData.inputArea_noSkills }}</div>
                   </template>
                 </div>
               </div>
@@ -302,7 +350,7 @@ function closeAll() {
 
           <!-- 会话 -->
           <div class="tool-pick" @click.stop="closeAll(); showSession = !showSession">
-            <span>会话</span>
+            <span>{{ langData.inputArea_session }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showSession" class="pick-dropdown" @click.stop>
               <div v-for="it in sessionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
@@ -314,7 +362,7 @@ function closeAll() {
 
           <!-- 操作 -->
           <div class="tool-pick" @click.stop="closeAll(); showAction = !showAction">
-            <span>操作</span>
+            <span>{{ langData.inputArea_actions }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showAction" class="pick-dropdown" @click.stop>
               <div v-for="it in actionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
@@ -326,7 +374,7 @@ function closeAll() {
         </div>
 
         <div class="input-right">
-          <button class="action-btn" title="上传附件">
+          <button class="action-btn" :title="langData.inputArea_uploadTooltip">
             <Icon icon="lucide:paperclip" />
           </button>
           <button
@@ -334,7 +382,7 @@ function closeAll() {
             :class="{ stop: chatStore.streaming, 'has-text': !chatStore.streaming && hasInput }"
             @click="chatStore.streaming ? $emit('stop') : doSend()"
             :disabled="!chatStore.streaming && !hasInput"
-            :title="chatStore.streaming ? '停止输出' : '发送'"
+            :title="chatStore.streaming ? langData.inputArea_stopTooltip : langData.inputArea_sendTooltip"
           >
             <Icon :icon="chatStore.streaming ? 'lucide:square' : 'lucide:arrow-up'" class="send-icon" />
           </button>
@@ -359,7 +407,10 @@ export default { inheritAttrs: false }
 .input-container { max-width: 820px; margin: 0 auto; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 12px; padding: 8px 12px; transition: border-color 0.2s; }
 .input-container:focus-within { border-color: var(--el-color-primary); }
 
-.input-textarea { width: 100%; resize: none; border: none; background: transparent; color: var(--el-text-color-primary); font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; padding: 6px 0; max-height: 160px; min-height: 40px; outline: none; line-height: 1.6; }
+.input-textarea { width: 100%; resize: none; border: none; background: transparent; color: var(--el-text-color-primary); font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; padding: 6px 2px 6px 0; max-height: 160px; min-height: 40px; outline: none; line-height: 1.6; overflow-y: auto; }
+.input-textarea::-webkit-scrollbar { width: 2px; }
+.input-textarea::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.8); border-radius: 1px; }
+.input-textarea::-webkit-scrollbar-track { background: transparent; }
 .input-textarea[data-placeholder]:empty:before {
   content: attr(data-placeholder);
   color: var(--el-text-color-placeholder);

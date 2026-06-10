@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { getLangData } from '@/i18n/locale'
 import { useSettingsStore } from '@/store/settings'
 import { msg } from '@/utils/Utils'
 import { Icon } from '@iconify/vue'
@@ -8,6 +9,7 @@ import MarkdownIt from 'markdown-it'
 
 const router = useRouter()
 const store = useSettingsStore()
+const langData = getLangData()
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
 function renderMarkdown(text: string) {
@@ -20,7 +22,7 @@ const expandedName = ref<string | null>(null)
 const detailCache = ref<Record<string, string>>({})
 
 const dialogVisible = ref(false)
-const dialogTitle = ref('新增记忆')
+const dialogTitle = ref(getLangData().memoryMgmt_createMemory)
 const editingOldName = ref('')
 const form = reactive({ name: '', type: 'user', content: '' })
 
@@ -33,7 +35,7 @@ const filteredMemories = computed(() => {
   return store.memories.filter((m: any) => m.type === currentFilter.value)
 })
 
-const typeLabel: Record<string, string> = { user: '用户', project: '项目' }
+const typeLabel: Record<string, string> = { user: langData.memoryMgmt_user, project: langData.memoryMgmt_project }
 
 function fmtTime(ts: number) {
   return new Date(ts * 1000).toISOString().slice(0, 10)
@@ -53,7 +55,7 @@ function toggleExpand(name: string) {
 }
 
 function openCreate() {
-  dialogTitle.value = '新增记忆'
+  dialogTitle.value = langData.memoryMgmt_createMemory
   editingOldName.value = ''
   form.name = ''
   form.type = 'user'
@@ -62,7 +64,7 @@ function openCreate() {
 }
 
 function openEdit(m: any) {
-  dialogTitle.value = '编辑记忆'
+  dialogTitle.value = langData.memoryMgmt_editMemory
   editingOldName.value = m.name
   form.name = m.name
   form.type = m.type
@@ -80,8 +82,8 @@ function openEdit(m: any) {
 }
 
 async function saveMemory() {
-  if (!form.name.trim()) { msg('请输入名称', 'warning'); return }
-  if (!form.content.trim()) { msg('请输入内容', 'warning'); return }
+  if (!form.name.trim()) { msg(langData.memoryMgmt_nameRequired, 'warning'); return }
+  if (!form.content.trim()) { msg(langData.memoryMgmt_contentRequired, 'warning'); return }
 
   let ok: boolean
   if (editingOldName.value) {
@@ -146,35 +148,35 @@ onMounted(() => { store.loadMemories() })
       <button class="back-btn" @click="router.push('/chat')">
         <Icon icon="lucide:chevron-left" />
       </button>
-      <h2>记忆管理</h2>
+      <h2>{{ langData.memoryMgmt_title }}</h2>
     </div>
 
     <div class="page-toolbar">
       <div class="filter-tabs">
         <button :class="['filter-tab', { active: currentFilter === 'all' }]" @click="setFilter('all')">
-          全部
+          {{ langData.memoryMgmt_all }}
         </button>
         <button :class="['filter-tab', { active: currentFilter === 'user' }]" @click="setFilter('user')">
-          用户
+          {{ langData.memoryMgmt_user }}
         </button>
         <button :class="['filter-tab', { active: currentFilter === 'project' }]" @click="setFilter('project')">
-          项目
+          {{ langData.memoryMgmt_project }}
         </button>
       </div>
       <el-button type="primary" @click="openCreate">
-        <Icon icon="lucide:plus" style="margin-right:4px" /> 新增记忆
+        <Icon icon="lucide:plus" style="margin-right:4px" /> {{ langData.memoryMgmt_addMemory }}
       </el-button>
     </div>
 
     <div v-if="selectedNames.length > 0" class="batch-bar">
-      <span>已选 <strong>{{ selectedNames.length }}</strong> 项</span>
-      <el-button type="danger" size="small" @click="confirmDeleteBatch">批量删除</el-button>
+      <span v-html="langData.memoryMgmt_selected.replace('{count}', `<strong>${selectedNames.length}</strong>`)"></span>
+      <el-button type="danger" size="small" @click="confirmDeleteBatch">{{ langData.memoryMgmt_batchDelete }}</el-button>
     </div>
 
     <div v-if="filteredMemories.length === 0" class="empty-state" style="text-align:center;padding:80px 20px;color:var(--el-text-color-secondary)">
       <Icon icon="lucide:file-text" :width="40" />
-      <h3 style="font-family:Georgia,serif;font-size:18px;font-weight:400;color:var(--el-text-color-primary);margin:12px 0 4px">暂无记忆</h3>
-      <p style="font-size:14px">点击「新增记忆」创建第一条</p>
+      <h3 style="font-family:Georgia,serif;font-size:18px;font-weight:400;color:var(--el-text-color-primary);margin:12px 0 4px">{{ langData.memoryMgmt_noMemory }}</h3>
+      <p style="font-size:14px">{{ langData.memoryMgmt_noMemoryHint }}</p>
     </div>
 
     <div v-else class="card-list">
@@ -195,12 +197,12 @@ onMounted(() => { store.loadMemories() })
               </div>
             </div>
             <div class="card-actions">
-              <el-tooltip content="编辑">
+              <el-tooltip :content="langData.btnEdit">
                 <el-button circle size="small" @click="openEdit(m)">
                   <Icon icon="lucide:edit-3" />
                 </el-button>
               </el-tooltip>
-              <el-tooltip content="删除">
+              <el-tooltip :content="langData.btnDelete">
                 <el-button circle size="small" @click="confirmDeleteSingle(m)">
                   <Icon icon="lucide:trash-2" />
                 </el-button>
@@ -211,9 +213,9 @@ onMounted(() => { store.loadMemories() })
         <div v-if="expandedName === m.name" class="card-expand">
           <div class="card-expand-body markdown-body" v-html="renderMarkdown(detailCache[m.name] || '')"></div>
           <div class="card-expand-footer">
-            <span>创建于 {{ fmtTime(m.createdAt) }}</span>
+            <span>{{ langData.memoryMgmt_created.replace('{date}', fmtTime(m.createdAt)) }}</span>
             <span>·</span>
-            <span>更新于 {{ fmtTime(m.updatedAt) }}</span>
+            <span>{{ langData.memoryMgmt_updated.replace('{date}', fmtTime(m.updatedAt)) }}</span>
           </div>
         </div>
       </div>
@@ -221,33 +223,33 @@ onMounted(() => { store.loadMemories() })
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="480px" destroy-on-close>
       <el-form :model="form" label-position="top">
-        <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="简短标题" />
+        <el-form-item :label="langData.memoryMgmt_nameLabel || langData.tableHeaderName" required>
+          <el-input v-model="form.name" :placeholder="langData.memoryMgmt_namePlaceholder" />
         </el-form-item>
-        <el-form-item label="类型" required>
+        <el-form-item :label="langData.memoryMgmt_typeLabel || '类型'" required>
           <el-select v-model="form.type" style="width:100%">
-            <el-option label="用户" value="user" />
-            <el-option label="项目" value="project" />
+            <el-option :label="langData.memoryMgmt_user" value="user" />
+            <el-option :label="langData.memoryMgmt_project" value="project" />
           </el-select>
         </el-form-item>
-        <el-form-item label="内容" required>
-          <el-input v-model="form.content" type="textarea" :rows="6" placeholder="记忆详情，支持 Markdown" />
+        <el-form-item :label="langData.memoryMgmt_contentLabel || '内容'" required>
+          <el-input v-model="form.content" type="textarea" :rows="6" :placeholder="langData.memoryMgmt_contentPlaceholder" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveMemory">保存</el-button>
+        <el-button @click="dialogVisible = false">{{ langData.btnCancel }}</el-button>
+        <el-button type="primary" @click="saveMemory">{{ langData.btnSave }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="deleteDialogVisible" title="确认删除" width="400px">
-      <p style="margin-bottom:10px">确定删除以下 {{ deleteTargets.length }} 条记忆？</p>
+    <el-dialog v-model="deleteDialogVisible" :title="langData.memoryMgmt_confirmDeleteTitle || langData.confirmDelete" width="400px">
+      <p style="margin-bottom:10px">{{ langData.memoryMgmt_confirmDeleteMsg.replace('{count}', deleteTargets.length) }}</p>
       <ul style="padding-left:18px;color:var(--el-text-color-regular)">
         <li v-for="n in deleteTargets" :key="n">{{ n }}</li>
       </ul>
       <template #footer>
-        <el-button @click="deleteDialogVisible = false">取消</el-button>
-        <el-button type="danger" @click="executeDelete">删除</el-button>
+        <el-button @click="deleteDialogVisible = false">{{ langData.btnCancel }}</el-button>
+        <el-button type="danger" @click="executeDelete">{{ langData.btnDelete }}</el-button>
       </template>
     </el-dialog>
   </div>

@@ -6,6 +6,9 @@ import ThinkingBlock from './ThinkingBlock.vue'
 import ToolCallCard from './ToolCallCard.vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
+import { getLangData } from '@/i18n/locale'
+
+const langData = getLangData()
 
 const props = defineProps<{ message: Message; isLast: boolean }>()
 
@@ -69,10 +72,10 @@ function setupCodeBlocks() {
       wrapper.className = 'code-block-wrapper'
       wrapper.innerHTML = `
         <div class="code-actions">
-          <span class="code-icon code-copy" title="复制">
+          <span class="code-icon code-copy" :title="langData.msgBubble_copy">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           </span>
-          <span class="code-icon code-toggle" title="收起">
+          <span class="code-icon code-toggle" :title="langData.msgBubble_collapse">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
           </span>
         </div>
@@ -92,7 +95,7 @@ function setupCodeBlocks() {
         toggleBtn.innerHTML = collapsed
           ? '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
           : '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>'
-        ;(toggleBtn as HTMLElement).title = collapsed ? '展开' : '收起'
+        ;(toggleBtn as HTMLElement).title = collapsed ? langData.msgBubble_expand : langData.msgBubble_collapse
       })
       pre.parentNode!.insertBefore(wrapper, pre)
       wrapper.appendChild(pre)
@@ -112,7 +115,7 @@ onUpdated(setupCodeBlocks)
     <div v-else-if="message.role === 'tool'" class="tool-bubble">
       <div class="tool-result-header" @click="toolExpanded = !toolExpanded">
         <Icon icon="lucide:wrench" class="tool-result-icon" />
-        <span class="tool-result-label">工具返回</span>
+        <span class="tool-result-label">{{ langData.msgBubble_toolResult }}</span>
         <span class="tool-result-summary">{{ contentSummary }}</span>
         <Icon :icon="toolExpanded ? 'lucide:chevron-up' : 'lucide:chevron-down'" class="tool-result-toggle" />
       </div>

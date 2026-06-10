@@ -13,4 +13,5 @@ public class ModelConfigEntity {
     private Long createdAt;
     private Long updatedAt;
     private Long maxContextTokens;
+    private String params;
 }

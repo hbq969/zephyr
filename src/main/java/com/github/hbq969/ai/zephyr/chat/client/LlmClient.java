@@ -52,16 +52,42 @@ public class LlmClient {
             bodyJson.add("tools", gson.toJsonTree(tools));
         }
 
+        // 注入模型参数（temperature、top_p、max_tokens 等）
+        Map<String, Object> params = parseParams(model.getParams());
+        if (params != null) {
+            for (Map.Entry<String, Object> e : params.entrySet()) {
+                if ("request_timeout".equals(e.getKey())) continue;
+                Object v = e.getValue();
+                if (v instanceof Number) {
+                    double d = ((Number) v).doubleValue();
+                    if (d == Math.floor(d) && !Double.isInfinite(d) && d <= Long.MAX_VALUE) {
+                        bodyJson.addProperty(e.getKey(), (long) d);
+                    } else {
+                        bodyJson.addProperty(e.getKey(), d);
+                    }
+                } else if (v instanceof Boolean) {
+                    bodyJson.addProperty(e.getKey(), (Boolean) v);
+                } else {
+                    bodyJson.addProperty(e.getKey(), String.valueOf(v));
+                }
+            }
+        }
+
         JsonObject streamOpts = new JsonObject();
         streamOpts.addProperty("include_usage", true);
         bodyJson.add("stream_options", streamOpts);
 
-        RequestBody body = RequestBody.create(gson.toJson(bodyJson), JSON);
+        int timeout = getTimeoutSeconds(params);
+
+        RequestBody reqBody = RequestBody.create(gson.toJson(bodyJson), JSON);
+        OkHttpClient client = (timeout != 120)
+                ? httpClient.newBuilder().readTimeout(timeout, TimeUnit.SECONDS).build()
+                : httpClient;
         Request request = new Request.Builder()
                 .url(baseUrl + "v1/chat/completions")
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .post(body)
+                .post(reqBody)
                 .build();
 
         StringBuilder fullContent = new StringBuilder();
@@ -69,7 +95,7 @@ public class LlmClient {
         List<LlmResult.ToolCall> toolCalls = new ArrayList<>();
         JsonArray accumulatedToolCalls = new JsonArray();
 
-        try (Response response = httpClient.newCall(request).execute()) {
+        try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 int code = response.code();
                 String errorBody = "";
@@ -183,5 +209,26 @@ public class LlmClient {
                 .thinking(fullThinking.length() > 0 ? fullThinking.toString() : null)
                 .toolCalls(toolCalls.isEmpty() ? null : toolCalls)
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseParams(String paramsJson) {
+        if (paramsJson == null || paramsJson.isBlank()) return null;
+        try {
+            return gson.fromJson(paramsJson, Map.class);
+        } catch (Exception e) {
+            log.warn("解析模型参数失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private int getTimeoutSeconds(Map<String, Object> params) {
+        if (params == null) return 120;
+        Object v = params.get("request_timeout");
+        if (v instanceof Number) {
+            int t = ((Number) v).intValue();
+            return t > 0 ? t : 120;
+        }
+        return 120;
     }
 }

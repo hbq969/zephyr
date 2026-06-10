@@ -13,7 +13,8 @@
       max_context_tokens bigint,
       is_default smallint default 0,
       created_at bigint,
-      updated_at bigint
+      updated_at bigint,
+      params text
     );
     create index if not exists idx_mc_user on model_configs(user_name);
   </update>

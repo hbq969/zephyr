@@ -1,26 +1,28 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { getLangData } from '@/i18n/locale'
 
 interface CmdItem { icon: string; name: string; desc: string; group: string }
 
-const commands: CmdItem[] = [
-  { icon: 'lucide:help-circle', name: '/help', desc: '帮助信息', group: '通用' },
-  { icon: 'lucide:brain', name: '/memory', desc: '记忆管理', group: '通用' },
-  { icon: 'lucide:cpu', name: '/model', desc: '切换模型', group: '通用' },
-  { icon: 'lucide:globe', name: '/search', desc: '联网搜索', group: '通用' },
-  { icon: 'lucide:file-plus', name: '/new', desc: '新建会话', group: '会话' },
-  { icon: 'lucide:download', name: '/export', desc: '导出 Markdown', group: '会话' },
-  { icon: 'lucide:minimize-2', name: '/compact', desc: '压缩上下文', group: '会话' },
-]
+const langData = getLangData()
+const commands = computed(() => [
+  { icon: 'lucide:help-circle', name: '/help', desc: langData.cmd_helpInfo, group: langData.cmd_groupGeneral },
+  { icon: 'lucide:brain', name: '/memory', desc: langData.cmd_memoryMgmt, group: langData.cmd_groupGeneral },
+  { icon: 'lucide:cpu', name: '/model', desc: langData.cmd_switchModel, group: langData.cmd_groupGeneral },
+  { icon: 'lucide:globe', name: '/search', desc: langData.cmd_webSearch, group: langData.cmd_groupGeneral },
+  { icon: 'lucide:file-plus', name: '/new', desc: langData.cmd_newSession, group: langData.cmd_groupSession },
+  { icon: 'lucide:download', name: '/export', desc: langData.cmd_exportMd, group: langData.cmd_groupSession },
+  { icon: 'lucide:minimize-2', name: '/compact', desc: langData.cmd_compactCtx, group: langData.cmd_groupSession },
+])
 
 const filter = ref('')
 const activeIdx = ref(0)
 const visible = ref(false)
 
 const filteredCommands = computed(() => {
-  if (!filter.value) return commands
-  return commands.filter(c => c.name.includes(filter.value) || c.desc.includes(filter.value))
+  if (!filter.value) return commands.value
+  return commands.value.filter(c => c.name.includes(filter.value) || c.desc.includes(filter.value))
 })
 
 const grouped = computed(() => {

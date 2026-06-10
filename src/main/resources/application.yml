@@ -34,7 +34,7 @@ spring:
   messages:
     basename: i18n/messages
     encoding: UTF-8
-    enabled: false
+    enabled: true
   mvc:
     interceptors:
       mdc:

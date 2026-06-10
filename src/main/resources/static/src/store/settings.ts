@@ -15,7 +15,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const mcpToolCount = ref(0)
   const skills = ref<SkillConfig[]>([])
   const memories = ref<MemoryItem[]>([])
-  const contextUsed = ref(53248)
+  const contextUsed = ref(0)
+  const contextLoaded = ref(false)
   const contextDetail = ref<Record<string, any> | null>(null)
 
   const contextTotal = computed(() => {
@@ -42,7 +43,8 @@ export const useSettingsStore = defineStore('settings', () => {
           baseUrl: m.baseUrl,
           isDefault: m.isDefault === 1,
           apiKey: m.apiKeyEncrypted,
-          maxContextTokens: m.maxContextTokens
+          maxContextTokens: m.maxContextTokens,
+          params: m.params
         }))
         models.value = list
         const def = list.find((m: ModelConfig) => m.isDefault)
@@ -51,13 +53,13 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (_) { /* keep defaults */ }
   }
 
-  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string) {
-    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens } })
+  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
+    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params } })
     if (res.data.state === 'OK') await loadModels()
   }
 
-  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string) {
-    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens } })
+  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
+    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params } })
     await loadModels()
   }
 
@@ -82,6 +84,16 @@ export const useSettingsStore = defineStore('settings', () => {
     return res.data
   }
 
+  async function fetchModels(baseUrl: string, apiKey: string, id?: string) {
+    const data: Record<string, string> = { baseUrl, apiKey }
+    if (id) data.id = id
+    const res = await axios({ url: '/model-config/fetch-models', method: 'post', data })
+    if (res.data.state === 'OK' && Array.isArray(res.data.body)) {
+      return res.data.body as { id: string }[]
+    }
+    return []
+  }
+
   async function loadContextUsage(conversationId?: string | null) {
     try {
       const params: Record<string, string> = {}
@@ -90,6 +102,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (res.data.state === 'OK' && res.data.body) {
         contextUsed.value = res.data.body.total || 0
         contextDetail.value = res.data.body
+        contextLoaded.value = true
       }
     } catch (_) {}
   }
@@ -277,9 +290,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     currentModel, models, mcpServers, mcpToolCount, skills, memories,
-    contextUsed, contextTotal, contextPercent, contextDetail,
+    contextUsed, contextLoaded, contextTotal, contextPercent, contextDetail,
     setModel, addModel,
-    loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote, detectContextRemote, detectCtxRaw,
+    loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote, detectContextRemote, detectCtxRaw, fetchModels,
     loadContextUsage,
     loadMcpServers, createMcpServer, updateMcpServer, deleteMcpServer,
     connectMcpServer, disconnectMcpServer,

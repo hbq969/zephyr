@@ -1,6 +1,9 @@
 <script lang="ts" setup>
 import { Icon } from '@iconify/vue'
 import type { ToolCall } from '@/types/chat'
+import { getLangData } from '@/i18n/locale'
+
+const langData = getLangData()
 
 defineProps<{ tool: ToolCall }>()
 </script>
@@ -14,7 +17,7 @@ defineProps<{ tool: ToolCall }>()
         <Icon v-if="tool.status === 'success'" icon="lucide:check-circle" style="font-size:11px" />
         <Icon v-else-if="tool.status === 'error'" icon="lucide:x-circle" style="font-size:11px" />
         <Icon v-else icon="lucide:loader-circle" style="font-size:11px" />
-        {{ tool.status === 'success' ? '成功' : tool.status === 'error' ? '失败' : '运行中' }}
+        {{ tool.status === 'success' ? langData.toolCard_success : tool.status === 'error' ? langData.toolCard_failed : langData.toolCard_running }}
       </span>
     </div>
     <div v-if="tool.output" class="tool-body">{{ tool.output }}</div>
