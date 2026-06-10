@@ -28,6 +28,7 @@ function startTimer() {
 
 onMounted(() => {
   settingsStore.loadModels()
+  settingsStore.loadContextUsage()
   startTimer()
 })
 
@@ -45,7 +46,7 @@ const ctxUsedStr = computed(() => {
 })
 const ctxTotalStr = computed(() => {
   const k = settingsStore.contextTotal / 1024
-  return k >= 1024 ? (k / 1024).toFixed(0) + 'M' : (k / 1024).toFixed(0) + 'K'
+  return k >= 1024 ? (k / 1024).toFixed(0) + 'M' : k.toFixed(0) + 'K'
 })
 
 function hexToHsl(hex: string): [number, number, number] {
@@ -87,8 +88,8 @@ const duration = computed(() => {
   const h = Math.floor(elapsed / 3600)
   const m = Math.floor((elapsed % 3600) / 60)
   const s = elapsed % 60
-  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
-  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m`
   return `${s}s`
 })
 </script>

@@ -59,6 +59,7 @@ public class ChatServiceImpl implements ChatService {
             try {
                 String cid = conversationId;
                 long now = System.currentTimeMillis() / 1000;
+                long msgSeq = now;  // 单调递增计数器，保证所有消息 timestamp 唯一
 
                 // 0. 预处理斜杠命令
                 String message = originalMessage;
@@ -89,7 +90,7 @@ public class ChatServiceImpl implements ChatService {
                 userMsg.setConversationId(cid);
                 userMsg.setRole("user");
                 userMsg.setContent(message);
-                userMsg.setCreatedAt(now);
+                userMsg.setCreatedAt(msgSeq++);
                 chatDao.insertMessage(userMsg);
 
                 // 3. 组装上下文
@@ -118,14 +119,14 @@ public class ChatServiceImpl implements ChatService {
                         }
                         messages.add(assistantMsg);
 
-                        // 4b. 持久化 assistant 消息（每轮递增时间戳，保证消息顺序）
-                        persistAssistantMessage(cid, result, now + round);
+                        // 4b. 持久化 assistant 消息（单调递增保证顺序）
+                        persistAssistantMessage(cid, result, msgSeq++);
 
                         // 4c. 分发工具调用
                         List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName);
                         messages.addAll(toolResults);
 
-                        // 4d. 持久化 tool 消息（用统一时间戳保证排序在 assistant 之后）
+                        // 4d. 持久化 tool 消息
                         for (int i = 0; i < result.getToolCalls().size(); i++) {
                             LlmResult.ToolCall tc = result.getToolCalls().get(i);
                             MessageEntity toolMsg = new MessageEntity();
@@ -134,13 +135,13 @@ public class ChatServiceImpl implements ChatService {
                             toolMsg.setRole("tool");
                             toolMsg.setContent(toolResults.get(i).get("content").toString());
                             toolMsg.setToolCallId(tc.getId());
-                            toolMsg.setCreatedAt(now + i + 1); // 比 assistant 晚 1-2 秒，保证排序正确
+                            toolMsg.setCreatedAt(msgSeq++);
                             chatDao.insertMessage(toolMsg);
                         }
                     } else {
                         // 5. 正常结束（内容为空时跳过持久化，避免空消息气泡）
                         if (isNotBlank(result.getContent()) || result.hasToolCalls()) {
-                            persistAssistantMessage(cid, result, now + round);
+                            persistAssistantMessage(cid, result, msgSeq++);
                         }
                         emitter.send(SseEmitter.event().name("message")
                                 .data(ChatEvent.builder().type("done").build()));
@@ -150,7 +151,7 @@ public class ChatServiceImpl implements ChatService {
                 }
                 // 超轮次结束
                 if (result != null && (isNotBlank(result.getContent()) || result.hasToolCalls())) {
-                    persistAssistantMessage(cid, result, now + MAX_ROUNDS);
+                    persistAssistantMessage(cid, result, msgSeq++);
                 }
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("done").build()));

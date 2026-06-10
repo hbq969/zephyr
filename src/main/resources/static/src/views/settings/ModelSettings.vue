@@ -11,6 +11,7 @@ const apiKey = ref('')
 const maxCtx = ref('')
 const editId = ref<string | null>(null)
 const detecting = ref(false)
+const detectingId = ref<string | null>(null)
 const detectMsg = ref('')
 
 onMounted(() => { settingsStore.loadModels() })
@@ -91,7 +92,7 @@ async function onSetCurrent(name: string) {
             <div class="row-title">{{ m.name }}</div>
             <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
             <div v-if="m.maxContextTokens" class="row-sub ctx-info">上下文: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
-            <span v-if="detectingId === m.id" class="detecting-text"><Icon icon="svg-spinners:3-dots-scale" /> 探测中...</span>
+            <span v-if="detectingId === m.id" class="detecting-text"><Icon icon="lucide:loader" class="spin-icon" /> 探测中...</span>
           </div>
         </div>
         <div class="row-right">
@@ -110,7 +111,7 @@ async function onSetCurrent(name: string) {
           <input v-model="maxCtx" placeholder="最大上下文 (tokens, 可选)" />
           <button class="detect-icon" :class="{ detecting }" @click="detectCtx" :disabled="detecting" title="探测上下文大小">
             <Icon v-if="!detecting" icon="lucide:scan-search" />
-            <Icon v-else icon="svg-spinners:3-dots-scale" />
+            <Icon v-else icon="lucide:loader" class="spin-icon" />
           </button>
           <span v-if="detectMsg" class="detect-msg" :class="{ fail: detectMsg === '探测失败' }">{{ detectMsg }}</span>
         </div>
@@ -161,4 +162,6 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .btn { padding: 6px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-family: inherit; font-weight: 500; }
 .btn-sec { background: var(--el-fill-color); color: var(--el-text-color-primary); }
 .btn-pri { background: var(--el-color-primary); color: #fff; }
+.spin-icon { animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>

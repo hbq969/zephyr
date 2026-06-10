@@ -17,6 +17,8 @@ const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const showSettings = ref(false)
 let abortController: AbortController | null = null
+let msgIdCounter = 0
+function nextMsgId() { return 'm' + (++msgIdCounter) }
 
 function refreshConversationList() {
   axios({ url: '/conversations/list', method: 'get' })
@@ -31,12 +33,33 @@ function newChat() {
 }
 
 function onSend(text: string) {
+  // 本地命令拦截 — 不发送到后端
+  if (text === '/clear') {
+    chatStore.clearMessages()
+    convStore.currentId = null
+    return
+  }
+  if (text === '/context') {
+    axios({ url: '/chat/context-usage', method: 'get', params: { conversationId: convStore.currentId } })
+      .then(res => {
+        if (res.data.state === 'OK') {
+          const info = res.data.body
+          chatStore.addMessage({ id: nextMsgId(), role: 'system', content: '上下文使用情况:\n' + JSON.stringify(info, null, 2), timestamp: Date.now() / 1000 })
+        }
+      })
+    return
+  }
+  if (text === '/help') {
+    chatStore.addMessage({ id: nextMsgId(), role: 'system', content: '可用命令:\n\n/clear — 清空当前对话\n/context — 查看上下文占比\n/resume — 恢复之前的对话\n/help — 查看帮助\n\nCtrl+Enter 发送 · Enter 换行', timestamp: Date.now() / 1000 })
+    return
+  }
+
   chatStore.startSession()
   if (abortController) abortController.abort()
   abortController = new AbortController()
 
-  chatStore.addMessage({ id: '', role: 'user', content: text, timestamp: Date.now() / 1000 })
-  chatStore.addMessage({ id: '', role: 'assistant', content: '', timestamp: Date.now() / 1000 })
+  chatStore.addMessage({ id: nextMsgId(), role: 'user', content: text, timestamp: Date.now() / 1000 })
+  chatStore.addMessage({ id: nextMsgId(), role: 'assistant', content: '', timestamp: Date.now() / 1000 })
   chatStore.streaming = true
 
   let lastPos = 0
@@ -69,6 +92,7 @@ function onSend(text: string) {
           } else if (event.type === 'done') {
             chatStore.pruneEmptyAssistant()
             refreshConversationList()
+            settingsStore.loadContextUsage(convStore.currentId)
             chatStore.streaming = false
           } else if (event.type === 'error') {
             chatStore.appendToken('\n\n[错误] ' + (event.content || '请求失败'))
@@ -103,6 +127,33 @@ function restoreConversation(id: string) {
           toolCalls: m.toolCalls || [],
           timestamp: m.timestamp
         }))
+        // 合并连续 assistant 消息的 thinking 和 content 到最后一条
+        // 工具调用循环每轮产生一个 assistant 消息，但流式期间前端只用了一个 assistant 气泡
+        const merged: any[] = []
+        for (let i = 0; i < msgs.length; i++) {
+          if (msgs[i].role === 'assistant') {
+            const group: any[] = []
+            while (i < msgs.length && msgs[i].role === 'assistant') {
+              group.push(msgs[i])
+              i++
+            }
+            i--
+            const thinkingParts: string[] = []
+            const contentParts: string[] = []
+            for (const m of group) {
+              if (m.thinking) thinkingParts.push(m.thinking)
+              if (m.content) contentParts.push(m.content)
+            }
+            const last = group[group.length - 1]
+            last.thinking = thinkingParts.join('\n')
+            last.content = contentParts.join('\n')
+            merged.push(last)
+          } else {
+            merged.push(msgs[i])
+          }
+        }
+        msgs.length = 0
+        msgs.push(...merged)
         chatStore.clearMessages()
         msgs.forEach((m: any) => chatStore.addMessage(m))
       }

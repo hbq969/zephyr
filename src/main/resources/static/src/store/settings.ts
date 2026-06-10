@@ -16,6 +16,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const skills = ref<SkillConfig[]>([])
   const memories = ref<MemoryItem[]>([])
   const contextUsed = ref(53248)
+  const contextDetail = ref<Record<string, any> | null>(null)
 
   const contextTotal = computed(() => {
     const def = models.value.find(m => m.name === currentModel.value)
@@ -79,6 +80,18 @@ export const useSettingsStore = defineStore('settings', () => {
   async function detectCtxRaw(name: string, baseUrl: string, apiKey: string) {
     const res = await axios({ url: '/model-config/detect-context', method: 'post', data: { name, baseUrl, apiKey } })
     return res.data
+  }
+
+  async function loadContextUsage(conversationId?: string | null) {
+    try {
+      const params: Record<string, string> = {}
+      if (conversationId) params.conversationId = conversationId
+      const res = await axios({ url: '/chat/context-usage', method: 'get', params })
+      if (res.data.state === 'OK' && res.data.body) {
+        contextUsed.value = res.data.body.total || 0
+        contextDetail.value = res.data.body
+      }
+    } catch (_) {}
   }
 
   // === MCP API 方法 ===
@@ -264,9 +277,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     currentModel, models, mcpServers, mcpToolCount, skills, memories,
-    contextUsed, contextTotal, contextPercent,
+    contextUsed, contextTotal, contextPercent, contextDetail,
     setModel, addModel,
     loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote, detectContextRemote, detectCtxRaw,
+    loadContextUsage,
     loadMcpServers, createMcpServer, updateMcpServer, deleteMcpServer,
     connectMcpServer, disconnectMcpServer,
     loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, loadMcpToolCount,

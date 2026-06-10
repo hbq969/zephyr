@@ -17,7 +17,8 @@
 
   <update id="update">
     update model_configs
-    set name = #{name}, base_url = #{baseUrl}, api_key_encrypted = #{apiKeyEncrypted}, max_context_tokens = #{maxContextTokens}, updated_at = #{updatedAt}
+    set name = #{name}, base_url = #{baseUrl}, api_key_encrypted = #{apiKeyEncrypted}, updated_at = #{updatedAt}
+    <if test="maxContextTokens != null">, max_context_tokens = #{maxContextTokens}</if>
     where id = #{id} and user_name = #{userName}
   </update>
 

@@ -13,6 +13,8 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@iconify-json/lucide": "^1.2.111",
     "@iconify/vue": "^5.0.1",
     "@mdi/font": "^7.4.47",
     "axios": "1.13.2",

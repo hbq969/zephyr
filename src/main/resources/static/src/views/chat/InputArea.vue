@@ -14,6 +14,7 @@ const showAbility = ref(false)
 const showSession = ref(false)
 const showAction = ref(false)
 const hoveredAbility = ref('')
+const hasInput = ref(false)
 const mcpGroups = ref<{ server: string; tools: { name: string; desc: string }[] }[]>([])
 const skillList = ref<{ name: string; desc: string }[]>([])
 
@@ -22,7 +23,6 @@ const abilityItems = [
   { key: 'skills', label: 'Skills' },
 ]
 const sessionItems = [
-  { cmd: '/resume', label: '恢复之前的对话' },
   { cmd: '/context', label: '上下文占比' },
 ]
 const actionItems = [
@@ -37,6 +37,7 @@ function onInput() {
       el.innerHTML = ''
     }
   }
+  hasInput.value = !!el && (el.textContent || '').trim().length > 0
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -74,6 +75,8 @@ function onPaste(e: ClipboardEvent) {
     sel.removeAllRanges()
     sel.addRange(range)
   }
+  const el = inputRef.value
+  hasInput.value = !!el && (el.textContent || '').trim().length > 0
 }
 
 function doSend() {
@@ -106,6 +109,7 @@ function doSend() {
 
   emit('send', msg)
   el.innerHTML = ''
+  hasInput.value = false
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
@@ -229,11 +233,6 @@ function closeAll() {
   hoveredAbility.value = ''
 }
 
-function hasContent() {
-  const el = inputRef.value
-  if (!el) return false
-  return (el.textContent || '').trim().length > 0
-}
 </script>
 
 <template>
@@ -332,9 +331,9 @@ function hasContent() {
           </button>
           <button
             class="send-btn"
-            :class="{ stop: chatStore.streaming, 'has-text': !chatStore.streaming && hasContent() }"
+            :class="{ stop: chatStore.streaming, 'has-text': !chatStore.streaming && hasInput }"
             @click="chatStore.streaming ? $emit('stop') : doSend()"
-            :disabled="!chatStore.streaming && !hasContent()"
+            :disabled="!chatStore.streaming && !hasInput"
             :title="chatStore.streaming ? '停止输出' : '发送'"
           >
             <Icon :icon="chatStore.streaming ? 'lucide:square' : 'lucide:arrow-up'" class="send-icon" />

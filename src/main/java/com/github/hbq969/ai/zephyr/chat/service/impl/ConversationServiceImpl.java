@@ -89,16 +89,17 @@ public class ConversationServiceImpl implements ConversationService {
         List<MessageEntity> entities = chatDao.queryMessages(conversationId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (MessageEntity e : entities) {
+            // 跳过后端内部消息（工具返回结果），仅展示给 LLM 的上下文用
+            if ("tool".equals(e.getRole())) continue;
+
             Map<String, Object> msg = new HashMap<>();
             msg.put("id", e.getId());
             msg.put("role", e.getRole());
             msg.put("content", e.getContent());
             msg.put("thinking", e.getThinking());
             msg.put("timestamp", e.getCreatedAt());
-            if (e.getToolCallsJson() != null && !e.getToolCallsJson().isEmpty()) {
-                msg.put("toolCalls", gson.fromJson(e.getToolCallsJson(),
-                        new TypeToken<List<Map<String, Object>>>(){}.getType()));
-            }
+            // toolCalls 仅 LLM 上下文重建用（ContextBuilder 走 chatDao 直接取），
+            // 前端历史展示不需要，不传给前端
             result.add(msg);
         }
         return result;

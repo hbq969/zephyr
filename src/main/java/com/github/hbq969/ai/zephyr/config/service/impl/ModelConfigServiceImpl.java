@@ -50,6 +50,10 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         entity.setBaseUrl(body.getOrDefault("baseUrl", ""));
         String apiKey = body.get("apiKey");
         entity.setApiKeyEncrypted(apiKey != null && !apiKey.isEmpty() ? encryptApiKey(apiKey) : "");
+        String maxCtx = body.get("maxContextTokens");
+        if (maxCtx != null && !maxCtx.isBlank()) {
+            entity.setMaxContextTokens(Long.parseLong(maxCtx));
+        }
         entity.setIsDefault(0);
         entity.setCreatedAt(System.currentTimeMillis() / 1000);
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);

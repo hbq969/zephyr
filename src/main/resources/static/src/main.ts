@@ -1,5 +1,11 @@
 import './assets/css/base.css'
 import './assets/css/dark.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+
+import { addCollection } from '@iconify/vue'
+import lucideIcons from '@iconify-json/lucide/icons.json'
 
 import router from './router'
 import ElementPlus from 'element-plus'
@@ -13,6 +19,8 @@ import { createPinia } from 'pinia'
 
 import { createApp } from 'vue'
 import App from './App.vue'
+
+addCollection(lucideIcons)
 
 const app = createApp(App)
 
