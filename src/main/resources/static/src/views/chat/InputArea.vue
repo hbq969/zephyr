@@ -61,6 +61,21 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSend() }
 }
 
+function onPaste(e: ClipboardEvent) {
+  e.preventDefault()
+  const text = e.clipboardData?.getData('text/plain')
+  if (!text) return
+  const sel = window.getSelection()
+  if (sel && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0)
+    range.deleteContents()
+    range.insertNode(document.createTextNode(text))
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  }
+}
+
 function doSend() {
   const el = inputRef.value
   if (!el) return
@@ -86,7 +101,7 @@ function doSend() {
     }
   }
 
-  const msg = parts.join('').trim()
+  const msg = parts.join('').replace(/ /g, ' ').trim()
   if (!msg) return
 
   emit('send', msg)
@@ -217,7 +232,7 @@ function closeAll() {
 function hasContent() {
   const el = inputRef.value
   if (!el) return false
-  return el.innerText.trim().length > 0
+  return el.textContent.trim().length > 0
 }
 </script>
 
@@ -230,6 +245,7 @@ function hasContent() {
         contenteditable="true"
         @keydown="onKeydown"
         @input="onInput"
+        @paste="onPaste"
         data-placeholder="Ctrl+Enter 发送 · Enter 换行"
       ></div>
       <div class="input-toolbar">
