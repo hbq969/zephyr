@@ -74,6 +74,7 @@ async function onSetCurrent(name: string) {
           <div>
             <div class="row-title">{{ m.name }}</div>
             <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
+            <div v-if="m.maxContextTokens" class="row-sub ctx-info">上下文: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
           </div>
         </div>
         <div class="row-right">
@@ -110,6 +111,7 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .row-icon { color: var(--el-text-color-secondary); font-size: 16px; }
 .row-title { font-size: 14px; color: var(--el-text-color-primary); }
 .row-sub { font-size: 12px; color: var(--el-text-color-placeholder); margin-top: 2px; }
+.ctx-info { color: #5db8a6; font-weight: 500; }
 .row-right { display: flex; align-items: center; gap: 6px; }
 .action-icon { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-placeholder); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
 .action-icon:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
