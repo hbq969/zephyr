@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useSettingsStore } from '@/store/settings'
 import { useChatStore } from '@/store/chat'
 import { Icon } from '@iconify/vue'
@@ -7,26 +7,36 @@ import { Icon } from '@iconify/vue'
 const settingsStore = useSettingsStore()
 const chatStore = useChatStore()
 const now = ref(Date.now())
-let timer: ReturnType<typeof setInterval>
+let timer: ReturnType<typeof setTimeout>
 
-function updateInterval(): number {
+function tick() {
+  now.value = Date.now()
   const elapsed = now.value - chatStore.sessionStartTime
-  return elapsed < 60000 ? 1000 : 60000
+  const interval = elapsed < 60000 ? 1000 : 60000
+  timer = setTimeout(tick, interval)
 }
 
-function scheduleNext() {
-  timer = setTimeout(() => {
-    now.value = Date.now()
-    scheduleNext()
-  }, updateInterval())
+function stopTimer() {
+  clearTimeout(timer)
+}
+
+function startTimer() {
+  stopTimer()
+  now.value = Date.now()
+  tick()
 }
 
 onMounted(() => {
   settingsStore.loadModels()
-  scheduleNext()
+  startTimer()
 })
 
-onBeforeUnmount(() => clearTimeout(timer))
+// 会话开始时立即重置计时器
+watch(() => chatStore.sessionStartTime, (val) => {
+  if (val > 0) startTimer()
+})
+
+onBeforeUnmount(stopTimer)
 
 const ctxPercent = computed(() => settingsStore.contextPercent)
 const ctxUsedStr = computed(() => {
