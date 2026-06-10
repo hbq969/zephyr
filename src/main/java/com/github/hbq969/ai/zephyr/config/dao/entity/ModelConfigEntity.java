@@ -12,4 +12,5 @@ public class ModelConfigEntity {
     private Integer isDefault;
     private Long createdAt;
     private Long updatedAt;
+    private Long maxContextTokens;
 }
