@@ -4,6 +4,7 @@ import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
 import com.github.hbq969.code.common.datasource.DS;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -18,4 +19,7 @@ public interface ModelConfigDao {
     ModelConfigEntity queryById(@Param("id") String id);
     void clearDefault(@Param("userName") String userName);
     void setDefault(@Param("id") String id, @Param("userName") String userName);
+
+    @Update("update model_configs set max_context_tokens = #{maxTokens}, updated_at = #{updatedAt} where id = #{id} and user_name = #{userName}")
+    void updateMaxContextTokens(@Param("id") String id, @Param("maxTokens") Long maxTokens, @Param("updatedAt") Long updatedAt, @Param("userName") String userName);
 }

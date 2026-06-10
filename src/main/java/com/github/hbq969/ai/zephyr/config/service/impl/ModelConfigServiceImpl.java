@@ -54,6 +54,20 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         entity.setCreatedAt(System.currentTimeMillis() / 1000);
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         modelConfigDao.insert(entity);
+        // 自动探测最大上下文
+        String apiKeyRaw = body.get("apiKey");
+        Long maxTokens = detectMaxContextTokens(entity, apiKeyRaw);
+        if (maxTokens != null) {
+            entity.setMaxContextTokens(maxTokens);
+            modelConfigDao.updateMaxContextTokens(entity.getId(), maxTokens, System.currentTimeMillis() / 1000, userName);
+        } else {
+            String manualStr = body.get("maxContextTokens");
+            if (manualStr != null && !manualStr.isBlank()) {
+                Long manual = Long.parseLong(manualStr);
+                entity.setMaxContextTokens(manual);
+                modelConfigDao.updateMaxContextTokens(entity.getId(), manual, System.currentTimeMillis() / 1000, userName);
+            }
+        }
         return entity;
     }
 
@@ -68,6 +82,10 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         String apiKey = body.get("apiKey");
         if (apiKey != null && !apiKey.isEmpty()) {
             entity.setApiKeyEncrypted(encryptApiKey(apiKey));
+        }
+        String maxCtx = body.get("maxContextTokens");
+        if (maxCtx != null && !maxCtx.isBlank()) {
+            entity.setMaxContextTokens(Long.parseLong(maxCtx));
         }
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         modelConfigDao.update(entity);
@@ -93,5 +111,51 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     private String maskApiKey(String key) {
         if (key.length() <= 8) return "****";
         return key.substring(0, 3) + "****" + key.substring(key.length() - 4);
+    }
+
+    private Long detectMaxContextTokens(ModelConfigEntity entity, String apiKey) {
+        if (entity.getBaseUrl() == null || entity.getBaseUrl().isBlank()) return null;
+        if (apiKey == null || apiKey.isBlank()) return null;
+        try {
+            String url = entity.getBaseUrl().replaceAll("/$", "") + "/v1/models";
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+            okhttp3.Request req = new okhttp3.Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .get()
+                    .build();
+            okhttp3.Response resp = client.newCall(req).execute();
+            if (!resp.isSuccessful()) { resp.close(); return null; }
+            String body = resp.body() != null ? resp.body().string() : "";
+            resp.close();
+            com.google.gson.JsonObject json = new com.google.gson.Gson().fromJson(body, com.google.gson.JsonObject.class);
+            if (json.has("data")) {
+                for (var item : json.getAsJsonArray("data")) {
+                    var obj = item.getAsJsonObject();
+                    String id = obj.has("id") ? obj.get("id").getAsString() : "";
+                    if (id.equals(entity.getName()) || id.contains(entity.getName())) {
+                        if (obj.has("context_window")) return obj.get("context_window").getAsLong();
+                        if (obj.has("max_context_length")) return obj.get("max_context_length").getAsLong();
+                        if (obj.has("max_input_tokens")) return obj.get("max_input_tokens").getAsLong();
+                        // Some APIs return context_window as a nested field
+                        if (obj.has("capabilities")) {
+                            var caps = obj.getAsJsonObject("capabilities");
+                            if (caps.has("context_window")) return caps.get("context_window").getAsLong();
+                        }
+                    }
+                }
+                // 如果没匹配到具体的模型名，尝试取第一个模型的上下文大小
+                var first = json.getAsJsonArray("data").get(0).getAsJsonObject();
+                if (first.has("context_window")) return first.get("context_window").getAsLong();
+                if (first.has("max_context_length")) return first.get("max_context_length").getAsLong();
+                if (first.has("max_input_tokens")) return first.get("max_input_tokens").getAsLong();
+            }
+        } catch (Exception e) {
+            log.info("自动探测模型 {} 上下文大小失败: {}", entity.getName(), e.getMessage());
+        }
+        return null;
     }
 }
