@@ -232,7 +232,7 @@ function closeAll() {
 function hasContent() {
   const el = inputRef.value
   if (!el) return false
-  return el.textContent.trim().length > 0
+  return (el.textContent || '').trim().length > 0
 }
 </script>
 
