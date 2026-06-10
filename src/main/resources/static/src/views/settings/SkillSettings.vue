@@ -196,6 +196,28 @@ function goBack() { window.history.back() }
     </div>
     <p class="subtitle">{{ langData.skillMgmt_subtitle }}</p>
 
+    <!-- 搜索过滤栏 -->
+    <div v-if="store.skills.length > 0" class="filter-bar">
+      <Icon icon="lucide:search" class="filter-search-icon" />
+      <el-input
+        v-model="filterKeyword"
+        class="filter-input"
+        :placeholder="langData.skillMgmt_searchPlaceholder || '搜索名称、描述...'"
+        clearable
+      />
+      <el-select v-model="filterSource" class="filter-select" :placeholder="langData.skillMgmt_filterSource || '全部来源'" clearable>
+        <el-option label="全部来源" value="" />
+        <el-option :label="langData.skillMgmt_source_builtin" value="builtin" />
+        <el-option :label="langData.skillMgmt_source_git" value="git" />
+        <el-option :label="langData.skillMgmt_source_url" value="url" />
+        <el-option :label="langData.skillMgmt_source_local" value="local" />
+        <el-option :label="langData.skillMgmt_source_upload" value="upload" />
+        <el-option :label="langData.skillMgmt_source_sync" value="sync" />
+        <el-option :label="langData.skillMgmt_source_marketplace" value="marketplace" />
+      </el-select>
+      <span class="filter-count">{{ filteredSkills.length }} / {{ store.skills.length }}</span>
+    </div>
+
     <div v-if="store.skills.length === 0" class="empty-state">
       <Icon icon="lucide:puzzle" width="48" style="color: var(--el-text-color-placeholder)" />
       <h3 class="empty-title">{{ langData.skillMgmt_noSkill }}</h3>
@@ -206,7 +228,7 @@ function goBack() { window.history.back() }
     </div>
 
     <div v-else class="skill-list">
-      <div v-for="s in store.skills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
+      <div v-for="s in filteredSkills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
         <div class="skill-icon" :class="s.source">
           <Icon :icon="s.source === 'builtin' ? 'lucide:star' : s.source === 'git' ? 'lucide:git-branch' : s.source === 'sync' ? 'lucide:refresh-cw' : s.source === 'upload' ? 'lucide:package' : 'lucide:puzzle'" width="18" />
         </div>
@@ -228,6 +250,12 @@ function goBack() { window.history.back() }
           </button>
         </div>
       </div>
+    </div>
+
+    <div v-if="store.skills.length > 0 && filteredSkills.length === 0" class="empty-result">
+      <Icon icon="lucide:search" class="empty-icon" />
+      <h3 class="empty-title">{{ langData.skillMgmt_noMatch || '没有匹配的 Skill' }}</h3>
+      <p class="empty-desc">{{ langData.skillMgmt_noMatchDesc || '尝试调整搜索关键词或来源筛选条件。' }}</p>
     </div>
 
     <!-- 安装弹窗 -->
