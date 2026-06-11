@@ -265,9 +265,12 @@ function checkThinkingState(flat: Record<string, string>) {
 }
 
 function buildParamsJson(): string {
+  const hiddenKeys = (thinkingOn.value && matchedTemplate.value)
+    ? new Set(matchedTemplate.value.hideOnThinking)
+    : new Set<string>()
   const flat: Record<string, string> = {}
   for (const p of params.value) {
-    if (p.value === '') continue
+    if (p.value === '' || hiddenKeys.has(p.key)) continue
     flat[p.key] = p.value
   }
   const nested = flattenToNested(flat)
