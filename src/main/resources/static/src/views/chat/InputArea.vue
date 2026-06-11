@@ -14,8 +14,7 @@ const inputRef = ref<HTMLDivElement>()
 const settingsStore = useSettingsStore()
 const showModelList = ref(false)
 const showAbility = ref(false)
-const showSession = ref(false)
-const showAction = ref(false)
+const showCommand = ref(false)
 const hoveredAbility = ref('')
 const hasInput = ref(false)
 const mcpGroups = ref<{ server: string; tools: { name: string; desc: string }[] }[]>([])
@@ -102,13 +101,38 @@ const abilityItems = [
   { key: 'mcp', label: 'MCP' },
   { key: 'skills', label: 'Skills' },
 ]
-const sessionItems = [
+const commandItems = [
   { cmd: '/context', label: langData.inputArea_contextUsage },
-]
-const actionItems = [
   { cmd: '/clear', label: langData.cmd_clearChat },
   { cmd: '/help', label: langData.cmd_viewHelp },
 ]
+
+function formatContextSize(tokens?: number | string): string {
+  const n = Number(tokens)
+  if (!n) return ''
+  if (n >= 1024 * 1024) return Math.round(n / (1024 * 1024)) + 'M'
+  if (n >= 1024) return Math.round(n / 1024) + 'K'
+  return String(n)
+}
+
+const THINKING_KEYS = ['thinking.type', 'thinking.budget_tokens', 'enable_thinking', 'reasoning_effort', 'thinking_budget']
+
+function hasThinking(paramsStr?: string): boolean {
+  if (!paramsStr) return false
+  try {
+    const obj = JSON.parse(paramsStr)
+    const check = (o: any): boolean => {
+      if (typeof o !== 'object' || o === null) return false
+      for (const k of Object.keys(o)) {
+        const fullKey = k
+        if (THINKING_KEYS.some(tk => tk === fullKey || fullKey.endsWith('.' + tk.split('.').pop()!))) return true
+        if (typeof o[k] === 'object' && check(o[k])) return true
+      }
+      return false
+    }
+    return check(obj)
+  } catch { return false }
+}
 
 const MAX_UNDO = 50
 const undoStack: string[] = []
@@ -366,8 +390,7 @@ function insertTag(type: 'mcp' | 'skill', name: string) {
 function closeAll() {
   showModelList.value = false
   showAbility.value = false
-  showSession.value = false
-  showAction.value = false
+  showCommand.value = false
   hoveredAbility.value = ''
 }
 
@@ -397,9 +420,9 @@ function closeAll() {
               <Icon icon="lucide:folder" class="ws-icon dim" />
             </template>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showWorkspaceList" class="pick-dropdown" @click.stop>
+            <div v-if="showWorkspaceList" class="pick-dropdown ws-dropdown" @click.stop>
               <div v-for="ws in workspaceStore.workspaces" :key="ws.id"
-                   class="pick-option"
+                   class="pick-option ws-option"
                    :class="{ current: workspaceStore.currentId === ws.id }"
                    @click="selectWorkspace(ws.id)">
                 <span class="ws-name">{{ ws.name }}</span>
@@ -414,11 +437,18 @@ function closeAll() {
 
           <!-- 模型切换 -->
           <div class="tool-pick" @click.stop="toggleModelList">
+            <Icon icon="lucide:brain" class="pick-icon" />
             <span>{{ settingsStore.models.length ? settingsStore.currentModel : langData.inputArea_noModel }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showModelList" class="pick-dropdown" @click.stop>
+            <div v-if="showModelList" class="pick-dropdown model-dropdown" @click.stop>
               <div v-for="m in settingsStore.models" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
-                <span>{{ m.name }}</span>
+                <div class="model-option-main">
+                  <span class="model-name">{{ m.name }}</span>
+                  <span class="model-tags">
+                    <span v-if="hasThinking(m.params)" class="model-tag think-tag">{{ langData.inputArea_thinking }}</span>
+                    <span v-if="m.maxContextTokens" class="model-tag ctx-tag">{{ formatContextSize(m.maxContextTokens) }}</span>
+                  </span>
+                </div>
                 <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
               </div>
             </div>
@@ -426,6 +456,7 @@ function closeAll() {
 
           <!-- 能力（二级菜单） -->
           <div class="tool-pick" @click.stop="closeAll(); showAbility = !showAbility">
+            <Icon icon="lucide:wand" class="pick-icon" />
             <span>{{ langData.inputArea_abilities }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showAbility" class="pick-dropdown ability-menu" @click.stop>
@@ -477,24 +508,13 @@ function closeAll() {
             </div>
           </div>
 
-          <!-- 会话 -->
-          <div class="tool-pick" @click.stop="closeAll(); showSession = !showSession">
-            <span>{{ langData.inputArea_session }}</span>
+          <!-- 命令 -->
+          <div class="tool-pick" @click.stop="closeAll(); showCommand = !showCommand">
+            <Icon icon="lucide:terminal" class="pick-icon" />
+            <span>{{ langData.inputArea_command }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showSession" class="pick-dropdown" @click.stop>
-              <div v-for="it in sessionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
-                <span class="cmd-name">{{ it.cmd }}</span>
-                <span class="cmd-desc">{{ it.label }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 操作 -->
-          <div class="tool-pick" @click.stop="closeAll(); showAction = !showAction">
-            <span>{{ langData.inputArea_actions }}</span>
-            <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showAction" class="pick-dropdown" @click.stop>
-              <div v-for="it in actionItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
+            <div v-if="showCommand" class="pick-dropdown" @click.stop>
+              <div v-for="it in commandItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
                 <span class="cmd-name">{{ it.cmd }}</span>
                 <span class="cmd-desc">{{ it.label }}</span>
               </div>
@@ -522,8 +542,7 @@ function closeAll() {
       <div v-if="showWorkspaceList" class="model-overlay" @click="showWorkspaceList = false"></div>
       <div v-if="showModelList" class="model-overlay" @click="closeModelList"></div>
       <div v-if="showAbility" class="model-overlay" @click="showAbility = false"></div>
-      <div v-if="showSession" class="model-overlay" @click="showSession = false"></div>
-      <div v-if="showAction" class="model-overlay" @click="showAction = false"></div>
+      <div v-if="showCommand" class="model-overlay" @click="showCommand = false"></div>
     </Teleport>
     <WorkspaceDialog v-if="showNewWorkspace" @close="showNewWorkspace = false" />
   </div>
@@ -567,6 +586,8 @@ export default { inheritAttrs: false }
   border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
   min-width: 200px; padding: 4px; z-index: 100;
 }
+.model-dropdown { min-width: 280px; }
+.ws-dropdown { min-width: 260px; }
 .pick-option {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px; border-radius: 6px; cursor: pointer;
@@ -575,6 +596,18 @@ export default { inheritAttrs: false }
 }
 .pick-option:hover { background: var(--el-fill-color-light); }
 .pick-option.current { color: var(--el-color-primary); }
+.model-option-main { display: flex; align-items: center; justify-content: space-between; flex: 1; min-width: 0; }
+.model-name { flex-shrink: 0; }
+.model-tags { display: flex; align-items: center; gap: 4px; margin-left: 8px; flex-shrink: 0; }
+.model-tag {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px; line-height: 1.5;
+  white-space: nowrap;
+}
+.ctx-tag { background: var(--el-fill-color-light); color: var(--el-text-color-secondary); }
+.think-tag { background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+
+html.dark .ctx-tag { background: var(--el-fill-color); color: var(--el-text-color-secondary); }
+html.dark .think-tag { background: var(--el-color-primary-light-3); color: var(--el-color-primary); }
 .check-icon { font-size: 15px; color: var(--el-color-primary); flex-shrink: 0; }
 .cmd-name { font-weight: 600; color: var(--el-color-primary); min-width: 60px; font-size: 12px; }
 .cmd-desc { color: var(--el-text-color-secondary); font-size: 12px; }
@@ -637,8 +670,10 @@ export default { inheritAttrs: false }
 
 .ws-icon { font-size: 14px; color: var(--el-text-color-secondary); }
 .ws-icon.dim { color: var(--el-text-color-placeholder); }
-.ws-name { font-weight: 500; font-size: 13px; }
-.ws-path { color: var(--el-text-color-placeholder); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.pick-icon { font-size: 14px; color: var(--el-text-color-secondary); }
+.ws-option { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
+.ws-name { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.ws-path { color: var(--el-text-color-placeholder); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .pick-divider { height: 1px; background: var(--el-border-color); margin: 4px 0; }
 </style>
 
