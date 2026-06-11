@@ -294,6 +294,7 @@ function goBack() { window.history.back() }
               <div class="form-group">
                 <label class="form-label">{{ langData.skillMgmt_downloadUrl }}</label>
                 <input class="form-input" v-model="downloadUrl" :placeholder="langData.skillMgmt_downloadUrlPlaceholder" />
+                <p class="form-hint">{{ langData.skillMgmt_uploadFormat }}</p>
               </div>
             </template>
 
@@ -301,6 +302,7 @@ function goBack() { window.history.back() }
               <div class="form-group">
                 <label class="form-label">{{ langData.skillMgmt_localPath }}</label>
                 <input class="form-input" v-model="localPath" :placeholder="langData.skillMgmt_localPathPlaceholder" />
+                <p class="form-hint">{{ langData.skillMgmt_uploadFormat }}</p>
               </div>
             </template>
 
@@ -316,7 +318,7 @@ function goBack() { window.history.back() }
                   <span class="upload-hint">{{ langData.skillMgmt_uploadFormat }}</span>
                 </template>
               </div>
-              <input ref="fileInput" type="file" accept=".zip,.tar.gz,.tgz,.md" @change="onFileChange" style="display:none" />
+              <input ref="fileInput" type="file" accept=".zip,.tar,.tar.gz,.tgz,.md" @change="onFileChange" style="display:none" />
               <div class="upload-note">{{ langData.skillMgmt_uploadNote }}</div>
             </template>
 

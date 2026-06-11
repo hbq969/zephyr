@@ -63,11 +63,30 @@ public class SkillServiceImpl implements SkillService {
                     break;
                 case "url":
                     tmpDir = Files.createTempDirectory("skill-url-");
-                    downloadAndExtract(url, tmpDir);
+                    if (url.endsWith(".md")) {
+                        downloadMd(url, tmpDir);
+                    } else {
+                        downloadAndExtract(url, tmpDir);
+                    }
                     srcDir = findSkillRoot(tmpDir);
                     break;
                 case "local":
-                    srcDir = findSkillRoot(Paths.get(path));
+                    if (path.endsWith(".md")) {
+                        tmpDir = Files.createTempDirectory("skill-local-md-");
+                        Path srcFile = Paths.get(path);
+                        if (!Files.isRegularFile(srcFile)) {
+                            throw new IllegalArgumentException("SKILL.md 文件不存在: " + path);
+                        }
+                        Files.copy(srcFile, tmpDir.resolve("SKILL.md"));
+                        srcDir = tmpDir;
+                    } else if (path.endsWith(".zip") || path.endsWith(".tar.gz")
+                            || path.endsWith(".tgz") || path.endsWith(".tar")) {
+                        tmpDir = Files.createTempDirectory("skill-local-archive-");
+                        extractArchive(Paths.get(path).toFile(), tmpDir);
+                        srcDir = findSkillRoot(tmpDir);
+                    } else {
+                        srcDir = findSkillRoot(Paths.get(path));
+                    }
                     break;
                 default:
                     throw new IllegalArgumentException("不支持的安装方式: " + source);
@@ -99,10 +118,11 @@ public class SkillServiceImpl implements SkillService {
             throw new IllegalArgumentException("文件名为空");
         }
         boolean isArchive = originalFilename.endsWith(".zip")
-                || originalFilename.endsWith(".tar.gz") || originalFilename.endsWith(".tgz");
+                || originalFilename.endsWith(".tar.gz") || originalFilename.endsWith(".tgz")
+                || originalFilename.endsWith(".tar");
         boolean isSkillMd = originalFilename.endsWith(".md");
         if (!isArchive && !isSkillMd) {
-            throw new IllegalArgumentException("仅支持 .zip、.tar.gz、.tgz、.md 格式");
+            throw new IllegalArgumentException("仅支持 .zip、.tar、.tar.gz、.tgz、.md 格式");
         }
         if (file.getSize() > 10 * 1024 * 1024) {
             throw new IllegalArgumentException("文件大小不能超过 10MB");
@@ -118,7 +138,7 @@ public class SkillServiceImpl implements SkillService {
             File tmpFile = tmpDir.resolve(originalFilename).toFile();
             file.transferTo(tmpFile);
 
-            ZipUtil.unzip(tmpFile, tmpDir.toFile());
+            extractArchive(tmpFile, tmpDir);
             Path skillRoot = findSkillRoot(tmpDir);
             String skillName = detectSkillName(skillRoot);
 
@@ -392,6 +412,19 @@ public class SkillServiceImpl implements SkillService {
         }
     }
 
+    private void downloadMd(String url, Path targetDir) {
+        try {
+            Path dest = targetDir.resolve("SKILL.md");
+            ProcessBuilder pb = new ProcessBuilder("curl", "-L", "-o", dest.toString(), url);
+            pb.inheritIO();
+            Process p = pb.start();
+            int code = p.waitFor();
+            if (code != 0) throw new RuntimeException("下载 SKILL.md 失败，退出码: " + code);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("下载 SKILL.md 失败: " + e.getMessage(), e);
+        }
+    }
+
     private void downloadAndExtract(String url, Path targetDir) {
         try {
             Path tmpFile = targetDir.resolve("download.tmp");
@@ -401,10 +434,28 @@ public class SkillServiceImpl implements SkillService {
             int code = p.waitFor();
             if (code != 0) throw new RuntimeException("下载失败，退出码: " + code);
 
-            ZipUtil.unzip(tmpFile.toFile(), targetDir.toFile());
+            extractArchive(tmpFile.toFile(), targetDir);
             FileUtil.del(tmpFile.toFile());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("下载失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void extractArchive(File archive, Path targetDir) {
+        String name = archive.getName().toLowerCase();
+        if (name.endsWith(".zip")) {
+            ZipUtil.unzip(archive, targetDir.toFile());
+        } else if (name.endsWith(".tar.gz") || name.endsWith(".tgz") || name.endsWith(".tar")) {
+            try {
+                ProcessBuilder pb = new ProcessBuilder("tar", "-xf", archive.getAbsolutePath(), "-C", targetDir.toString());
+                pb.inheritIO();
+                int code = pb.start().waitFor();
+                if (code != 0) throw new RuntimeException("tar 解压失败，退出码: " + code);
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException("tar 解压失败: " + e.getMessage(), e);
+            }
+        } else {
+            throw new IllegalArgumentException("不支持的压缩格式: " + name);
         }
     }
 }
