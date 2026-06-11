@@ -2,6 +2,8 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { useSettingsStore } from '@/store/settings'
 import { useChatStore } from '@/store/chat'
+import { useWorkspaceStore } from '@/store/workspace'
+import WorkspaceDialog from './WorkspaceDialog.vue'
 import { Icon } from '@iconify/vue'
 import axios from '@/network'
 import { getLangData } from '@/i18n/locale'
@@ -89,6 +91,10 @@ function scrollActiveSkill() {
     el?.scrollIntoView({ block: 'nearest' })
   })
 }
+
+const workspaceStore = useWorkspaceStore()
+const showWorkspaceList = ref(false)
+const showNewWorkspace = ref(false)
 
 const langData = getLangData()
 
@@ -215,6 +221,15 @@ function doSend() {
   hasInput.value = false
   undoStack.length = 0
   el.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+function toggleWorkspaceList() {
+  closeAll(); showWorkspaceList.value = !showWorkspaceList.value
+}
+
+function selectWorkspace(id: string | null) {
+  workspaceStore.selectWorkspace(id)
+  showWorkspaceList.value = false
 }
 
 function toggleModelList() {
@@ -372,6 +387,31 @@ function closeAll() {
       ></div>
       <div class="input-toolbar">
         <div class="input-left">
+          <!-- 工作空间选择 -->
+          <div class="tool-pick" @click.stop="toggleWorkspaceList">
+            <template v-if="workspaceStore.current">
+              <Icon icon="lucide:folder" class="ws-icon" />
+              <span>{{ workspaceStore.current.name }}</span>
+            </template>
+            <template v-else>
+              <Icon icon="lucide:folder" class="ws-icon dim" />
+            </template>
+            <Icon icon="lucide:chevron-down" class="pick-arrow" />
+            <div v-if="showWorkspaceList" class="pick-dropdown" @click.stop>
+              <div v-for="ws in workspaceStore.workspaces" :key="ws.id"
+                   class="pick-option"
+                   :class="{ current: workspaceStore.currentId === ws.id }"
+                   @click="selectWorkspace(ws.id)">
+                <span class="ws-name">{{ ws.name }}</span>
+                <span class="ws-path">{{ ws.path }}</span>
+              </div>
+              <div v-if="workspaceStore.workspaces.length > 0" class="pick-divider"></div>
+              <div class="pick-option" @click="showWorkspaceList = false; showNewWorkspace = true">
+                <Icon icon="lucide:plus" />新建工作空间
+              </div>
+            </div>
+          </div>
+
           <!-- 模型切换 -->
           <div class="tool-pick" @click.stop="toggleModelList">
             <span>{{ settingsStore.models.length ? settingsStore.currentModel : langData.inputArea_noModel }}</span>
@@ -479,11 +519,13 @@ function closeAll() {
       </div>
     </div>
     <Teleport to="body">
+      <div v-if="showWorkspaceList" class="model-overlay" @click="showWorkspaceList = false"></div>
       <div v-if="showModelList" class="model-overlay" @click="closeModelList"></div>
       <div v-if="showAbility" class="model-overlay" @click="showAbility = false"></div>
       <div v-if="showSession" class="model-overlay" @click="showSession = false"></div>
       <div v-if="showAction" class="model-overlay" @click="showAction = false"></div>
     </Teleport>
+    <WorkspaceDialog v-if="showNewWorkspace" @close="showNewWorkspace = false" />
   </div>
 </template>
 
@@ -592,6 +634,12 @@ export default { inheritAttrs: false }
 .send-btn.stop { background: var(--el-color-danger) !important; box-shadow: 0 0 0 0 rgba(198,69,69,0.4); animation: stopPulse 1.5s ease-in-out infinite; }
 @keyframes stopPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(198,69,69,0.4); } 50% { box-shadow: 0 0 0 8px rgba(198,69,69,0); } }
 .send-btn.stop .send-icon { color: #fff; font-size: 12px; }
+
+.ws-icon { font-size: 14px; color: var(--el-text-color-secondary); }
+.ws-icon.dim { color: var(--el-text-color-placeholder); }
+.ws-name { font-weight: 500; font-size: 13px; }
+.ws-path { color: var(--el-text-color-placeholder); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.pick-divider { height: 1px; background: var(--el-border-color); margin: 4px 0; }
 </style>
 
 <!-- 非 scoped：动态创建的 tag 元素需要全局样式 -->
