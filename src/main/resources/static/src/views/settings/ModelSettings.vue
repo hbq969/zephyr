@@ -174,20 +174,14 @@ function onDepthCustomChange(val: string) {
   else params.value.push({ key: t.depthKey!, value: val, tip: null, isPreset: false })
 }
 
-watch(name, (val) => {
-  const t = matchTemplate(val)
-  clearThinkingParams()
+function onModelNameInput() {
+  const t = matchTemplate(name.value)
   if (t) {
+    clearThinkingParams()
+    applyTemplate(t)
     selectedTemplateName.value = t.name
-    if (showForm.value) {
-      applyTemplate(t)
-    }
-  } else {
-    matchedTemplate.value = null
-    selectedTemplateName.value = '__custom__'
-    thinkingOn.value = false
   }
-})
+}
 
 const visibleParams = computed(() => {
   const thinkingKeys = ['thinking.type', 'thinking.budget_tokens', 'enable_thinking', 'reasoning_effort', 'thinking_budget']
@@ -385,6 +379,7 @@ async function fetchModels() {
 function onModelSelect(val: string) {
   if (val) {
     name.value = val
+    onModelNameInput()
     const sel = document.getElementById('modelSelect') as HTMLSelectElement | null
     const input = document.getElementById('modelNameInput') as HTMLInputElement | null
     if (sel) sel.style.display = 'none'
@@ -465,7 +460,7 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           <div class="field">
             <label class="field-label">{{ langData.modelConfig_modelName }}</label>
             <div class="input-row">
-              <input class="field-input" type="text" id="modelNameInput" v-model="name" :placeholder="langData.modelConfig_modelName" />
+              <input class="field-input" type="text" id="modelNameInput" v-model="name" :placeholder="langData.modelConfig_modelName" @input="onModelNameInput()" />
               <select id="modelSelect" class="fetch-select" style="display:none;" @change="onModelSelect(($event.target as HTMLSelectElement).value)">
                 <option value="">-- 选择模型 --</option>
               </select>
