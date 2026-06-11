@@ -8,6 +8,9 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,5 +52,33 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Transactional
     public void delete(String id, String userName) {
         workspaceDao.delete(id, userName);
+    }
+
+    @Override
+    public List<Map<String, Object>> browse(String parent) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String root = parent != null && !parent.isBlank() ? parent : System.getProperty("user.home");
+        File dir = new File(root);
+        if (!dir.exists() || !dir.isDirectory()) return result;
+
+        // 上级目录
+        File parentFile = dir.getParentFile();
+        Map<String, Object> up = new LinkedHashMap<>();
+        up.put("name", "..");
+        up.put("path", parentFile != null ? parentFile.getAbsolutePath() : root);
+        result.add(up);
+
+        // 子目录
+        File[] children = dir.listFiles(File::isDirectory);
+        if (children != null) {
+            java.util.Arrays.sort(children, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+            for (File f : children) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", f.getName());
+                item.put("path", f.getAbsolutePath());
+                result.add(item);
+            }
+        }
+        return result;
     }
 }

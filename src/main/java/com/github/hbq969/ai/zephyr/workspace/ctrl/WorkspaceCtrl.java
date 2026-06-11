@@ -49,4 +49,12 @@ public class WorkspaceCtrl {
         workspaceService.delete(body.get("id"), userName());
         return ReturnMessage.success("ok");
     }
+
+    @Operation(summary = "浏览目录")
+    @RequestMapping(path = "/browse", method = RequestMethod.GET)
+    @ResponseBody
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "workspace_browse", apiDesc = "工作空间_浏览目录")
+    public ReturnMessage<?> browse(@RequestParam(required = false) String parent) {
+        return ReturnMessage.success(workspaceService.browse(parent));
+    }
 }

@@ -11,16 +11,36 @@ const name = ref('')
 const path = ref('')
 const saving = ref(false)
 
-async function onBrowseDir() {
-  try {
-    const handle = await (window as any).showDirectoryPicker()
-    if (!name.value.trim()) {
-      name.value = handle.name
-    }
-  } catch (e: any) {
-    if (e.name !== 'AbortError') {
-      msg('目录选择失败: ' + (e.message || e), 'error')
-    }
+const showBrowser = ref(false)
+const browserPath = ref('')
+const dirs = ref<{ name: string; path: string }[]>([])
+const browserLoading = ref(false)
+
+function openBrowser() {
+  showBrowser.value = true
+  loadDirs(browserPath.value || '/')
+}
+
+function loadDirs(parent: string) {
+  browserLoading.value = true
+  axios({ url: '/workspace/browse', method: 'get', params: { parent } })
+    .then(res => {
+      if (res.data.state === 'OK') {
+        dirs.value = res.data.body || []
+        browserPath.value = parent
+      }
+    })
+    .catch(() => {})
+    .finally(() => { browserLoading.value = false })
+}
+
+function onDirClick(item: { name: string; path: string }) {
+  if (item.name === '..') {
+    loadDirs(item.path)
+  } else {
+    path.value = item.path
+    if (!name.value.trim()) name.value = item.name
+    showBrowser.value = false
   }
 }
 
@@ -64,9 +84,24 @@ function onSubmit() {
           <span>目录</span>
           <div class="ws-dir-row">
             <input v-model="path" class="ws-input ws-dir-input" placeholder="/Users/hbq/my-project" @keydown.enter="onSubmit" />
-            <button class="ws-btn ws-btn-browse" @click="onBrowseDir">浏览</button>
+            <button class="ws-btn ws-btn-browse" @click="openBrowser">浏览</button>
           </div>
         </label>
+
+        <!-- 目录浏览器 -->
+        <div v-if="showBrowser" class="ws-browser">
+          <div class="ws-browser-head">
+            <Icon icon="lucide:folder-open" class="ws-browser-icon" />
+            <span class="ws-browser-path">{{ browserPath }}</span>
+          </div>
+          <div v-if="browserLoading" class="ws-browser-loading">加载中...</div>
+          <div v-else class="ws-browser-list">
+            <div v-for="d in dirs" :key="d.path" class="ws-browser-item" @click="onDirClick(d)">
+              <Icon :icon="d.name === '..' ? 'lucide:corner-up-left' : 'lucide:folder'" class="ws-browser-item-icon" />
+              <span>{{ d.name }}</span>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="ws-dialog-footer">
         <button class="ws-btn ws-btn-cancel" @click="emit('close')">取消</button>
@@ -92,6 +127,19 @@ function onSubmit() {
 .ws-input::placeholder { color: var(--el-text-color-placeholder); }
 .ws-dir-row { display: flex; gap: 8px; }
 .ws-dir-input { flex: 1; }
+
+.ws-browser { border: 1px solid var(--el-border-color); border-radius: 8px; overflow: hidden; max-height: 220px; display: flex; flex-direction: column; }
+.ws-browser-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--el-border-color); background: var(--el-fill-color-light); font-size: 12px; color: var(--el-text-color-secondary); }
+.ws-browser-icon { font-size: 14px; color: var(--el-color-primary); flex-shrink: 0; }
+.ws-browser-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.ws-browser-loading { padding: 20px; text-align: center; font-size: 12px; color: var(--el-text-color-placeholder); }
+.ws-browser-list { flex: 1; overflow-y: auto; padding: 4px; }
+.ws-browser-list::-webkit-scrollbar { width: 2px; }
+.ws-browser-list::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 1px; }
+.ws-browser-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--el-text-color-primary); transition: background 0.1s; }
+.ws-browser-item:hover { background: var(--el-fill-color-light); }
+.ws-browser-item-icon { font-size: 15px; color: var(--el-text-color-secondary); flex-shrink: 0; }
+
 .ws-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; }
 .ws-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid var(--el-border-color); font-size: 13px; cursor: pointer; transition: background 0.15s; }
 .ws-btn-cancel { background: var(--el-bg-color); color: var(--el-text-color-regular); }
