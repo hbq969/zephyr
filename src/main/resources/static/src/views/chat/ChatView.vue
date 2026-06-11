@@ -3,6 +3,7 @@ import { onMounted, ref, watch, computed, nextTick } from 'vue'
 import { useConversationsStore } from '@/store/conversations'
 import { useChatStore } from '@/store/chat'
 import { useSettingsStore } from '@/store/settings'
+import { useWorkspaceStore } from '@/store/workspace'
 import ChatSidebar from './ChatSidebar.vue'
 import ChatArea from './ChatArea.vue'
 import InputArea from './InputArea.vue'
@@ -16,6 +17,7 @@ import axios from '@/network'
 const convStore = useConversationsStore()
 const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
+const workspaceStore = useWorkspaceStore()
 const showSettings = ref(false)
 const langData = getLangData()
 
@@ -111,7 +113,7 @@ function onSend(text: string) {
   axios({
     url: `/chat/send`,
     method: 'post',
-    data: { conversationId: convStore.currentId, message: text },
+    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId },
     responseType: 'text',
     signal: abortController.signal,
     onDownloadProgress(evt: any) {
@@ -181,7 +183,8 @@ function restoreConversation(id: string) {
   axios({ url: `/conversations/${id}/messages`, method: 'get' })
     .then(res => {
       if (res.data.state === 'OK') {
-        const msgs = (res.data.body || []).map((m: any) => ({
+        const body = res.data.body
+        const msgs = (body.messages || body || []).map((m: any) => ({
           id: m.id,
           role: m.role,
           content: m.content || '',
@@ -231,6 +234,9 @@ function restoreConversation(id: string) {
         msgs.length = 0
         msgs.push(...merged)
         chatStore.clearMessages()
+        if (body.workspaceId) {
+          workspaceStore.selectWorkspace(body.workspaceId)
+        }
         msgs.forEach((m: any) => chatStore.addMessage(m))
       }
     })
@@ -251,6 +257,10 @@ onMounted(() => {
     })
   settingsStore.loadModels()
   settingsStore.loadMcpServers()
+  axios({ url: '/workspace/list', method: 'get' })
+    .then(res => {
+      if (res.data.state === 'OK') workspaceStore.setWorkspaces(res.data.body)
+    })
 })
 </script>
 

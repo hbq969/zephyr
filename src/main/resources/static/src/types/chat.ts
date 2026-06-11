@@ -30,9 +30,18 @@ export interface ToolCall {
 export interface Conversation {
   id: string
   title: string
+  workspaceId?: string
   updatedAt: number
   createdAt: number
   messageCount?: number
+}
+
+export interface Workspace {
+  id: string
+  name: string
+  path: string
+  createdAt: number
+  updatedAt: number
 }
 
 // === Time grouping (sidebar) ===
