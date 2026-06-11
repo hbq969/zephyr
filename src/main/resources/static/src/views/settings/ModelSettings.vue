@@ -1,9 +1,10 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
 import { getLangData } from '@/i18n/locale'
 import { msg } from '@/utils/Utils'
+import { matchTemplate, getTemplate, TEMPLATES, type ModelTemplate } from '@/modelTemplates'
 
 const langData = getLangData()
 const settingsStore = useSettingsStore()
@@ -13,11 +14,189 @@ const baseUrl = ref('')
 const apiKey = ref('')
 const apiKeyShown = ref('')
 const hasExistingKey = ref(false)
-const maxCtx = ref('')
+const maxCtxPreset = ref('')
+const maxCtxCustom = ref('')
 const editId = ref<string | null>(null)
-const detecting = ref(false)
-const detectMsg = ref('')
 const fetching = ref(false)
+
+const CTX_PRESETS = [
+  { label: '128K', value: '131072' },
+  { label: '256K', value: '262144' },
+  { label: '1M', value: '1048576' },
+]
+
+function flattenToNested(flat: Record<string, string>): Record<string, any> {
+  const result: Record<string, any> = {}
+  for (const [k, v] of Object.entries(flat)) {
+    if (!v) continue
+    const num = Number(v)
+    const val = isNaN(num) ? v : num
+    if (k.includes('.')) {
+      const parts = k.split('.')
+      let cur = result
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!cur[parts[i]] || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {}
+        cur = cur[parts[i]]
+      }
+      cur[parts[parts.length - 1]] = val
+    } else {
+      result[k] = val
+    }
+  }
+  return result
+}
+
+function nestedToFlatten(obj: Record<string, any>, prefix = ''): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      Object.assign(result, nestedToFlatten(v, key))
+    } else {
+      result[key] = String(v)
+    }
+  }
+  return result
+}
+
+function resolveMaxCtx(): string {
+  if (maxCtxPreset.value === 'custom') return maxCtxCustom.value
+  return maxCtxPreset.value
+}
+
+function setMaxCtxFromStored(val: string | number | undefined) {
+  if (!val) { maxCtxPreset.value = ''; maxCtxCustom.value = ''; return }
+  const s = String(val)
+  const preset = CTX_PRESETS.find(p => p.value === s)
+  if (preset) { maxCtxPreset.value = preset.value; maxCtxCustom.value = '' }
+  else { maxCtxPreset.value = 'custom'; maxCtxCustom.value = s }
+}
+
+const thinkingOn = ref(false)
+const matchedTemplate = ref<ModelTemplate | null>(null)
+const selectedTemplateName = ref('__custom__')
+const depthPreset = ref('')
+const depthCustom = ref('')
+
+const templateOptions = computed(() => {
+  return [
+    { label: langData.modelConfig_templateCustom, value: '__custom__' },
+    ...TEMPLATES.map(t => ({
+      label: (t.requiresProxy ? '⚠️ ' : '') + t.name,
+      value: t.name,
+    })),
+  ]
+})
+
+function applyTemplate(t: ModelTemplate | null) {
+  if (!t) return
+  matchedTemplate.value = t
+  thinkingOn.value = true
+  for (const [k, v] of Object.entries(t.thinkingOnParams)) {
+    const existing = params.value.find(p => p.key === k)
+    if (existing) existing.value = v
+    else params.value.push({ key: k, value: v, tip: null, isPreset: false })
+  }
+  if (t.depthKey) {
+    const dv = t.thinkingOnParams[t.depthKey]
+    if (dv) {
+      if (t.depthValues) {
+        depthPreset.value = dv
+        depthCustom.value = ''
+      } else {
+        depthPreset.value = '__custom__'
+        depthCustom.value = dv
+      }
+    }
+  }
+}
+
+function clearThinkingParams() {
+  const thinkingKeys = ['thinking.type', 'thinking.budget_tokens', 'enable_thinking', 'reasoning_effort', 'thinking_budget']
+  params.value = params.value.filter(p => !thinkingKeys.includes(p.key))
+  depthPreset.value = ''
+  depthCustom.value = ''
+}
+
+function onToggleThinking(val: boolean) {
+  thinkingOn.value = val
+  const t = matchedTemplate.value
+  if (!t) return
+  clearThinkingParams()
+  if (val) {
+    for (const [k, v] of Object.entries(t.thinkingOnParams)) {
+      params.value.push({ key: k, value: v, tip: null, isPreset: false })
+    }
+    if (t.depthKey) {
+      const dv = t.thinkingOnParams[t.depthKey]
+      if (dv) {
+        if (t.depthValues) { depthPreset.value = dv }
+        else { depthPreset.value = '__custom__'; depthCustom.value = dv }
+      }
+    }
+  } else {
+    for (const [k, v] of Object.entries(t.thinkingOffParams)) {
+      if (v) params.value.push({ key: k, value: v, tip: null, isPreset: false })
+    }
+  }
+}
+
+function onTemplateChange(name: string) {
+  selectedTemplateName.value = name
+  const t = getTemplate(name)
+  if (t) {
+    clearThinkingParams()
+    applyTemplate(t)
+  } else {
+    matchedTemplate.value = null
+    thinkingOn.value = false
+    clearThinkingParams()
+  }
+}
+
+function onDepthChange(val: string) {
+  const t = matchedTemplate.value
+  if (!t || !t.depthKey) return
+  const idx = params.value.findIndex(p => p.key === t.depthKey)
+  const effectiveVal = val === '__custom__' ? depthCustom.value : val
+  if (idx >= 0) {
+    params.value[idx].value = effectiveVal
+  } else {
+    params.value.push({ key: t.depthKey!, value: effectiveVal, tip: null, isPreset: false })
+  }
+}
+
+function onDepthCustomChange(val: string) {
+  const t = matchedTemplate.value
+  if (!t || !t.depthKey) return
+  const idx = params.value.findIndex(p => p.key === t.depthKey)
+  if (idx >= 0) params.value[idx].value = val
+  else params.value.push({ key: t.depthKey!, value: val, tip: null, isPreset: false })
+}
+
+watch(name, (val) => {
+  const t = matchTemplate(val)
+  clearThinkingParams()
+  if (t) {
+    selectedTemplateName.value = t.name
+    applyTemplate(t)
+  } else {
+    matchedTemplate.value = null
+    selectedTemplateName.value = '__custom__'
+    thinkingOn.value = false
+  }
+})
+
+const visibleParams = computed(() => {
+  const thinkingKeys = ['thinking.type', 'thinking.budget_tokens', 'enable_thinking', 'reasoning_effort', 'thinking_budget']
+  if (!thinkingOn.value || !matchedTemplate.value) {
+    return params.value.filter(p => !thinkingKeys.includes(p.key))
+  }
+  return params.value.filter(p => {
+    if (thinkingKeys.includes(p.key)) return false
+    return !matchedTemplate.value!.hideOnThinking.includes(p.key)
+  })
+})
 
 const PRESET_PARAMS = [
   { key: 'temperature', default: '0.7', tip: '控制输出随机性，值越高回复越多样，越低越确定' },
@@ -34,24 +213,62 @@ const newParamKey = ref('')
 const newParamVal = ref('')
 
 function initParams(loadedParams?: Record<string, any>) {
-  params.value = PRESET_PARAMS.map(p => ({ key: p.key, value: loadedParams?.[p.key] != null ? String(loadedParams[p.key]) : p.default, tip: p.tip, isPreset: true }))
-  if (loadedParams) {
-    for (const [k, v] of Object.entries(loadedParams)) {
-      if (!PRESET_PARAMS.find(p => p.key === k)) {
-        params.value.push({ key: k, value: String(v), tip: null, isPreset: false })
-      }
+  params.value = PRESET_PARAMS.map(p => ({
+    key: p.key, value: p.default, tip: p.tip, isPreset: true,
+  }))
+  if (!loadedParams) {
+    matchedTemplate.value = null
+    selectedTemplateName.value = '__custom__'
+    thinkingOn.value = false
+    return
+  }
+  const flat = nestedToFlatten(loadedParams)
+  for (const p of params.value) {
+    if (flat[p.key] != null) p.value = String(flat[p.key])
+  }
+  for (const [k, v] of Object.entries(flat)) {
+    if (!PRESET_PARAMS.find(p => p.key === k) && !params.value.find(p => p.key === k)) {
+      params.value.push({ key: k, value: String(v), tip: null, isPreset: false })
+    }
+  }
+  checkThinkingState(flat)
+}
+
+function checkThinkingState(flat: Record<string, string>) {
+  const t = matchTemplate(name.value || '')
+  if (!t) {
+    matchedTemplate.value = null
+    selectedTemplateName.value = '__custom__'
+    thinkingOn.value = false
+    return
+  }
+  matchedTemplate.value = t
+  selectedTemplateName.value = t.name
+  if (t.paradigm === 'reasoning-effort' || t.paradigm === 'none') {
+    thinkingOn.value = !t.canDisable ? true : !!(flat['reasoning_effort'])
+  } else if (t.paradigm === 'thinking-type') {
+    thinkingOn.value = flat['thinking.type'] !== 'disabled'
+  } else if (t.paradigm === 'enable-thinking') {
+    thinkingOn.value = flat['enable_thinking'] === 'true'
+  }
+  if (t.depthKey && flat[t.depthKey]) {
+    if (t.depthValues) {
+      depthPreset.value = flat[t.depthKey]
+    } else {
+      depthPreset.value = '__custom__'
+      depthCustom.value = flat[t.depthKey]
     }
   }
 }
 
 function buildParamsJson(): string {
-  const obj: Record<string, any> = {}
+  const flat: Record<string, string> = {}
   for (const p of params.value) {
     if (p.value === '') continue
-    const num = Number(p.value)
-    obj[p.key] = isNaN(num) ? p.value : num
+    flat[p.key] = p.value
   }
-  return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ''
+  const nested = flattenToNested(flat)
+  return Object.keys(nested).length > 0 ? JSON.stringify(nested) : ''
 }
 
 function parseParamsJson(raw?: string): Record<string, any> | undefined {
@@ -65,9 +282,9 @@ async function add() {
   if (!name.value.trim()) return
   const paramsJson = buildParamsJson()
   if (editId.value) {
-    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, maxCtx.value, paramsJson)
+    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson)
   } else {
-    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, maxCtx.value, paramsJson)
+    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson)
   }
   resetForm()
 }
@@ -78,18 +295,23 @@ function resetForm() {
   apiKey.value = ''
   apiKeyShown.value = ''
   hasExistingKey.value = false
-  maxCtx.value = ''
+  maxCtxPreset.value = ''
+  maxCtxCustom.value = ''
   editId.value = null
   showForm.value = false
-  detectMsg.value = ''
   initParams()
+  thinkingOn.value = false
+  matchedTemplate.value = null
+  selectedTemplateName.value = '__custom__'
+  depthPreset.value = ''
+  depthCustom.value = ''
 }
 
 function startEdit(m: any) {
   editId.value = m.id
   name.value = m.name
   baseUrl.value = m.baseUrl || ''
-  maxCtx.value = m.maxContextTokens ? String(m.maxContextTokens) : ''
+  setMaxCtxFromStored(m.maxContextTokens)
   if (m.apiKey) {
     hasExistingKey.value = true
     apiKey.value = ''
@@ -156,29 +378,6 @@ function onModelSelect(val: string) {
   }
 }
 
-async function detectCtx() {
-  if (!baseUrl.value.trim() || (!apiKey.value && !hasExistingKey.value)) return
-  detecting.value = true
-  detectMsg.value = ''
-  if (editId.value) {
-    const res = await settingsStore.detectContextRemote(editId.value)
-    if (res?.state === 'OK' && res.body) {
-      maxCtx.value = String(res.body)
-      detectMsg.value = langData.modelConfig_detectSuccess
-    } else {
-      detectMsg.value = langData.modelConfig_detectFail
-    }
-  } else {
-    const res = await settingsStore.detectCtxRaw(name.value.trim(), baseUrl.value.trim(), apiKey.value)
-    if (res?.state === 'OK' && res.body) {
-      maxCtx.value = String(res.body)
-      detectMsg.value = langData.modelConfig_detectSuccess
-    } else {
-      detectMsg.value = langData.modelConfig_detectFail
-    }
-  }
-  detecting.value = false
-}
 
 async function removeModel(id: string) { await settingsStore.deleteModelRemote(id) }
 async function setDefault(id: string) { await settingsStore.setDefaultModelRemote(id) }
@@ -264,14 +463,12 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           </div>
           <div class="field">
             <label class="field-label">{{ langData.modelConfig_maxCtx }}</label>
-            <div class="input-row">
-              <input class="field-input" v-model="maxCtx" :placeholder="langData.modelConfig_maxCtx" />
-              <button class="fetch-btn" :class="{ detecting }" @click="detectCtx" :disabled="detecting" :title="langData.modelConfig_detectCtx">
-                <Icon v-if="!detecting" icon="lucide:scan-search" />
-                <Icon v-else icon="lucide:loader" class="spin-icon" />
-              </button>
-              <span v-if="detectMsg" class="detect-msg" :class="{ fail: detectMsg === langData.modelConfig_detectFail }">{{ detectMsg }}</span>
-            </div>
+            <select class="field-input" v-model="maxCtxPreset">
+              <option value="">{{ langData.modelConfig_ctxUnset }}</option>
+              <option v-for="p in CTX_PRESETS" :key="p.value" :value="p.value">{{ p.label }} ({{ p.value }})</option>
+              <option value="custom">{{ langData.modelConfig_ctxCustom }}</option>
+            </select>
+            <input v-if="maxCtxPreset === 'custom'" class="field-input" style="margin-top:8px" v-model="maxCtxCustom" :placeholder="langData.modelConfig_maxCtx" />
           </div>
         </div>
 
@@ -348,9 +545,7 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .input-row .field-input { flex: 1; }
 .fetch-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--el-border-color); background: var(--el-bg-color); color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; transition: all 0.15s; }
 .fetch-btn:hover { color: var(--el-color-primary); border-color: var(--el-color-primary); }
-.fetch-btn.fetching, .fetch-btn.detecting { color: var(--el-color-primary); pointer-events: none; }
-.detect-msg { font-size: 11px; white-space: nowrap; color: var(--el-color-success); }
-.detect-msg.fail { color: var(--el-color-danger); }
+.fetch-btn.fetching { color: var(--el-color-primary); pointer-events: none; }
 .fetch-select { flex: 1; height: 40px; padding: 0 12px; border: 1px solid var(--el-color-primary); border-radius: 8px; background: var(--el-bg-color); color: var(--el-text-color-primary); font-family: inherit; font-size: 14px; outline: none; appearance: none; padding-right: 36px; cursor: pointer; }
 .key-hint { font-size: 12px; color: var(--el-color-success); }
 
