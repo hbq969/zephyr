@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.workspace.dao.WorkspaceDao">
+
+  <update id="createWorkspacesTable">
+    create table if not exists zephyr_workspaces (
+      id varchar(64) primary key,
+      name varchar(128) not null,
+      path varchar(512) not null,
+      user_name varchar(64) not null,
+      created_at bigint,
+      updated_at bigint
+    );
+    create index if not exists idx_ws_user on zephyr_workspaces(user_name);
+  </update>
+
+</mapper>
