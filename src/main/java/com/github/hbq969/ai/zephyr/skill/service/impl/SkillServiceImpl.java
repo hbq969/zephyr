@@ -281,12 +281,12 @@ public class SkillServiceImpl implements SkillService {
         List<Path> result = new ArrayList<>();
         File[] children = dir.toFile().listFiles();
         if (children == null) return result;
-        // 顶层自身有 SKILL.md → 记录但不作为 skill（仅在 detectPackName 中用于取包名）
         boolean topHasSkillMd = Files.exists(dir.resolve("SKILL.md"));
         for (File child : children) {
             if (!child.isDirectory()) continue;
             Path childPath = child.toPath();
             if ("skills".equals(child.getName())) {
+                // skills/ 中间层：取其下子目录
                 File[] inner = child.listFiles(File::isDirectory);
                 if (inner != null) {
                     for (File innerDir : inner) {
@@ -297,9 +297,12 @@ public class SkillServiceImpl implements SkillService {
                 }
             } else if (Files.exists(childPath.resolve("SKILL.md"))) {
                 result.add(childPath);
+            } else {
+                // 非 skills 目录且无直接 SKILL.md → 递归进去查找
+                // 处理 superpowers/skills/brainstorming/SKILL.md 这类两层嵌套
+                result.addAll(findSkillRoots(childPath));
             }
         }
-        // 无子目录 skill 但顶层有 SKILL.md → 单 skill
         if (result.isEmpty() && topHasSkillMd) {
             result.add(dir);
         }
