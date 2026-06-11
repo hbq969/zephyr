@@ -70,8 +70,6 @@ public class LlmClient {
         bodyJson.add("stream_options", streamOpts);
 
         int timeout = getTimeoutSeconds(params);
-
-        int timeout = getTimeoutSeconds(params);
         RequestBody reqBody = RequestBody.create(gson.toJson(bodyJson), JSON);
         OkHttpClient client = (timeout != 120)
                 ? httpClient.newBuilder().readTimeout(timeout, TimeUnit.SECONDS).build()
