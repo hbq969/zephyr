@@ -477,7 +477,11 @@ public class SkillServiceImpl implements SkillService {
 
     private void downloadAndExtract(String url, Path targetDir) {
         try {
-            Path tmpFile = targetDir.resolve("download.tmp");
+            String fileName = url.substring(url.lastIndexOf('/') + 1);
+            int qi = fileName.indexOf('?');
+            if (qi >= 0) fileName = fileName.substring(0, qi);
+            if (fileName.isEmpty()) fileName = "download.tmp";
+            Path tmpFile = targetDir.resolve(fileName);
             ProcessBuilder pb = new ProcessBuilder("curl", "-L", "-o", tmpFile.toString(), url);
             pb.inheritIO();
             Process p = pb.start();
