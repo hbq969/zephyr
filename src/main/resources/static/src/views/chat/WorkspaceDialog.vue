@@ -10,6 +10,24 @@ const workspaceStore = useWorkspaceStore()
 const name = ref('')
 const path = ref('')
 const saving = ref(false)
+const dirInputRef = ref<HTMLInputElement>()
+
+function onBrowseDir() {
+  dirInputRef.value?.click()
+}
+
+function onDirChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = input.files
+  if (!files || files.length === 0) return
+
+  // 从选中文件的 webkitRelativePath 提取目录名
+  const relativePath = files[0].webkitRelativePath
+  const dirName = relativePath.split('/')[0]
+  if (dirName && !name.value.trim()) {
+    name.value = dirName
+  }
+}
 
 function onSubmit() {
   if (!path.value.trim()) { msg('请填写目录路径', 'warning'); return }
@@ -49,7 +67,11 @@ function onSubmit() {
         </label>
         <label class="ws-field">
           <span>目录</span>
-          <input v-model="path" class="ws-input" placeholder="/Users/hbq/my-project" @keydown.enter="onSubmit" />
+          <div class="ws-dir-row">
+            <input v-model="path" class="ws-input ws-dir-input" placeholder="/Users/hbq/my-project" @keydown.enter="onSubmit" />
+            <button class="ws-btn ws-btn-browse" @click="onBrowseDir">浏览</button>
+            <input ref="dirInputRef" type="file" webkitdirectory directory class="ws-dir-hidden" @change="onDirChange" />
+          </div>
         </label>
       </div>
       <div class="ws-dialog-footer">
@@ -74,10 +96,15 @@ function onSubmit() {
 .ws-input { width: 100%; padding: 8px 12px; border: 1px solid var(--el-border-color); border-radius: 8px; background: var(--el-bg-color); color: var(--el-text-color-primary); font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box; }
 .ws-input:focus { border-color: var(--el-color-primary); }
 .ws-input::placeholder { color: var(--el-text-color-placeholder); }
+.ws-dir-row { display: flex; gap: 8px; }
+.ws-dir-input { flex: 1; }
+.ws-dir-hidden { display: none; }
 .ws-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; }
 .ws-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid var(--el-border-color); font-size: 13px; cursor: pointer; transition: background 0.15s; }
 .ws-btn-cancel { background: var(--el-bg-color); color: var(--el-text-color-regular); }
 .ws-btn-cancel:hover { background: var(--el-fill-color-light); }
+.ws-btn-browse { background: var(--el-bg-color); color: var(--el-text-color-regular); padding: 8px 12px; white-space: nowrap; }
+.ws-btn-browse:hover { background: var(--el-fill-color-light); }
 .ws-btn-confirm { background: var(--el-color-primary); color: #fff; border-color: var(--el-color-primary); }
 .ws-btn-confirm:hover { background: var(--el-color-primary-dark-2); }
 .ws-btn-confirm:disabled { opacity: 0.6; cursor: default; }
