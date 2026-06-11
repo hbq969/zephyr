@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Message } from '@/types/chat'
+import type { Message, ToolCall } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
@@ -67,5 +67,25 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  return { messages, streaming, currentThinking, sessionStartTime, addMessage, appendToken, setThinking, updateLastThinking, clearMessages, startSession, pruneEmptyAssistant }
+  function upsertToolCall(name: string, patch: Partial<ToolCall>) {
+    flushTokens()
+    const msgs = messages.value
+    if (msgs.length === 0) return
+    const last = msgs[msgs.length - 1]
+    if (last.role !== 'assistant') return
+    if (!last.toolCalls) last.toolCalls = []
+    const existing = last.toolCalls.find(tc => tc.name === name)
+    if (existing) {
+      Object.assign(existing, patch)
+    } else {
+      last.toolCalls.push({
+        name,
+        input: patch.input || {},
+        output: patch.output,
+        status: patch.status || 'running',
+      } as ToolCall)
+    }
+  }
+
+  return { messages, streaming, currentThinking, sessionStartTime, addMessage, appendToken, setThinking, updateLastThinking, clearMessages, startSession, pruneEmptyAssistant, upsertToolCall }
 })
