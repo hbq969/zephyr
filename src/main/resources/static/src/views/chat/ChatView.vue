@@ -85,7 +85,7 @@ function newChat() {
   convStore.currentId = null
 }
 
-function onSend(text: string) {
+function onSend(text: string, filePaths?: string[]) {
   if (text === '/context') {
     axios({ url: '/chat/context-usage', method: 'get', params: { conversationId: convStore.currentId } })
       .then(res => {
@@ -105,7 +105,10 @@ function onSend(text: string) {
   if (abortController) abortController.abort()
   abortController = new AbortController()
 
-  chatStore.addMessage({ id: nextMsgId(), role: 'user', content: text, timestamp: Date.now() / 1000 })
+  const displayText = filePaths && filePaths.length > 0
+    ? '[上传了 ' + filePaths.length + ' 个文件]\n' + text
+    : text
+  chatStore.addMessage({ id: nextMsgId(), role: 'user', content: displayText, timestamp: Date.now() / 1000 })
   chatStore.addMessage({ id: nextMsgId(), role: 'assistant', content: '', timestamp: Date.now() / 1000 })
   chatStore.streaming = true
 
@@ -113,7 +116,7 @@ function onSend(text: string) {
   axios({
     url: `/chat/send`,
     method: 'post',
-    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId },
+    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, filePaths: filePaths || [] },
     responseType: 'text',
     signal: abortController.signal,
     onDownloadProgress(evt: any) {
