@@ -138,6 +138,23 @@ public class ChatServiceImpl implements ChatService {
 
                         // 4c. 分发工具调用
                         List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName);
+
+                        // 推送工具执行结果
+                        for (int i = 0; i < result.getToolCalls().size(); i++) {
+                            LlmResult.ToolCall tc = result.getToolCalls().get(i);
+                            String output = toolResults.get(i).get("content").toString();
+                            try {
+                                emitter.send(SseEmitter.event().name("message")
+                                        .data(ChatEvent.builder()
+                                                .type("tool_result")
+                                                .toolName(tc.getName())
+                                                .toolOutput(output)
+                                                .build()));
+                            } catch (IOException e) {
+                                log.warn("推送 tool_result 事件失败: {}", e.getMessage());
+                            }
+                        }
+
                         messages.addAll(toolResults);
 
                         // 4d. 持久化 tool 消息
