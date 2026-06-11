@@ -247,10 +247,13 @@ function checkThinkingState(flat: Record<string, string>) {
   }
   matchedTemplate.value = t
   selectedTemplateName.value = t.name
-  if (t.paradigm === 'reasoning-effort' || t.paradigm === 'none') {
-    thinkingOn.value = !t.canDisable ? true : !!(flat['reasoning_effort'])
+  if (t.paradigm === 'reasoning-effort') {
+    thinkingOn.value = true
+  } else if (t.paradigm === 'none') {
+    const hasThinking = Object.keys(t.thinkingOnParams).length > 0 || t.hideOnThinking.length > 0
+    thinkingOn.value = !t.canDisable && hasThinking
   } else if (t.paradigm === 'thinking-type') {
-    thinkingOn.value = flat['thinking.type'] !== 'disabled'
+    thinkingOn.value = flat['thinking.type'] === 'enabled'
   } else if (t.paradigm === 'enable-thinking') {
     thinkingOn.value = flat['enable_thinking'] === 'true'
   }
@@ -261,6 +264,9 @@ function checkThinkingState(flat: Record<string, string>) {
       depthPreset.value = '__custom__'
       depthCustom.value = flat[t.depthKey]
     }
+  } else {
+    depthPreset.value = ''
+    depthCustom.value = ''
   }
 }
 
