@@ -472,15 +472,62 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           </div>
         </div>
 
+        <div class="section-title">{{ langData.modelConfig_thinkingMode }}</div>
+        <div class="config-block">
+          <div class="field">
+            <label class="field-label">{{ langData.modelConfig_templateLabel }}</label>
+            <select class="field-input" v-model="selectedTemplateName" @change="onTemplateChange(($event.target as HTMLSelectElement).value)">
+              <option v-for="o in templateOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+            </select>
+          </div>
+          <div v-if="matchedTemplate" class="field">
+            <label class="field-label">{{ langData.modelConfig_thinkingMode }}</label>
+            <div class="toggle-row">
+              <span v-if="!matchedTemplate.canDisable" class="toggle-hint">
+                {{ thinkingOn ? langData.modelConfig_thinkingModeOn : langData.modelConfig_thinkingModeOff }}（始终{{ thinkingOn ? '开启' : '关闭' }}）
+              </span>
+              <label v-else class="toggle-switch">
+                <input type="checkbox" :checked="thinkingOn" @change="onToggleThinking(($event.target as HTMLInputElement).checked)" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div v-if="matchedTemplate && matchedTemplate.depthKey" class="field">
+            <label class="field-label">{{ langData.modelConfig_thinkingDepth }}</label>
+            <template v-if="matchedTemplate.depthValues">
+              <select class="field-input" :value="depthPreset" @change="onDepthChange(($event.target as HTMLSelectElement).value)">
+                <option v-for="v in matchedTemplate.depthValues" :key="v" :value="v">{{ v }}</option>
+              </select>
+            </template>
+            <template v-else>
+              <div class="input-row">
+                <input v-if="depthPreset === '__custom__'" class="field-input" v-model="depthCustom"
+                       :placeholder="langData.modelConfig_budgetCustom"
+                       @input="onDepthCustomChange(($event.target as HTMLInputElement).value)" />
+                <select class="field-input" v-model="depthPreset" @change="onDepthChange(($event.target as HTMLSelectElement).value)">
+                  <option value="512">512</option>
+                  <option value="1024">1K</option>
+                  <option value="2048">2K</option>
+                  <option value="4096">4K</option>
+                  <option value="8192">8K</option>
+                  <option value="16000">16K</option>
+                  <option value="32000">32K</option>
+                  <option value="__custom__">{{ langData.modelConfig_ctxCustom }}</option>
+                </select>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <div class="section-title">{{ langData.modelConfig_params }}</div>
         <div class="config-block">
-          <div v-for="(p, i) in params" :key="p.key + i" class="param-row">
+          <div v-for="(p, i) in visibleParams" :key="p.key + i" class="param-row">
             <div class="param-name">
               <span :class="{ 'is-custom': !p.isPreset }">{{ p.key }}</span>
               <span v-if="p.tip" class="tip-icon" :data-tip="p.tip">?</span>
             </div>
             <input class="field-input param-value" v-model="p.value" spellcheck="false" />
-            <button class="param-delete" @click="removeParam(i)" title="删除">
+            <button class="param-delete" @click="removeParam(params.findIndex(x => x.key === p.key))" title="删除">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -573,4 +620,15 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 
 .spin-icon { animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* 思考模式 */
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+.toggle-hint { font-size: 13px; color: var(--el-text-color-secondary); font-style: italic; }
+.toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--el-border-color); border-radius: 22px; transition: 0.2s; }
+.toggle-slider::before { content: ''; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.toggle-switch input:checked + .toggle-slider { background: var(--el-color-primary); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+html.dark .toggle-slider::before { background: var(--el-bg-color); }
 </style>
