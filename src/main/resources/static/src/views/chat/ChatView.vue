@@ -127,6 +127,14 @@ function onSend(text: string) {
             chatStore.appendToken(event.content)
           } else if (event.type === 'thinking') {
             chatStore.updateLastThinking(event.content)
+          } else if (event.type === 'tool_call') {
+            chatStore.upsertToolCall(event.toolName, { status: 'running' })
+          } else if (event.type === 'tool_result') {
+            const isError = event.toolOutput && event.toolOutput.startsWith('工具执行错误')
+            chatStore.upsertToolCall(event.toolName, {
+              status: isError ? 'error' : 'success',
+              output: event.toolOutput,
+            })
           } else if (event.type === 'meta') {
             convStore.currentId = event.content
             refreshConversationList()
