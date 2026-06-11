@@ -127,6 +127,15 @@ const locale: any = {
         "modelConfig_addParam": "添加参数",
         "modelConfig_paramName": "参数名",
         "modelConfig_paramValue": "参数值",
+        "modelConfig_ctxUnset": "不限制",
+        "modelConfig_ctxCustom": "自定义",
+        "modelConfig_thinkingMode": "思考模式",
+        "modelConfig_thinkingModeOn": "开启",
+        "modelConfig_thinkingModeOff": "关闭",
+        "modelConfig_thinkingDepth": "思考深度",
+        "modelConfig_templateLabel": "参数模板",
+        "modelConfig_templateCustom": "自定义（无模板）",
+        "modelConfig_budgetCustom": "自定义 token 数",
 
         // 系统命令
         "cmd_clearChat": "清空当前对话",
@@ -401,6 +410,15 @@ const locale: any = {
         "modelConfig_addParam": "Add parameter",
         "modelConfig_paramName": "Param name",
         "modelConfig_paramValue": "Param value",
+        "modelConfig_ctxUnset": "Unlimited",
+        "modelConfig_ctxCustom": "Custom",
+        "modelConfig_thinkingMode": "Thinking Mode",
+        "modelConfig_thinkingModeOn": "On",
+        "modelConfig_thinkingModeOff": "Off",
+        "modelConfig_thinkingDepth": "Thinking Depth",
+        "modelConfig_templateLabel": "Parameter Template",
+        "modelConfig_templateCustom": "Custom (no template)",
+        "modelConfig_budgetCustom": "Custom token count",
 
         // Commands
         "cmd_clearChat": "Clear current chat",
@@ -675,6 +693,15 @@ const locale: any = {
         "modelConfig_addParam": "パラメータ追加",
         "modelConfig_paramName": "パラメータ名",
         "modelConfig_paramValue": "パラメータ値",
+        "modelConfig_ctxUnset": "制限なし",
+        "modelConfig_ctxCustom": "カスタム",
+        "modelConfig_thinkingMode": "思考モード",
+        "modelConfig_thinkingModeOn": "オン",
+        "modelConfig_thinkingModeOff": "オフ",
+        "modelConfig_thinkingDepth": "思考深度",
+        "modelConfig_templateLabel": "パラメータテンプレート",
+        "modelConfig_templateCustom": "カスタム（テンプレートなし）",
+        "modelConfig_budgetCustom": "カスタムトークン数",
 
         // Commands
         "cmd_clearChat": "現在の会話をクリア",
