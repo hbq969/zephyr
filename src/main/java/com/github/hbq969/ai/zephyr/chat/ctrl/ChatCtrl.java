@@ -37,6 +37,7 @@ public class ChatCtrl {
         return chatService.send(
                 userName(),
                 body.getConversationId(),
+                body.getWorkspaceId(),
                 body.getMessage()
         );
     }

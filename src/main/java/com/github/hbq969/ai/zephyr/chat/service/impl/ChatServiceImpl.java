@@ -50,7 +50,7 @@ public class ChatServiceImpl implements ChatService {
     private McpConnectionManager mcpConnectionManager;
 
     @Override
-    public SseEmitter send(String userName, String conversationId, String originalMessage) {
+    public SseEmitter send(String userName, String conversationId, String workspaceId, String originalMessage) {
         SseEmitter emitter = new SseEmitter(300000L);
         String cancelKey = userName;
 
@@ -84,6 +84,7 @@ public class ChatServiceImpl implements ChatService {
                     conv.setId(cid);
                     conv.setUserName(userName);
                     conv.setTitle(message.length() > 30 ? message.substring(0, 30) : message);
+                    conv.setWorkspaceId(workspaceId);
                     conv.setCreatedAt(now);
                     conv.setUpdatedAt(now);
                     chatDao.insertConversation(conv);
