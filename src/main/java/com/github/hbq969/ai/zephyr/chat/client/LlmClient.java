@@ -52,23 +52,15 @@ public class LlmClient {
             bodyJson.add("tools", gson.toJsonTree(tools));
         }
 
-        // 注入模型参数（temperature、top_p、max_tokens 等）
+        // 注入模型参数（temperature、top_p、max_tokens 等 + 点号路径展开为嵌套对象）
         Map<String, Object> params = parseParams(model.getParams());
         if (params != null) {
             for (Map.Entry<String, Object> e : params.entrySet()) {
                 if ("request_timeout".equals(e.getKey())) continue;
-                Object v = e.getValue();
-                if (v instanceof Number) {
-                    double d = ((Number) v).doubleValue();
-                    if (d == Math.floor(d) && !Double.isInfinite(d) && d <= Long.MAX_VALUE) {
-                        bodyJson.addProperty(e.getKey(), (long) d);
-                    } else {
-                        bodyJson.addProperty(e.getKey(), d);
-                    }
-                } else if (v instanceof Boolean) {
-                    bodyJson.addProperty(e.getKey(), (Boolean) v);
+                if (e.getKey().contains(".")) {
+                    setNestedProperty(bodyJson, e.getKey(), e.getValue());
                 } else {
-                    bodyJson.addProperty(e.getKey(), String.valueOf(v));
+                    addJsonProperty(bodyJson, e.getKey(), e.getValue());
                 }
             }
         }
@@ -230,5 +222,36 @@ public class LlmClient {
             return t > 0 ? t : 120;
         }
         return 120;
+    }
+
+    private void setNestedProperty(JsonObject root, String path, Object value) {
+        String[] parts = path.split("\\.");
+        JsonObject cur = root;
+        for (int i = 0; i < parts.length - 1; i++) {
+            JsonElement child = cur.get(parts[i]);
+            if (child == null || !child.isJsonObject()) {
+                JsonObject next = new JsonObject();
+                cur.add(parts[i], next);
+                cur = next;
+            } else {
+                cur = child.getAsJsonObject();
+            }
+        }
+        addJsonProperty(cur, parts[parts.length - 1], value);
+    }
+
+    private void addJsonProperty(JsonObject obj, String key, Object value) {
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (d == Math.floor(d) && !Double.isInfinite(d) && d <= Long.MAX_VALUE) {
+                obj.addProperty(key, (long) d);
+            } else {
+                obj.addProperty(key, d);
+            }
+        } else if (value instanceof Boolean) {
+            obj.addProperty(key, (Boolean) value);
+        } else {
+            obj.addProperty(key, String.valueOf(value));
+        }
     }
 }
