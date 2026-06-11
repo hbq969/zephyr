@@ -155,6 +155,7 @@ public class LlmClient {
                             // tool calls
                             if (delta.has("tool_calls") && !delta.get("tool_calls").isJsonNull()) {
                                 JsonArray tcArray = delta.getAsJsonArray("tool_calls");
+                                Set<String> emittedNames = new HashSet<>();
                                 for (int i = 0; i < tcArray.size(); i++) {
                                     JsonObject tc = tcArray.get(i).getAsJsonObject();
                                     int idx = tc.has("index") ? tc.get("index").getAsInt() : 0;
@@ -168,7 +169,22 @@ public class LlmClient {
                                         JsonObject func = tc.getAsJsonObject("function");
                                         if (!accumulated.has("function")) accumulated.add("function", new JsonObject());
                                         JsonObject accFunc = accumulated.getAsJsonObject("function");
-                                        if (func.has("name")) accFunc.addProperty("name", func.get("name").getAsString());
+                                        if (func.has("name")) {
+                                            String name = func.get("name").getAsString();
+                                            accFunc.addProperty("name", name);
+                                            // 首次解析到 name 时推送 tool_call 事件
+                                            if (emittedNames.add(String.valueOf(idx) + ":" + name)) {
+                                                try {
+                                                    emitter.send(SseEmitter.event().name("message")
+                                                            .data(ChatEvent.builder()
+                                                                    .type("tool_call")
+                                                                    .toolName(name)
+                                                                    .build()));
+                                                } catch (IOException e) {
+                                                    log.warn("推送 tool_call 事件失败: {}", e.getMessage());
+                                                }
+                                            }
+                                        }
                                         if (func.has("arguments")) {
                                             String args = accFunc.has("arguments") ? accFunc.get("arguments").getAsString() : "";
                                             accFunc.addProperty("arguments", args + func.get("arguments").getAsString());
