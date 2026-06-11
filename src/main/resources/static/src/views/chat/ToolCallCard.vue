@@ -62,13 +62,13 @@ const hasDetails = computed(() => inputStr.value || props.tool.output)
         </template>
         <span v-if="elapsedSeconds > 0" class="elapsed-time">{{ elapsedText }}</span>
       </span>
+      <Icon v-if="hasDetails" :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" class="chevron" />
       <span class="tool-status" :class="tool.status">
         <Icon v-if="tool.status === 'success'" icon="lucide:check-circle" style="font-size:11px" />
         <Icon v-else-if="tool.status === 'error'" icon="lucide:x-circle" style="font-size:11px" />
         <Icon v-else icon="lucide:loader-circle" style="font-size:11px" />
         {{ tool.status === 'success' ? langData.toolCard_success : tool.status === 'error' ? langData.toolCard_failed : langData.toolCard_running }}
       </span>
-      <Icon v-if="hasDetails" :icon="collapsed ? 'lucide:chevron-down' : 'lucide:chevron-up'" class="chevron" />
     </div>
     <!-- 折叠时显示参数预览（仅 animating 且有 input 时） -->
     <div v-if="collapsed && animating && inputStr" class="tool-preview">{{ inputStr }}</div>
