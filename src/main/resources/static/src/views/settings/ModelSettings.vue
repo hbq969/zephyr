@@ -91,7 +91,14 @@ const templateOptions = computed(() => {
 function applyTemplate(t: ModelTemplate | null) {
   if (!t) return
   matchedTemplate.value = t
-  thinkingOn.value = true
+  if (t.paradigm === 'reasoning-effort') {
+    thinkingOn.value = true
+  } else if (t.paradigm === 'none') {
+    const hasThinking = Object.keys(t.thinkingOnParams).length > 0 || t.hideOnThinking.length > 0
+    thinkingOn.value = !t.canDisable && hasThinking
+  } else {
+    thinkingOn.value = true
+  }
   for (const [k, v] of Object.entries(t.thinkingOnParams)) {
     const existing = params.value.find(p => p.key === k)
     if (existing) existing.value = v
