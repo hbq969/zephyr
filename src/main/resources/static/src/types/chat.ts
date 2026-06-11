@@ -122,3 +122,11 @@ export interface MemoryItem {
   createdAt: number
   updatedAt: number
 }
+
+// === File Attachment ===
+export interface FileAttachment {
+  path: string       // workspace 相对路径
+  name: string       // 原始文件名（展示用）
+  size: number       // 字节
+  status: 'uploading' | 'done' | 'error'
+}

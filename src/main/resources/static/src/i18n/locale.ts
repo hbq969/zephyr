@@ -76,6 +76,8 @@ const locale: any = {
         "inputArea_searchPlaceholder": "输入关键词搜索...",
         "inputArea_noMatch": "无匹配结果",
         "inputArea_thinking": "推理",
+        "inputArea_fileTooLarge": "文件大小不能超过 10MB",
+        "inputArea_uploadFailed": "上传失败",
 
         // 消息气泡
         "msgBubble_copy": "复制",
@@ -359,6 +361,8 @@ const locale: any = {
         "inputArea_searchPlaceholder": "Type to search...",
         "inputArea_noMatch": "No matches",
         "inputArea_thinking": "Reasoning",
+        "inputArea_fileTooLarge": "File size cannot exceed 10MB",
+        "inputArea_uploadFailed": "Upload failed",
 
         // Message bubble
         "msgBubble_copy": "Copy",
@@ -642,6 +646,8 @@ const locale: any = {
         "inputArea_searchPlaceholder": "キーワード検索...",
         "inputArea_noMatch": "一致なし",
         "inputArea_thinking": "推論",
+        "inputArea_fileTooLarge": "ファイルサイズは10MBを超えることはできません",
+        "inputArea_uploadFailed": "アップロード失敗",
 
         // Message bubble
         "msgBubble_copy": "コピー",
