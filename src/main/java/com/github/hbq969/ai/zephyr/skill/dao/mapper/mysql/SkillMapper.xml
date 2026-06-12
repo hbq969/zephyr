@@ -4,7 +4,7 @@
 <mapper namespace="com.github.hbq969.ai.zephyr.skill.dao.SkillDao">
 
   <update id="createSkillConfigsTable">
-    create table if not exists skill_configs (
+    create table if not exists zephyr_skill_configs (
       id varchar(64) primary key,
       user_name varchar(64) not null,
       skill_name varchar(128) not null,
@@ -18,8 +18,8 @@
       created_at bigint,
       updated_at bigint
     );
-    create index if not exists idx_sc_user on skill_configs(user_name);
-    create index if not exists idx_sc_skill_name on skill_configs(skill_name);
+    create index if not exists idx_zephyr_sc_user on zephyr_skill_configs(user_name);
+    create index if not exists idx_zephyr_sc_skill_name on zephyr_skill_configs(skill_name);
   </update>
 
 </mapper>

@@ -43,17 +43,17 @@ public class InitialServiceImpl extends AbstractScriptInitialAware {
 
     @Override
     protected void tableCreate0() {
-        com.github.hbq969.code.common.utils.ThrowUtils.call("model_configs",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_model_configs",
                 () -> modelConfigDao.createModelConfigsTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("mcp_servers",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_mcp_servers",
                 () -> mcpDao.createMcpServersTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("mcp_tools",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_mcp_tools",
                 () -> mcpDao.createMcpToolsTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("skill_configs",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_skill_configs",
                 () -> skillDao.createSkillConfigsTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("conversations",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_conversations",
                 () -> chatDao.createConversationsTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("messages",
+        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_messages",
                 () -> chatDao.createMessagesTable());
         com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_workspaces",
                 () -> workspaceDao.createWorkspacesTable());

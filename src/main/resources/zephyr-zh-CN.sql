@@ -1,12 +1,12 @@
-ALTER TABLE mcp_tools ADD COLUMN IF NOT EXISTS parameters_json text;
+ALTER TABLE zephyr_mcp_tools ADD COLUMN IF NOT EXISTS parameters_json text;
 
 delete from h_sm_info where app='zephyr';
 insert into h_sm_info(app,info_content) values('zephyr','{"title":"Zephyr智能体"}');
 
-alter table model_configs add column if not exists max_context_tokens bigint;
-alter table model_configs add column if not exists params text;
+alter table zephyr_model_configs add column if not exists max_context_tokens bigint;
+alter table zephyr_model_configs add column if not exists params text;
 
-alter table conversations add column if not exists workspace_id varchar(64);
+alter table zephyr_conversations add column if not exists workspace_id varchar(64);
 
 delete from h_menus where app='zephyr' and name in ('agents','zephyr_api');
 insert into h_menus(app,name,menu_desc,url,parent_key,order_index,menu_level,icon_name,created_at) values('zephyr','agents','智能体','/agents','-',0,1,'HAProxyIcon',1735800456);

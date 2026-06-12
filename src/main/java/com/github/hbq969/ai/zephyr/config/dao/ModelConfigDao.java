@@ -20,6 +20,6 @@ public interface ModelConfigDao {
     void clearDefault(@Param("userName") String userName);
     void setDefault(@Param("id") String id, @Param("userName") String userName);
 
-    @Update("update model_configs set max_context_tokens = #{maxTokens}, updated_at = #{updatedAt} where id = #{id} and user_name = #{userName}")
+    @Update("update zephyr_model_configs set max_context_tokens = #{maxTokens}, updated_at = #{updatedAt} where id = #{id} and user_name = #{userName}")
     void updateMaxContextTokens(@Param("id") String id, @Param("maxTokens") Long maxTokens, @Param("updatedAt") Long updatedAt, @Param("userName") String userName);
 }

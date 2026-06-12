@@ -8,7 +8,7 @@
                display_name as displayName, description, source, source_url as sourceUrl,
                version, enabled, install_path as installPath,
                created_at as createdAt, updated_at as updatedAt
-        from skill_configs
+        from zephyr_skill_configs
         where user_name = #{userName}
         order by source asc, created_at desc
     </select>
@@ -18,7 +18,7 @@
                display_name as displayName, description, source, source_url as sourceUrl,
                version, enabled, install_path as installPath,
                created_at as createdAt, updated_at as updatedAt
-        from skill_configs
+        from zephyr_skill_configs
         where user_name = #{userName} and enabled = 1
         order by source asc, created_at desc
     </select>
@@ -28,7 +28,7 @@
                display_name as displayName, description, source, source_url as sourceUrl,
                version, enabled, install_path as installPath,
                created_at as createdAt, updated_at as updatedAt
-        from skill_configs where id = #{id}
+        from zephyr_skill_configs where id = #{id}
     </select>
 
     <select id="queryBySkillName" resultType="com.github.hbq969.ai.zephyr.skill.dao.entity.SkillConfigEntity">
@@ -36,21 +36,21 @@
                display_name as displayName, description, source, source_url as sourceUrl,
                version, enabled, install_path as installPath,
                created_at as createdAt, updated_at as updatedAt
-        from skill_configs
+        from zephyr_skill_configs
         where skill_name = #{skillName} and user_name = #{userName}
     </select>
 
     <insert id="insert">
-        insert into skill_configs (id, user_name, skill_name, display_name, description, source, source_url, version, enabled, install_path, created_at, updated_at)
+        insert into zephyr_skill_configs (id, user_name, skill_name, display_name, description, source, source_url, version, enabled, install_path, created_at, updated_at)
         values (#{id}, #{userName}, #{skillName}, #{displayName}, #{description}, #{source}, #{sourceUrl}, #{version}, #{enabled}, #{installPath}, #{createdAt}, #{updatedAt})
     </insert>
 
     <delete id="delete">
-        delete from skill_configs where id = #{id} and user_name = #{userName}
+        delete from zephyr_skill_configs where id = #{id} and user_name = #{userName}
     </delete>
 
     <update id="toggle">
-        update skill_configs set enabled = #{enabled} where id = #{id} and user_name = #{userName}
+        update zephyr_skill_configs set enabled = #{enabled} where id = #{id} and user_name = #{userName}
     </update>
 
 </mapper>

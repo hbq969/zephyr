@@ -4,7 +4,7 @@
 <mapper namespace="com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao">
 
   <update id="createModelConfigsTable">
-    create table if not exists model_configs (
+    create table if not exists zephyr_model_configs (
       id varchar(64) primary key,
       user_name varchar(64) not null,
       name varchar(128) not null,
@@ -16,7 +16,7 @@
       updated_at bigint,
       params text
     );
-    create index if not exists idx_mc_user on model_configs(user_name);
+    create index if not exists idx_zephyr_mc_user on zephyr_model_configs(user_name);
   </update>
 
 </mapper>

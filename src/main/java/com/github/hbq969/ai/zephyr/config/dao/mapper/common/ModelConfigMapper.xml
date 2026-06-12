@@ -5,18 +5,18 @@
 
   <select id="queryByUserName" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
     select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, params
-    from model_configs
+    from zephyr_model_configs
     where user_name = #{userName}
     order by created_at desc
   </select>
 
   <insert id="insert">
-    insert into model_configs (id, user_name, name, base_url, api_key_encrypted, max_context_tokens, params, is_default, created_at, updated_at)
+    insert into zephyr_model_configs (id, user_name, name, base_url, api_key_encrypted, max_context_tokens, params, is_default, created_at, updated_at)
     values (#{id}, #{userName}, #{name}, #{baseUrl}, #{apiKeyEncrypted}, #{maxContextTokens}, #{params}, #{isDefault}, #{createdAt}, #{updatedAt})
   </insert>
 
   <update id="update">
-    update model_configs
+    update zephyr_model_configs
     set name = #{name}, base_url = #{baseUrl}, updated_at = #{updatedAt}
     <if test="apiKeyEncrypted != null and apiKeyEncrypted != ''">, api_key_encrypted = #{apiKeyEncrypted}</if>
     <if test="maxContextTokens != null">, max_context_tokens = #{maxContextTokens}</if>
@@ -25,20 +25,20 @@
   </update>
 
   <delete id="delete">
-    delete from model_configs where id = #{id} and user_name = #{userName}
+    delete from zephyr_model_configs where id = #{id} and user_name = #{userName}
   </delete>
 
   <select id="queryById" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
     select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, params
-    from model_configs where id = #{id}
+    from zephyr_model_configs where id = #{id}
   </select>
 
   <update id="clearDefault">
-    update model_configs set is_default = 0 where user_name = #{userName}
+    update zephyr_model_configs set is_default = 0 where user_name = #{userName}
   </update>
 
   <update id="setDefault">
-    update model_configs set is_default = 1 where id = #{id} and user_name = #{userName}
+    update zephyr_model_configs set is_default = 1 where id = #{id} and user_name = #{userName}
   </update>
 
 </mapper>

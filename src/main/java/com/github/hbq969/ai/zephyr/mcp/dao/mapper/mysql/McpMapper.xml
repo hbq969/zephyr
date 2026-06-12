@@ -4,7 +4,7 @@
 <mapper namespace="com.github.hbq969.ai.zephyr.mcp.dao.McpDao">
 
   <update id="createMcpServersTable">
-    create table if not exists mcp_servers (
+    create table if not exists zephyr_mcp_servers (
       id varchar(64) primary key,
       user_name varchar(64) not null,
       name varchar(128) not null,
@@ -18,11 +18,11 @@
       created_at bigint,
       updated_at bigint
     );
-    create index if not exists idx_ms_user on mcp_servers(user_name);
+    create index if not exists idx_zephyr_ms_user on zephyr_mcp_servers(user_name);
   </update>
 
   <update id="createMcpToolsTable">
-    create table if not exists mcp_tools (
+    create table if not exists zephyr_mcp_tools (
       id varchar(64) primary key,
       user_name varchar(64) not null,
       server_id varchar(64) not null,
@@ -33,8 +33,8 @@
       source varchar(16) not null,
       created_at bigint
     );
-    create index if not exists idx_mt_server on mcp_tools(server_id);
-    create index if not exists idx_mt_user on mcp_tools(user_name);
+    create index if not exists idx_zephyr_mt_server on zephyr_mcp_tools(server_id);
+    create index if not exists idx_zephyr_mt_user on zephyr_mcp_tools(user_name);
   </update>
 
 </mapper>
