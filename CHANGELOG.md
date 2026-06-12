@@ -2,6 +2,25 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.0.1] - 2026-06-12
+
+### 新增
+
+- **聊天模式切换**：Default/Accept Edits/Bypass 三种模式，三套文件系统安全提示词
+- **文件系统安全强化**：路径规范化（强制解析相对路径、消除 `..`、解析符号链接）、边界精确前缀检查、禁用路径遍历
+
+### 修复
+
+- 聊天页面 loading 闪屏
+- 重命名输入框自动聚焦全选
+- Zephyr 菜单图标从 agent 改为 HAProxyIcon
+- 切换 workspace 时更新对话归属
+
+### 优化
+
+- 清除所有 Vue 文件中硬编码中文，补全三语 i18n key
+- 表名统一添加 `zephyr_` 前缀
+
 ## [1.0.0] - 2026-06-12
 
 ### 新增
