@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useConversationsStore } from '@/store/conversations'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
@@ -43,6 +43,10 @@ function startRename(id: string, currentTitle: string) {
   renameId.value = id
   renameText.value = currentTitle
   openMenuId.value = null
+  nextTick(() => {
+    const input = document.querySelector('.rename-input') as HTMLInputElement
+    if (input) { input.focus(); input.select() }
+  })
 }
 
 function confirmRename(id: string) {
