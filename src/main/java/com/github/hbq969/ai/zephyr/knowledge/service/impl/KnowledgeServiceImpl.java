@@ -2,6 +2,7 @@ package com.github.hbq969.ai.zephyr.knowledge.service.impl;
 
 import com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties;
 import com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao;
+import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
 import com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao;
 import com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity;
 import com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity;
@@ -172,6 +173,34 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         knowledgeDao.updateDocStatus(docId, "processing", 0, null);
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
         processDocAsync(docId, kbId, dataDir.resolve(docId + "_" + doc.getFileName()));
+    }
+
+    @Override
+    public List<SearchResult> search(String query, List<String> kbIds, int topK) {
+        if (kbIds == null || kbIds.isEmpty()) return List.of();
+
+        ModelConfigEntity embedModel = modelConfigDao.queryDefaultByType("embedding");
+        if (embedModel == null) throw new RuntimeException("未配置默认 Embedding 模型");
+
+        List<float[]> embeddings = embeddingClient.embed(List.of(query), embedModel);
+        if (embeddings.isEmpty()) return List.of();
+
+        List<ChromaClient.QueryResult> allResults = new ArrayList<>();
+        for (String kbId : kbIds) {
+            try {
+                allResults.addAll(chromaClient.query("kb_" + kbId, embeddings.get(0), topK));
+            } catch (Exception e) {
+                log.warn("知识库 {} 检索失败: {}", kbId, e.getMessage());
+            }
+        }
+
+        return allResults.stream()
+                .sorted((a, b) -> Double.compare(b.getScore(), a.getScore()))
+                .limit(topK)
+                .map(r -> new SearchResult(r.getDocument(),
+                        r.getMetadata() != null ? r.getMetadata().getOrDefault("file_name", "") : "",
+                        r.getScore()))
+                .toList();
     }
 
     @Async

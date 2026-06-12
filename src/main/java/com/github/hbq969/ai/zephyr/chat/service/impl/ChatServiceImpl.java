@@ -13,6 +13,8 @@ import com.github.hbq969.ai.zephyr.mcp.utils.McpConnectionManager;
 import com.github.hbq969.ai.zephyr.memory.service.MemoryService;
 import com.github.hbq969.ai.zephyr.skill.service.SkillService;
 import com.github.hbq969.ai.zephyr.workspace.dao.WorkspaceDao;
+import com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao;
+import com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Resource;
@@ -55,6 +57,12 @@ public class ChatServiceImpl implements ChatService {
 
     @Resource
     private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+
+    @Resource
+    private KnowledgeDao knowledgeDao;
+
+    @Resource
+    private KnowledgeService knowledgeService;
 
     @Override
     public SseEmitter send(String userName, String conversationId, String workspaceId,
@@ -178,7 +186,8 @@ public class ChatServiceImpl implements ChatService {
                         persistAssistantMessage(cid, result, msgSeq++);
 
                         // 4c. 分发工具调用
-                        List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName);
+                        List<String> enabledKbIds = cid != null ? knowledgeDao.queryKbIdsByConversation(cid) : List.of();
+                        List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName, enabledKbIds);
 
                         // 推送工具执行结果
                         for (int i = 0; i < result.getToolCalls().size(); i++) {
@@ -347,7 +356,7 @@ public class ChatServiceImpl implements ChatService {
         return "请调用 " + cmdName;
     }
 
-    private List<Map<String, Object>> dispatchTools(List<LlmResult.ToolCall> toolCalls, String userName) {
+    private List<Map<String, Object>> dispatchTools(List<LlmResult.ToolCall> toolCalls, String userName, List<String> enabledKbIds) {
         List<Map<String, Object>> results = new ArrayList<>();
         for (LlmResult.ToolCall tc : toolCalls) {
             String content;
@@ -355,6 +364,7 @@ public class ChatServiceImpl implements ChatService {
                 content = switch (tc.getName()) {
                     case "use_skill" -> executeUseSkill(tc.getArguments().get("skill_name").toString(), userName);
                     case "use_memory" -> executeUseMemory(tc.getArguments().get("memory_name").toString(), userName);
+                    case "search_knowledge" -> executeSearchKnowledge(tc.getArguments(), enabledKbIds);
                     default -> executeMcpTool(tc.getName(), tc.getArguments(), userName);
                 };
             } catch (Exception e) {
@@ -482,6 +492,40 @@ public class ChatServiceImpl implements ChatService {
             }
         }
         return "MCP 工具未找到: " + toolName;
+    }
+
+    private String executeSearchKnowledge(Map<String, Object> args, List<String> enabledKbIds) {
+        if (enabledKbIds == null || enabledKbIds.isEmpty()) {
+            return "{\"message\": \"当前对话未启用任何知识库\"}";
+        }
+        try {
+            String query = args.get("query").toString();
+            int topK = 5;
+            if (args.containsKey("top_k")) {
+                topK = ((Number) args.get("top_k")).intValue();
+            }
+            List<KnowledgeService.SearchResult> results = knowledgeService.search(query, enabledKbIds, topK);
+            if (results.isEmpty()) {
+                return "{\"results\": [], \"message\": \"未找到相关文档片段\"}";
+            }
+            StringBuilder sb = new StringBuilder("{\"results\": [");
+            for (int i = 0; i < results.size(); i++) {
+                KnowledgeService.SearchResult r = results.get(i);
+                if (i > 0) sb.append(",");
+                sb.append("{\"content\": \"").append(escapeJson(r.getContent())).append("\",")
+                  .append("\"source\": \"").append(escapeJson(r.getSourceFile())).append("\",")
+                  .append("\"score\": ").append(String.format("%.4f", r.getScore())).append("}");
+            }
+            sb.append("]}");
+            return sb.toString();
+        } catch (Exception e) {
+            return "{\"error\": \"知识库检索暂时不可用，请稍后重试: " + escapeJson(e.getMessage()) + "\"}";
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\t", "\\t");
     }
 
     @Override

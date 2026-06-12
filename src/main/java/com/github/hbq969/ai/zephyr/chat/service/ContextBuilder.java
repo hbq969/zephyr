@@ -48,6 +48,10 @@ public class ContextBuilder {
     private ChatDao chatDao;
     @Resource
     private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+    @Resource
+    private com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao knowledgeDao;
+    @Resource
+    private com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService knowledgeService;
 
     private static final String FS_DEFAULT = """
             ## 文件系统安全（Default 模式）
@@ -162,9 +166,24 @@ public class ContextBuilder {
             }
         }
 
+        // 加载对话勾选的知识库
+        if (conversationId != null && !conversationId.isEmpty()) {
+            List<String> enabledKbIds = knowledgeDao.queryKbIdsByConversation(conversationId);
+            if (!enabledKbIds.isEmpty()) {
+                List<com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity> kbs = knowledgeDao.queryKbByIds(enabledKbIds);
+                systemPrompt.append("\n\n## 已启用知识库\n");
+                for (com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity kb : kbs) {
+                    systemPrompt.append("- ").append(kb.getName()).append(": ")
+                        .append(kb.getDescription() != null ? kb.getDescription() : "").append("\n");
+                }
+                systemPrompt.append("使用 search_knowledge 工具检索知识库内容");
+            }
+        }
+
         // 6. 添加内置工具
         toolDefs.add(buildUseSkillTool());
         toolDefs.add(buildUseMemoryTool());
+        toolDefs.add(buildSearchKnowledgeTool());
 
         // 7. 加载历史消息（最近 20 轮）
         List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt.toString());
@@ -415,6 +434,21 @@ public class ContextBuilder {
                         .name("use_memory")
                         .description("查看指定记忆的完整内容")
                         .parameters(params)
+                        .build())
+                .build();
+    }
+
+    private ToolDef buildSearchKnowledgeTool() {
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("query", Map.of("type", "string", "description", "检索关键词或问题"));
+        props.put("top_k", Map.of("type", "integer", "description", "返回结果数量，默认 5"));
+
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("search_knowledge")
+                        .description("从已勾选的知识库中检索相关文档片段")
+                        .parameters(Map.of("type", "object", "properties", props, "required", List.of("query")))
                         .build())
                 .build();
     }

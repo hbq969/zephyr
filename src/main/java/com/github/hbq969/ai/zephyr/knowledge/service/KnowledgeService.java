@@ -30,6 +30,8 @@ public interface KnowledgeService {
 
     void reParseDoc(String docId, String kbId, String userName);
 
+    List<SearchResult> search(String query, List<String> kbIds, int topK);
+
     @Data
     class SearchResult {
         private final String content;
