@@ -147,7 +147,7 @@ cp -rf src/main/resources/*.xml target/classes/
 mvn spring-boot:run -Dspring-boot.run.profiles=me
 ```
 
-Open **http://localhost:30733/zephyr/zephyr-ui/index.html** and log in with `admin` / `1`.
+Open **http://localhost:30733/zephyr/ui/index.html** and log in with `admin` / `123456`.
 
 ### 4. Configure a model
 
@@ -281,9 +281,9 @@ npm run type-check
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home
 mvn spring-boot:run -Dspring-boot.run.profiles=me
 
-# API test
-curl -u admin:1 -H "X-SM-Test: 1" \
-  "http://localhost:30733/zephyr/zephyr-ui/mcp/server/list"
+# API test (basic auth + captcha bypass header)
+curl -u admin:123456 -H "X-SM-Test: 1" \
+  "http://localhost:30733/zephyr/ui/mcp/server/list"
 ```
 
 After modifying the frontend, rebuild and copy to target:
