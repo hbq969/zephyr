@@ -447,7 +447,7 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
             <div class="row-title">
               {{ m.name }}
               <span class="model-type-tag" :class="m.modelType === 'embedding' ? 'tag-embedding' : 'tag-llm'">
-                {{ m.modelType === 'embedding' ? 'Embedding' : '对话' }}
+                {{ m.modelType === 'embedding' ? langData.modelConfig_typeEmbedding : langData.modelConfig_typeLlm }}
               </span>
             </div>
             <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
