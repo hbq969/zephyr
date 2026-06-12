@@ -34,6 +34,9 @@ public class ZephyrConfigProperties {
     /** Memory 存储路径 */
     private Memory memory = new Memory();
 
+    /** 知识库相关配置 */
+    private Knowledge knowledge = new Knowledge();
+
     /** Skill 管理配置（上传/同步） */
     private Skill skill = new Skill();
 
@@ -176,6 +179,26 @@ public class ZephyrConfigProperties {
     public static class Memory {
         /** Memory 存储根目录，默认 ~/.zephyr/memory */
         private String home = System.getProperty("user.home") + "/.zephyr/memory";
+    }
+
+    @Data
+    public static class Knowledge {
+        /** Chroma 向量数据库 */
+        private Chroma chroma = new Chroma();
+        /** 文档存储根目录，默认 ~/.zephyr/knowledge */
+        private String dataDir = System.getProperty("user.home") + "/.zephyr/knowledge";
+
+        @Data
+        public static class Chroma {
+            /** 部署模式: embedded 或 server */
+            private String mode = "embedded";
+            /** embedded 模式数据目录 */
+            private String dataDir = System.getProperty("user.home") + "/.zephyr/chroma";
+            /** embedded 模式 HTTP 端口 */
+            private int port = 18951;
+            /** server 模式 Chroma 地址 */
+            private String baseUrl;
+        }
     }
 
     @Data

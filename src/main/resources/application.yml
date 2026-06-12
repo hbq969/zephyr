@@ -271,6 +271,12 @@ zephyr:
     home: ${user.home}/.zephyr/skills  # skill 安装目录
   memory:
     home: ${user.home}/.zephyr/memory  # 记忆存储目录
+  knowledge:
+    data-dir: ${user.home}/.zephyr/knowledge
+    chroma:
+      mode: embedded
+      data-dir: ${user.home}/.zephyr/chroma
+      port: 18951
   skill:
     upload:
       max-size-bytes: 104857600  # 100MB
