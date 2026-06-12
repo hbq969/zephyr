@@ -114,6 +114,8 @@ export interface ModelConfig {
   isDefault: boolean
   maxContextTokens?: number
   params?: string
+  modelType?: string
+  dimensions?: number
 }
 
 // === Memory ===

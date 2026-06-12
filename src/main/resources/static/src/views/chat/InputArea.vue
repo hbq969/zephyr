@@ -41,6 +41,8 @@ const filteredSkills = computed(() => {
   return skillList.value.filter(s => s.name.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
 })
 
+const chatModels = computed(() => settingsStore.models.filter((m: any) => !m.modelType || m.modelType === 'llm'))
+
 // 键盘导航：扁平化列表 + 选中索引
 interface FlatItem { name: string; desc: string }
 const mcpFlatItems = computed<FlatItem[]>(() => {
@@ -287,7 +289,7 @@ function selectWorkspace(id: string | null) {
 }
 
 function toggleModelList() {
-  if (settingsStore.models.length === 0) return
+  if (chatModels.value.length === 0) return
   closeAll() ; showModelList.value = !showModelList.value
 }
 
@@ -503,10 +505,10 @@ function closeAll() {
           <!-- 模型切换 -->
           <div class="tool-pick" @click.stop="toggleModelList">
             <Icon icon="lucide:brain" class="pick-icon" />
-            <span>{{ settingsStore.models.length ? settingsStore.currentModel : langData.inputArea_noModel }}</span>
+            <span>{{ chatModels.length ? settingsStore.currentModel : langData.inputArea_noModel }}</span>
             <Icon icon="lucide:chevron-down" class="pick-arrow" />
             <div v-if="showModelList" class="pick-dropdown model-dropdown" @click.stop>
-              <div v-for="m in settingsStore.models" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
+              <div v-for="m in chatModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                 <div class="model-option-main">
                   <span class="model-name">{{ m.name }}</span>
                   <span class="model-tags">

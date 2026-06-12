@@ -161,6 +161,11 @@ const locale: any = {
         "modelConfig_paramTip_presencePenalty": "鼓励模型谈论新话题，正值增加话题多样性",
         "modelConfig_paramTip_reasoningEffort": "推理模型的思考深度（low / medium / high），仅部分模型支持",
         "modelConfig_paramTip_requestTimeout": "请求 LLM API 的超时等待时间（秒）",
+        "modelConfig_modelType": "模型类型",
+        "modelConfig_typeLlm": "对话模型 (llm)",
+        "modelConfig_typeEmbedding": "Embedding 模型 (embedding)",
+        "modelConfig_dimensionsLabel": "向量维度",
+        "modelConfig_dimensionsPlaceholder": "例如 1024, 1536, 3072",
 
         // 系统命令
         "cmd_clearChat": "清空当前对话",
@@ -502,6 +507,11 @@ const locale: any = {
         "modelConfig_paramTip_presencePenalty": "Encourages the model to talk about new topics. Positive values increase topic diversity.",
         "modelConfig_paramTip_reasoningEffort": "Reasoning depth for thinking models (low / medium / high). Only supported by some models.",
         "modelConfig_paramTip_requestTimeout": "Timeout in seconds when waiting for LLM API response.",
+        "modelConfig_modelType": "Model Type",
+        "modelConfig_typeLlm": "Chat Model (llm)",
+        "modelConfig_typeEmbedding": "Embedding Model (embedding)",
+        "modelConfig_dimensionsLabel": "Dimensions",
+        "modelConfig_dimensionsPlaceholder": "e.g. 1024, 1536, 3072",
 
         // Commands
         "cmd_clearChat": "Clear current chat",
@@ -843,6 +853,11 @@ const locale: any = {
         "modelConfig_paramTip_presencePenalty": "新しいトピックについて話すよう促します。正の値でトピックの多様性が増加。",
         "modelConfig_paramTip_reasoningEffort": "思考モデルの推論深度（low / medium / high）。一部のモデルのみ対応。",
         "modelConfig_paramTip_requestTimeout": "LLM API応答待ちのタイムアウト時間（秒）。",
+        "modelConfig_modelType": "モデルタイプ",
+        "modelConfig_typeLlm": "対話モデル (llm)",
+        "modelConfig_typeEmbedding": "Embedding モデル (embedding)",
+        "modelConfig_dimensionsLabel": "ベクトル次元",
+        "modelConfig_dimensionsPlaceholder": "例: 1024, 1536, 3072",
 
         // Commands
         "cmd_clearChat": "現在の会話をクリア",

@@ -18,6 +18,8 @@ const maxCtxPreset = ref('')
 const maxCtxCustom = ref('')
 const editId = ref<string | null>(null)
 const fetching = ref(false)
+const modelType = ref('llm')
+const dimensions = ref<number | undefined>(undefined)
 
 const CTX_PRESETS = [
   { label: '128K', value: '131072' },
@@ -309,9 +311,9 @@ async function add() {
   if (!name.value.trim()) return
   const paramsJson = buildParamsJson()
   if (editId.value) {
-    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson)
+    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value)
   } else {
-    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson)
+    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value)
   }
   resetForm()
 }
@@ -326,6 +328,8 @@ function resetForm() {
   maxCtxCustom.value = ''
   editId.value = null
   showForm.value = false
+  modelType.value = 'llm'
+  dimensions.value = undefined
   initParams()
   thinkingOn.value = false
   matchedTemplate.value = null
@@ -349,6 +353,8 @@ function startEdit(m: any) {
     apiKeyShown.value = ''
   }
   initParams(parseParamsJson(m.params))
+  modelType.value = m.modelType || 'llm'
+  dimensions.value = m.dimensions || undefined
   showForm.value = true
 }
 
@@ -438,9 +444,15 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
         <div class="row-left">
           <Icon icon="lucide:cpu" class="row-icon" />
           <div>
-            <div class="row-title">{{ m.name }}</div>
+            <div class="row-title">
+              {{ m.name }}
+              <span class="model-type-tag" :class="m.modelType === 'embedding' ? 'tag-embedding' : 'tag-llm'">
+                {{ m.modelType === 'embedding' ? 'Embedding' : '对话' }}
+              </span>
+            </div>
             <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
             <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ langData.modelConfig_contextLabel }}: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
+            <div v-if="m.modelType === 'embedding' && m.dimensions" class="row-sub dim-info">{{ langData.modelConfig_dimensionsLabel }}: {{ m.dimensions }}</div>
           </div>
         </div>
         <div class="row-right">
@@ -497,6 +509,17 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
               <option value="custom">{{ langData.modelConfig_ctxCustom }}</option>
             </select>
             <input v-if="maxCtxPreset === 'custom'" class="field-input" style="margin-top:8px" v-model="maxCtxCustom" :placeholder="langData.modelConfig_maxCtx" />
+          </div>
+          <div class="field">
+            <label class="field-label">{{ langData.modelConfig_modelType }}</label>
+            <select class="field-input" v-model="modelType">
+              <option value="llm">{{ langData.modelConfig_typeLlm }}</option>
+              <option value="embedding">{{ langData.modelConfig_typeEmbedding }}</option>
+            </select>
+          </div>
+          <div v-if="modelType === 'embedding'" class="field">
+            <label class="field-label">{{ langData.modelConfig_dimensionsLabel }}</label>
+            <input class="field-input" type="number" v-model.number="dimensions" :placeholder="langData.modelConfig_dimensionsPlaceholder" />
           </div>
         </div>
 
@@ -598,6 +621,10 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .row-title { font-size: 14px; color: var(--el-text-color-primary); }
 .row-sub { font-size: 12px; color: var(--el-text-color-placeholder); margin-top: 2px; }
 .ctx-info { color: var(--el-color-success); font-weight: 500; }
+.dim-info { color: var(--el-color-primary); font-weight: 500; }
+.model-type-tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; font-weight: 500; vertical-align: middle; margin-left: 6px; }
+.tag-llm { background: rgba(204,120,92,0.12); color: var(--el-color-primary); }
+.tag-embedding { background: rgba(103,194,58,0.12); color: var(--el-color-success); }
 .row-right { display: flex; align-items: center; gap: 6px; }
 .action-icon { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-placeholder); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
 .action-icon:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }

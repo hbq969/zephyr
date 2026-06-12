@@ -45,7 +45,9 @@ export const useSettingsStore = defineStore('settings', () => {
           isDefault: m.isDefault === 1,
           apiKey: m.apiKeyEncrypted,
           maxContextTokens: m.maxContextTokens,
-          params: m.params
+          params: m.params,
+          modelType: m.modelType || 'llm',
+          dimensions: m.dimensions
         }))
         models.value = list
         const def = list.find((m: ModelConfig) => m.isDefault)
@@ -54,13 +56,13 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (_) { /* keep defaults */ }
   }
 
-  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
-    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params } })
+  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number) {
+    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions } })
     if (res.data.state === 'OK') await loadModels()
   }
 
-  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string) {
-    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params } })
+  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number) {
+    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions } })
     await loadModels()
   }
 
