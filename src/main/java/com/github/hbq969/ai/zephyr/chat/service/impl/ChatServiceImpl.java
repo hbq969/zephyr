@@ -58,7 +58,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public SseEmitter send(String userName, String conversationId, String workspaceId,
-                           String originalMessage, List<String> filePaths) {
+                           String originalMessage, String mode, List<String> filePaths) {
         SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());
         String cancelKey = userName;
 
@@ -102,7 +102,7 @@ public class ChatServiceImpl implements ChatService {
                 }
 
                 // 2. 组装上下文（不含当前用户消息）
-                ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
+                ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode != null ? mode : "default");
                 List<Map<String, Object>> messages = ctx.getMessages();
 
                 // 如果有上传文件，拼入用户消息
@@ -321,7 +321,7 @@ public class ChatServiceImpl implements ChatService {
                 return null;
             }
             case "context" -> {
-                Map<String, Object> usage = contextUsage(userName, cid);
+                Map<String, Object> usage = contextUsage(userName, cid, null);
                 StringBuilder sb = new StringBuilder("## 上下文占比\n\n");
                 sb.append("| 类型 | Token 数 |\n");
                 sb.append("|------|----------|\n");
@@ -516,8 +516,8 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public Map<String, Object> contextUsage(String userName, String cid) {
-        ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
+    public Map<String, Object> contextUsage(String userName, String cid, String mode) {
+        ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode != null ? mode : "default");
         int sysTokens = estimateTokens(ctx.getSystemPrompt());
         int histTokens = 0;
         int skillTokens = 0;

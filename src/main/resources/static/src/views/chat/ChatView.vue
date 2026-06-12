@@ -84,6 +84,7 @@ function newChat() {
   chatStore.clearMessages()
   convStore.currentId = null
   settingsStore.contextUsed = 0
+  chatStore.mode = 'default'
 }
 
 function onSend(text: string, filePaths?: string[]) {
@@ -117,7 +118,7 @@ function onSend(text: string, filePaths?: string[]) {
   axios({
     url: `/chat/send`,
     method: 'post',
-    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, filePaths: filePaths || [] },
+    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, mode: chatStore.mode, filePaths: filePaths || [] },
     responseType: 'text',
     signal: abortController.signal,
     onDownloadProgress(evt: any) {

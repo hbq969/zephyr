@@ -8,5 +8,6 @@ public class ChatRequest {
     private String conversationId;
     private String workspaceId;
     private String message;
+    private String mode;
     private List<String> filePaths;
 }

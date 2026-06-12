@@ -49,6 +49,22 @@ public class ContextBuilder {
     @Resource
     private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
+    private static final String FS_DEFAULT = """
+            ## 文件系统安全（Default 模式）
+            - 工作空间目录内：直接读写，无需确认
+            - 工作空间目录外：每次访问都需用户明确回复"同意"授权。授权仅当次有效，下次访问同一路径仍需重新授权
+            - 即使用户在消息中指定了工作空间外的路径，也必须先征得授权，不得直接执行""";
+
+    private static final String FS_ACCEPT_EDITS = """
+            ## 文件系统安全（Accept Edits 模式）
+            - 工作空间目录内：直接读写，无需确认
+            - 工作空间目录外：同一文件首次访问需用户明确回复"同意"授权，授权后在当前对话内持续有效，后续访问无需再次确认。不同文件仍需各自首次授权
+            - 即使用户在消息中指定了工作空间外的路径，也必须先征得授权，不得直接执行""";
+
+    private static final String FS_BYPASS = """
+            ## 文件系统（Bypass 模式 — 无限制）
+            你拥有完整文件系统访问权限，不再受工作空间目录约束。请对破坏性操作保持谨慎。""";
+
     private static final String ROLE_PROMPT = """
             你是一个 AI 助手，名为 zephyr。
 
@@ -60,12 +76,7 @@ public class ContextBuilder {
             **必须先用 use_skill 加载对应技能，获得处理该类型文件的完整指导，然后严格按指导操作。**
             你不具备直接读取文件内容的能力，依赖技能中的工具来完成解析。
 
-            ## 文件系统安全（强制要求，最高优先级）
-            **所有文件操作（含 Bash 命令、MCP 文件工具、代码读写等一切能接触文件系统的手段）仅限在工作空间目录内。**
-            - 工作空间是唯一合法操作目录，其父目录、兄弟目录、系统目录等其他任何路径均视为越权
-            - 即使用户在消息中指定了其他路径，也必须拒绝并提醒用户该路径不在当前工作空间内
-            - 执行任何 Bash 命令前，先检查命令中是否包含工作空间外的路径，如有则拒绝执行
-            - 唯一例外：用户明确回复"同意"授权后，方可访问指定路径。授权仅对当次请求有效，后续再次访问同一路径仍需重新获得授权
+            {fileSystemSecurity}
 
             ## 工具使用说明
             - 优先使用 MCP 工具获取实时准确的数据
@@ -87,7 +98,13 @@ public class ContextBuilder {
             - `/记忆名` → 调用 use_memory(memory_name="记忆名") 查看该记忆
             """;
 
-    public Context build(String userName, String conversationId) {
+    private String fileSystemSecurityPrompt(String mode) {
+        if ("bypass".equalsIgnoreCase(mode)) return FS_BYPASS;
+        if ("acceptEdits".equalsIgnoreCase(mode)) return FS_ACCEPT_EDITS;
+        return FS_DEFAULT;
+    }
+
+    public Context build(String userName, String conversationId, String mode) {
         // 1. 加载模型配置
         List<ModelConfigEntity> models = modelConfigDao.queryByUserName(userName);
         ModelConfigEntity model = models.stream()
@@ -106,7 +123,8 @@ public class ContextBuilder {
         String memoryIndex = buildMemoryIndex(userName);
 
         // 5. 组装 system prompt
-        StringBuilder systemPrompt = new StringBuilder(ROLE_PROMPT);
+        StringBuilder systemPrompt = new StringBuilder(ROLE_PROMPT.replace("{fileSystemSecurity}",
+                fileSystemSecurityPrompt(mode)));
         if (!skillIndex.isEmpty()) {
             systemPrompt.append("\n\n## 可用技能\n").append(skillIndex)
                     .append("\n（需要详细指导时使用 use_skill 工具加载）");
@@ -123,9 +141,10 @@ public class ContextBuilder {
                 WorkspaceEntity ws = workspaceDao.queryById(conv.getWorkspaceId());
                 if (ws != null) {
                     systemPrompt.append("\n\n## 工作空间\n")
-                        .append("工作空间（唯一合法操作目录）: ").append(ws.getPath()).append("\n")
-                        .append("此路径的父目录、兄弟目录（如 ").append(ws.getPath()).append(" 的同级目录）均不属于工作空间。")
-                        .append("仅此目录及其子目录内的文件可以访问，其他一切路径禁止操作。\n");
+                        .append("当前工作目录: ").append(ws.getPath()).append("\n");
+                    if (!"bypass".equalsIgnoreCase(mode)) {
+                        systemPrompt.append("此路径的父目录、兄弟目录均不属于工作空间，仅此目录及其子目录内的文件可以访问。\n");
+                    }
                 }
             }
         }

@@ -98,6 +98,22 @@ const showNewWorkspace = ref(false)
 
 const langData = getLangData()
 
+const modeLabel = computed(() => {
+  switch (chatStore.mode) {
+    case 'acceptEdits': return 'Accept Edits'
+    case 'bypass': return 'Bypass'
+    default: return 'Default'
+  }
+})
+
+const modeTooltip = computed(() => {
+  switch (chatStore.mode) {
+    case 'acceptEdits': return langData.inputArea_modeAcceptEdits
+    case 'bypass': return langData.inputArea_modeBypass
+    default: return langData.inputArea_modeDefault
+  }
+})
+
 const abilityItems = [
   { key: 'mcp', label: 'MCP' },
   { key: 'skills', label: 'Skills' },
@@ -192,6 +208,8 @@ function onKeydown(e: KeyboardEvent) {
       }
     }
   }
+  // Shift+Tab: 切换模式
+  if (e.key === 'Tab' && e.shiftKey) { e.preventDefault(); chatStore.cycleMode(); return }
   // Ctrl/Cmd+Enter: 发送
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSend(); return }
   // Shift+Enter: 换行（浏览器自然插入 <br>，只需保存撤销状态）
@@ -451,6 +469,12 @@ function closeAll() {
       ></div>
       <div class="input-toolbar">
         <div class="input-left">
+          <!-- 模式切换 Pill -->
+          <div class="mode-pill" :class="'mode-' + chatStore.mode" @click.stop="chatStore.cycleMode()" :title="modeTooltip">
+            <span class="mode-dot"></span>
+            <span class="mode-label">{{ modeLabel }}</span>
+          </div>
+
           <!-- 工作空间选择 -->
           <div class="tool-pick" @click.stop="toggleWorkspaceList">
             <template v-if="workspaceStore.current">
@@ -612,6 +636,37 @@ export default { inheritAttrs: false }
 .input-toolbar { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; }
 
 .input-left { display: flex; align-items: center; gap: 2px; }
+
+/* 模式切换 Pill */
+.mode-pill {
+  display: flex; align-items: center; gap: 3px;
+  padding: 3px 10px; border-radius: 9999px; cursor: pointer;
+  font-size: 11px; font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  user-select: none; border: 1px solid transparent;
+}
+.mode-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mode-label { white-space: nowrap; }
+
+/* Default */
+.mode-default { color: var(--el-text-color-regular); }
+.mode-default .mode-dot { background: #8e8b82; }
+.mode-default:hover { background: var(--el-fill-color-light); }
+
+/* Accept Edits */
+.mode-acceptEdits { background: rgba(232,165,90,0.12); color: var(--el-text-color-primary); }
+.mode-acceptEdits .mode-dot { background: #e8a55a; }
+.mode-acceptEdits:hover { background: rgba(232,165,90,0.2); }
+
+/* Bypass */
+.mode-bypass { background: rgba(198,69,45,0.16); color: #c64545; font-weight: 600; }
+.mode-bypass .mode-dot { background: #c64545; }
+.mode-bypass:hover { background: rgba(198,69,45,0.24); }
+
+/* dark */
+html.dark .mode-default { color: #a09d96; }
+html.dark .mode-acceptEdits { background: rgba(232,165,90,0.14); color: #faf9f5; }
+html.dark .mode-bypass { background: rgba(198,69,45,0.22); color: #e07373; }
 
 .tool-pick {
   position: relative; display: flex; align-items: center; gap: 3px;

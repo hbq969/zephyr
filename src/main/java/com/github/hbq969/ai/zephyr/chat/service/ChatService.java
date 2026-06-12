@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 public interface ChatService {
-    SseEmitter send(String userName, String conversationId, String workspaceId, String message, List<String> filePaths);
+    SseEmitter send(String userName, String conversationId, String workspaceId, String message, String mode, List<String> filePaths);
     void cancel(String userName);
-    Map<String, Object> contextUsage(String userName, String conversationId);
+    Map<String, Object> contextUsage(String userName, String conversationId, String mode);
     Map<String, Object> upload(MultipartFile file, String workspaceId, String userName);
 }

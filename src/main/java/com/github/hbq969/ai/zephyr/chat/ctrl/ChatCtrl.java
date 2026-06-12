@@ -40,6 +40,7 @@ public class ChatCtrl {
                 body.getConversationId(),
                 body.getWorkspaceId(),
                 body.getMessage(),
+                body.getMode(),
                 body.getFilePaths()
         );
     }
@@ -92,8 +93,9 @@ public class ChatCtrl {
     @RequestMapping(path = "/context-usage", method = RequestMethod.GET)
     @ResponseBody
     @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "chat_contextUsage", apiDesc = "聊天接口_上下文占比")
-    public ReturnMessage<?> contextUsage(@RequestParam(required = false) String conversationId) {
+    public ReturnMessage<?> contextUsage(@RequestParam(required = false) String conversationId,
+                                         @RequestParam(required = false) String mode) {
         return ReturnMessage.success(chatService.contextUsage(
-                userName(), conversationId));
+                userName(), conversationId, mode));
     }
 }

@@ -1,3 +1,6 @@
+// === Chat Mode ===
+export type ChatMode = 'default' | 'acceptEdits' | 'bypass'
+
 // === SSE Chat Event ===
 export interface ChatEvent {
   type: 'token' | 'thinking' | 'tool_call' | 'tool_result' | 'usage' | 'compaction' | 'done' | 'error'

@@ -82,6 +82,9 @@ const locale: any = {
         "inputArea_fileTooLarge": "文件大小不能超过 10MB",
         "inputArea_uploadFailed": "上传失败",
         "inputArea_newWorkspace": "新建工作空间",
+        "inputArea_modeDefault": "默认 — 工作空间外操作每次确认",
+        "inputArea_modeAcceptEdits": "Accept Edits — 同一文件确认后不再提示",
+        "inputArea_modeBypass": "Bypass — 完整文件系统权限，无限制",
 
         // 消息气泡
         "msgBubble_copy": "复制",
@@ -413,6 +416,9 @@ const locale: any = {
         "inputArea_fileTooLarge": "File size cannot exceed 10MB",
         "inputArea_uploadFailed": "Upload failed",
         "inputArea_newWorkspace": "New Workspace",
+        "inputArea_modeDefault": "Default — confirm every operation outside workspace",
+        "inputArea_modeAcceptEdits": "Accept Edits — same file confirmed once, no re-prompt",
+        "inputArea_modeBypass": "Bypass — full filesystem access, no restrictions",
 
         // Message bubble
         "msgBubble_copy": "Copy",
@@ -744,6 +750,9 @@ const locale: any = {
         "inputArea_fileTooLarge": "ファイルサイズは10MBを超えることはできません",
         "inputArea_uploadFailed": "アップロード失敗",
         "inputArea_newWorkspace": "新規ワークスペース",
+        "inputArea_modeDefault": "デフォルト — ワークスペース外の操作は毎回確認",
+        "inputArea_modeAcceptEdits": "Accept Edits — 同じファイルは一度確認すれば再確認不要",
+        "inputArea_modeBypass": "バイパス — ファイルシステム完全アクセス、制限なし",
 
         // Message bubble
         "msgBubble_copy": "コピー",

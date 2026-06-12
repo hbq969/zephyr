@@ -1,12 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Message, ToolCall } from '@/types/chat'
+import type { Message, ToolCall, ChatMode } from '@/types/chat'
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const streaming = ref(false)
   const currentThinking = ref('')
   const sessionStartTime = ref(0)
+  const mode = ref<ChatMode>('default')
+
+  function cycleMode() {
+    const order: ChatMode[] = ['default', 'acceptEdits', 'bypass']
+    const idx = order.indexOf(mode.value)
+    mode.value = order[(idx + 1) % order.length]
+  }
 
   let tokenBuf = ''
   let thinkingBuf = ''
@@ -91,5 +98,5 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  return { messages, streaming, currentThinking, sessionStartTime, addMessage, appendToken, setThinking, updateLastThinking, clearMessages, startSession, pruneEmptyAssistant, upsertToolCall }
+  return { messages, streaming, currentThinking, sessionStartTime, mode, addMessage, appendToken, setThinking, updateLastThinking, clearMessages, startSession, pruneEmptyAssistant, upsertToolCall, cycleMode }
 })
