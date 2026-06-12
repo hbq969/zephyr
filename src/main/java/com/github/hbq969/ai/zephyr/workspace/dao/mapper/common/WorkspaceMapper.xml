@@ -20,6 +20,13 @@
         delete from zephyr_workspaces where id = #{id} and user_name = #{userName}
     </delete>
 
+    <select id="queryByPath" resultType="com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity">
+        select id, name, path, user_name as userName,
+               created_at as createdAt, updated_at as updatedAt
+        from zephyr_workspaces
+        where path = #{path} and user_name = #{userName}
+    </select>
+
     <select id="queryById" resultType="com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity">
         select id, name, path, user_name as userName,
                created_at as createdAt, updated_at as updatedAt

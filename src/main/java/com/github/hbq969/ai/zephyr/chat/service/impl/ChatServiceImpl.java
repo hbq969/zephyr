@@ -17,7 +17,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -54,13 +53,13 @@ public class ChatServiceImpl implements ChatService {
     @Resource
     private WorkspaceDao workspaceDao;
 
-    @Value("${chat.upload.max-file-size:10485760}")
-    private long maxFileSize;
+    @Resource
+    private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
     @Override
     public SseEmitter send(String userName, String conversationId, String workspaceId,
                            String originalMessage, List<String> filePaths) {
-        SseEmitter emitter = new SseEmitter(300000L);
+        SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());
         String cancelKey = userName;
 
         emitter.onTimeout(() -> {
@@ -102,7 +101,44 @@ public class ChatServiceImpl implements ChatService {
                             .data(ChatEvent.builder().type("meta").content(cid).build()));
                 }
 
-                // 2. 持久化 user 消息
+                // 2. 组装上下文（不含当前用户消息）
+                ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
+                List<Map<String, Object>> messages = ctx.getMessages();
+
+                // 如果有上传文件，拼入用户消息
+                String userContent = message;
+                if (filePaths != null && !filePaths.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("[用户上传了以下文件，请根据扩展名使用对应的 skill 处理]\n");
+                    for (String p : filePaths) {
+                        String ext = "";
+                        String name = p.substring(p.lastIndexOf('/') + 1);
+                        int dotIdx = name.lastIndexOf('.');
+                        if (dotIdx > 0) {
+                            ext = name.substring(dotIdx).toLowerCase();
+                            // 去掉时间戳前缀（如 1718123456_）
+                            int usIdx = name.indexOf('_');
+                            if (usIdx > 0 && usIdx < dotIdx) {
+                                name = name.substring(usIdx + 1);
+                            }
+                        }
+                        String skillHint = switch (ext) {
+                            case ".pdf" -> " → 调用 use_skill(\"pdf\")";
+                            case ".xlsx", ".xls" -> " → 调用 use_skill(\"xlsx\")";
+                            case ".docx", ".doc" -> " → 调用 use_skill(\"docx\")";
+                            case ".pptx", ".ppt" -> " → 调用 use_skill(\"pptx\")";
+                            case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp" -> " → 调用 use_skill(\"image-analysis\")";
+                            default -> "";
+                        };
+                        sb.append("- ").append(name).append(skillHint).append("\n");
+                        sb.append("  路径: ").append(p).append("\n");
+                    }
+                    sb.append("\n用户消息: ").append(message);
+                    userContent = sb.toString();
+                }
+                messages.add(Map.of("role", "user", "content", userContent));
+
+                // 3. 持久化 user 消息（必须在上下文构建之后，避免重复加载）
                 MessageEntity userMsg = new MessageEntity();
                 userMsg.setId(UUID.fastUUID().toString(true).substring(0, 12));
                 userMsg.setConversationId(cid);
@@ -110,22 +146,6 @@ public class ChatServiceImpl implements ChatService {
                 userMsg.setContent(message);
                 userMsg.setCreatedAt(msgSeq++);
                 chatDao.insertMessage(userMsg);
-
-                // 3. 组装上下文
-                ContextBuilder.Context ctx = contextBuilder.build(userName, cid);
-                List<Map<String, Object>> messages = ctx.getMessages();
-
-                // 如果有上传文件，拼入用户消息
-                String userContent = message;
-                if (filePaths != null && !filePaths.isEmpty()) {
-                    StringBuilder sb = new StringBuilder("[用户上传的文件:]\n");
-                    for (String p : filePaths) {
-                        sb.append("- ").append(p).append("\n");
-                    }
-                    sb.append("\n用户消息: ").append(message);
-                    userContent = sb.toString();
-                }
-                messages.add(Map.of("role", "user", "content", userContent));
 
                 // 4. 工具调用循环（无轮次限制，模型自行决定何时停止）
                 LlmResult result = null;
@@ -206,12 +226,19 @@ public class ChatServiceImpl implements ChatService {
                     }
                 }
             } catch (Exception e) {
-                log.error("Chat error", e);
-                try {
-                    emitter.send(SseEmitter.event().name("message")
-                            .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
-                    emitter.complete();
-                } catch (Exception ignored) {}
+                // 客户端断连是预期行为，不记 ERROR
+                boolean disconnected = e instanceof java.io.IOException
+                        && e.getMessage() != null && e.getMessage().contains("CANCEL");
+                if (disconnected) {
+                    log.debug("SSE 客户端已断开，终止对话");
+                } else {
+                    log.error("Chat error", e);
+                    try {
+                        emitter.send(SseEmitter.event().name("message")
+                                .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
+                        emitter.complete();
+                    } catch (Exception ignored) {}
+                }
             }
         });
 
@@ -333,16 +360,71 @@ public class ChatServiceImpl implements ChatService {
             } catch (Exception e) {
                 content = "工具执行错误: " + e.getMessage();
             }
+            content = sanitizeToolOutput(content);
             results.add(Map.of("role", "tool", "tool_call_id", tc.getId(), "content",
-                    content.length() > 8000 ? content.substring(0, 8000) + "..." : content));
+                    content.length() > cfg.getChat().getToolOutput().getMaxLength() ? content.substring(0, cfg.getChat().getToolOutput().getMaxLength()) + "..." : content));
         }
         return results;
+    }
+
+    /** 清除 NULL byte 并检测/截断二进制内容 */
+    private String sanitizeToolOutput(String raw) {
+        if (raw == null || raw.isEmpty()) return "";
+        // 清除 NULL byte
+        String s = raw.replace("\0", "");
+
+        // 采样判断是否为二进制数据
+        int sampleLen = Math.min(s.length(), cfg.getChat().getToolOutput().getBinarySampleSize());
+        int binaryCount = 0;
+        for (int i = 0; i < sampleLen; i++) {
+            char c = s.charAt(i);
+            // 控制字符（排除常见的空白字符）视为二进制
+            if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
+                binaryCount++;
+            }
+        }
+        double ratio = (double) binaryCount / sampleLen;
+
+        // 二进制占比超过阈值 → 提取可读片段
+        if (ratio > cfg.getChat().getToolOutput().getBinaryThreshold()) {
+            StringBuilder result = new StringBuilder();
+            StringBuilder buf = new StringBuilder();
+            int totalPrintable = 0;
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                boolean printable = (c >= 0x20 && c <= 0x7E) || c == '\t' || c == '\n' || c == '\r'
+                        || (c >= 0x80 && c <= 0xFF)  // Latin-1 补充
+                        || Character.isLetterOrDigit(c) || Character.getType(c) == Character.OTHER_PUNCTUATION;
+                if (printable) {
+                    buf.append(c);
+                    totalPrintable++;
+                } else {
+                    if (buf.length() >= 20) {
+                        if (!result.isEmpty()) result.append("\n...\n");
+                        result.append(buf);
+                    }
+                    buf.setLength(0);
+                }
+                if (result.length() > cfg.getChat().getToolOutput().getBinaryExtractionLimit()) break;
+            }
+            if (buf.length() >= 20) {
+                if (!result.isEmpty()) result.append("\n...\n");
+                result.append(buf);
+            }
+
+            if (result.isEmpty()) {
+                return "[二进制内容，共 " + s.length() + " 字节，无可读文本片段]";
+            }
+            return result + "\n\n[二进制内容已省略，共提取 " + totalPrintable + " 个可读字符]";
+        }
+
+        return s;
     }
 
     private String executeUseSkill(String skillName) {
         // pack:skill 格式 → pack/skill 路径
         String relativePath = skillName.replace(':', '/');
-        Path skillMd = Paths.get(System.getProperty("user.home"), ".zephyr", "skills", relativePath, "SKILL.md");
+        Path skillMd = Paths.get(cfg.getSkills().getHome(), relativePath, "SKILL.md");
         if (Files.exists(skillMd)) {
             try {
                 String raw = Files.readString(skillMd);
@@ -397,8 +479,8 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public Map<String, Object> upload(MultipartFile file, String workspaceId, String userName) {
-        if (file.getSize() > maxFileSize) {
-            throw new IllegalArgumentException("文件大小不能超过 " + (maxFileSize / 1024 / 1024) + "MB");
+        if (file.getSize() > cfg.getChat().getUpload().getMaxFileSize()) {
+            throw new IllegalArgumentException("文件大小不能超过 " + (cfg.getChat().getUpload().getMaxFileSize() / 1024 / 1024) + "MB");
         }
         if (workspaceId == null || workspaceId.isBlank()) {
             throw new IllegalArgumentException("workspaceId 不能为空");
@@ -418,13 +500,13 @@ public class ChatServiceImpl implements ChatService {
         String safeName = originalName.replaceAll("[/\\\\:<>\"|?*]", "_");
         long ts = System.currentTimeMillis() / 1000;
         String filename = ts + "_" + safeName;
-        Path uploadsDir = Paths.get(ws.getPath(), ".zephyr-uploads");
+        Path uploadsDir = Paths.get(ws.getPath(), cfg.getChat().getUpload().getDirectoryName());
         try {
             Files.createDirectories(uploadsDir);
             Path dest = uploadsDir.resolve(filename);
             file.transferTo(dest.toFile());
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("path", ".zephyr-uploads/" + filename);
+            result.put("path", cfg.getChat().getUpload().getDirectoryName() + "/" + filename);
             result.put("name", originalName);
             result.put("size", file.getSize());
             return result;
@@ -446,7 +528,7 @@ public class ChatServiceImpl implements ChatService {
             int t = estimateTokens(content != null ? content : "");
             if ("system".equals(role)) continue;
             else if ("tool".equals(role)) {
-                if (t > 1000) skillTokens += t;
+                if (t > cfg.getChat().getContext().getSkillTokenThreshold()) skillTokens += t;
                 else memTokens += t;
             } else {
                 histTokens += t;
@@ -465,7 +547,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private int estimateTokens(String text) {
-        return (int) Math.ceil(text.length() * 0.3);
+        return (int) Math.ceil(text.length() * cfg.getChat().getContext().getTokenEstimationRatio());
     }
 
     private boolean isNotBlank(String s) {

@@ -19,16 +19,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class McpConnectionManager {
 
-    private static final int MAX_CONNECTIONS = 100;
-    private static final long IDLE_TIMEOUT_MS = 15 * 60 * 1000L; // 15 分钟
+
 
     private final Map<String, McpConnection> connections = new ConcurrentHashMap<>();
 
-    @Value("${encrypt.restful.aes.key}")
-    private String aesKey;
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
-    @Value("${encrypt.restful.aes.iv}")
-    private String aesIv;
+
 
     @Resource
     private McpDao mcpDao;
@@ -46,7 +43,7 @@ public class McpConnectionManager {
         McpConnection existing = connections.get(key);
         if (existing != null) return existing;
 
-        if (connections.size() >= MAX_CONNECTIONS) {
+        if (connections.size() >= cfg.getMcp().getConnection().getMaxConnections()) {
             evictLru();
         }
 
@@ -57,10 +54,10 @@ public class McpConnectionManager {
 
         // 解密 headers
         if (server.getHeaders() != null && !server.getHeaders().isEmpty()) {
-            server.setHeaders(AESUtil.decrypt(server.getHeaders(), aesKey, aesIv, StandardCharsets.UTF_8));
+            server.setHeaders(AESUtil.decrypt(server.getHeaders(), cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8));
         }
 
-        McpConnection conn = McpConnection.create(server);
+        McpConnection conn = McpConnection.create(server, cfg.getMcp().getTool().getTimeoutSeconds());
         connections.put(key, conn);
         log.info("MCP 连接已建立: {} (当前 {} 个连接)", key, connections.size());
         return conn;
@@ -95,11 +92,11 @@ public class McpConnectionManager {
         }
     }
 
-    @Scheduled(fixedRate = 300000) // 每 5 分钟
+    @Scheduled(fixedRateString = "${zephyr.mcp.connection.cleanup-interval-millis:300000}")
     public void cleanupIdle() {
         long now = System.currentTimeMillis();
         connections.entrySet().removeIf(entry -> {
-            if (now - entry.getValue().getLastUsedAt() > IDLE_TIMEOUT_MS) {
+            if (now - entry.getValue().getLastUsedAt() > cfg.getMcp().getConnection().getIdleTimeoutMillis()) {
                 entry.getValue().close();
                 log.info("空闲连接回收: {}", entry.getKey());
                 return true;

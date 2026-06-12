@@ -14,14 +14,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import jakarta.annotation.Resource;
+
 @Service
 @Slf4j
 public class MemoryServiceImpl implements MemoryService {
 
-    private static final String MEMORY_HOME = System.getProperty("user.home") + "/.zephyr/memory";
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
     private Path userDir(String userName) {
-        Path dir = Paths.get(MEMORY_HOME, userName);
+        Path dir = Paths.get(cfg.getMemory().getHome(), userName);
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {

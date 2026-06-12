@@ -29,7 +29,8 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SkillServiceImpl implements SkillService {
 
-    private static final String SKILLS_HOME = System.getProperty("user.home") + "/.zephyr/skills";
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+
 
     @Resource
     private SkillDao skillDao;
@@ -120,8 +121,8 @@ public class SkillServiceImpl implements SkillService {
         if (!isArchive && !isSkillMd) {
             throw new IllegalArgumentException("仅支持 .zip、.tar、.tar.gz、.tgz、.md 格式");
         }
-        if (file.getSize() > 100 * 1024 * 1024) {
-            throw new IllegalArgumentException("文件大小不能超过 100MB");
+        if (file.getSize() > cfg.getSkill().getUpload().getMaxSizeBytes()) {
+            throw new IllegalArgumentException("文件大小不能超过 " + (cfg.getSkill().getUpload().getMaxSizeBytes() / 1024 / 1024) + "MB");
         }
 
         Path tmpDir = null;
@@ -151,13 +152,14 @@ public class SkillServiceImpl implements SkillService {
         }
     }
 
+
     @Override
     public List<SkillVO> syncScan(String userName) {
         List<SkillVO> result = new ArrayList<>();
         Map<String, String> platforms = new LinkedHashMap<>();
-        platforms.put("claude-code", System.getProperty("user.home") + "/.claude/skills");
-        platforms.put("codex", System.getProperty("user.home") + "/.codex/skills");
-        platforms.put("opencode", System.getProperty("user.home") + "/.opencode/skills");
+        platforms.put("claude-code", cfg.getSkill().getSync().getClaudeSkillsPath());
+        platforms.put("codex", cfg.getSkill().getSync().getCodexSkillsPath());
+        platforms.put("opencode", cfg.getSkill().getSync().getOpencodeSkillsPath());
 
         for (Map.Entry<String, String> entry : platforms.entrySet()) {
             Path platformDir = Paths.get(entry.getValue());
@@ -208,7 +210,7 @@ public class SkillServiceImpl implements SkillService {
             Path srcDir = Paths.get(platformPath, skillName);
             if (!Files.isDirectory(srcDir)) continue;
 
-            Path destDir = Paths.get(SKILLS_HOME, skillName);
+            Path destDir = Paths.get(cfg.getSkills().getHome(), skillName);
             deleteAndCopyDir(srcDir, destDir);
 
             SkillConfigEntity existing = skillDao.queryBySkillName(skillName, userName);
@@ -248,7 +250,7 @@ public class SkillServiceImpl implements SkillService {
         String skillName = entity.getSkillName();
         int colonIdx = skillName.indexOf(':');
         if (colonIdx > 0) {
-            Path packDir = Paths.get(SKILLS_HOME, skillName.substring(0, colonIdx));
+            Path packDir = Paths.get(cfg.getSkills().getHome(), skillName.substring(0, colonIdx));
             if (Files.isDirectory(packDir)) {
                 String[] remaining = packDir.toFile().list();
                 if (remaining == null || remaining.length == 0) {
@@ -346,6 +348,11 @@ public class SkillServiceImpl implements SkillService {
             case "git" -> {
                 String name = url.substring(url.lastIndexOf('/') + 1);
                 if (name.endsWith(".git")) name = name.substring(0, name.length() - 4);
+                // GitHub URL 使用 owner/org 作为 pack 名，如 github.com/anthropics/skills.git → anthropics
+                Matcher m = Pattern.compile("github\\.com[:/]([^/]+)/([^/]+)").matcher(url);
+                if (m.find()) {
+                    name = m.group(1);
+                }
                 yield name;
             }
             case "url" -> {
@@ -376,8 +383,8 @@ public class SkillServiceImpl implements SkillService {
             }
 
             Path destDir = packName != null
-                    ? Paths.get(SKILLS_HOME, packName, skillName)
-                    : Paths.get(SKILLS_HOME, skillName);
+                    ? Paths.get(cfg.getSkills().getHome(), packName, skillName)
+                    : Paths.get(cfg.getSkills().getHome(), skillName);
 
             deleteAndCopyDir(skillRoot, destDir);
             installed.add(insertSkillConfig(destDir, fullName, source, sourceUrl, userName));

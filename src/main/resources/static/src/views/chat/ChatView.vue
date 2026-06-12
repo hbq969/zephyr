@@ -83,6 +83,7 @@ function refreshConversationList() {
 function newChat() {
   chatStore.clearMessages()
   convStore.currentId = null
+  settingsStore.contextUsed = 0
 }
 
 function onSend(text: string, filePaths?: string[]) {

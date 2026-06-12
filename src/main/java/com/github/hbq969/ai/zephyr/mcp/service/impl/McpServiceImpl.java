@@ -10,7 +10,6 @@ import com.github.hbq969.ai.zephyr.mcp.utils.McpConnectionManager;
 import com.github.hbq969.code.common.encrypt.ext.utils.AESUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +21,8 @@ import java.util.Map;
 @Slf4j
 public class McpServiceImpl implements McpService {
 
-    @Value("${encrypt.restful.aes.key}")
-    private String aesKey;
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
-    @Value("${encrypt.restful.aes.iv}")
-    private String aesIv;
 
     @Resource
     private McpDao mcpDao;
@@ -105,7 +101,7 @@ public class McpServiceImpl implements McpService {
         // 解密 headers 供 MCP 客户端请求使用
         String encryptedHeaders = server.getHeaders();
         if (encryptedHeaders != null && !encryptedHeaders.isEmpty()) {
-            server.setHeaders(AESUtil.decrypt(encryptedHeaders, aesKey, aesIv, StandardCharsets.UTF_8));
+            server.setHeaders(AESUtil.decrypt(encryptedHeaders, cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8));
         }
 
         // 拉取工具列表
@@ -188,7 +184,7 @@ public class McpServiceImpl implements McpService {
     }
 
     private String encryptHeaders(String plain) {
-        return AESUtil.encrypt(plain, aesKey, aesIv, StandardCharsets.UTF_8);
+        return AESUtil.encrypt(plain, cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8);
     }
 
     private String maskHeaders(String encrypted) {

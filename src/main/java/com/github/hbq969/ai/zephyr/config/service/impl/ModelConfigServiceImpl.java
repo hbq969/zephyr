@@ -7,7 +7,6 @@ import com.github.hbq969.ai.zephyr.config.service.ModelConfigService;
 import com.github.hbq969.code.common.encrypt.ext.utils.AESUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,11 +20,9 @@ import java.util.Map;
 @Slf4j
 public class ModelConfigServiceImpl implements ModelConfigService {
 
-    @Value("${encrypt.restful.aes.key}")
-    private String aesKey;
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
-    @Value("${encrypt.restful.aes.iv}")
-    private String aesIv;
+
 
     @Resource
     private ModelConfigDao modelConfigDao;
@@ -127,12 +124,12 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     }
 
     private String encryptApiKey(String plain) {
-        return AESUtil.encrypt(plain, aesKey, aesIv, StandardCharsets.UTF_8);
+        return AESUtil.encrypt(plain, cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8);
     }
 
     private String decryptApiKey(String encrypted) {
         if (encrypted == null || encrypted.isBlank()) return "";
-        return AESUtil.decrypt(encrypted, aesKey, aesIv, StandardCharsets.UTF_8);
+        return AESUtil.decrypt(encrypted, cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8);
     }
 
     private String maskApiKey(String key) {
@@ -163,8 +160,8 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         try {
             String url = baseUrl.replaceAll("/$", "") + "/v1/models";
             okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(cfg.getModelConfig().getApi().getConnectTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(cfg.getModelConfig().getApi().getReadTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS)
                     .build();
             okhttp3.Request req = new okhttp3.Request.Builder()
                     .url(url)
@@ -200,8 +197,8 @@ public class ModelConfigServiceImpl implements ModelConfigService {
         try {
             String url = entity.getBaseUrl().replaceAll("/$", "") + "/v1/models";
             okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(cfg.getModelConfig().getApi().getConnectTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(cfg.getModelConfig().getApi().getReadTimeoutSeconds(), java.util.concurrent.TimeUnit.SECONDS)
                     .build();
             okhttp3.Request req = new okhttp3.Request.Builder()
                     .url(url)

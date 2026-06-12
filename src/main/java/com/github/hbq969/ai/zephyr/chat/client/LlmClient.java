@@ -6,9 +6,10 @@ import com.github.hbq969.ai.zephyr.chat.model.ToolDef;
 import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
 import com.github.hbq969.code.common.encrypt.ext.utils.AESUtil;
 import com.google.gson.*;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -24,19 +25,23 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class LlmClient {
 
-    @Value("${encrypt.restful.aes.key}")
-    private String aesKey;
+    @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
-    @Value("${encrypt.restful.aes.iv}")
-    private String aesIv;
 
     private static final Gson gson = new Gson();
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .build();
+
+
+    private OkHttpClient httpClient;
+
+    @PostConstruct
+    void initHttpClient() {
+        httpClient = new OkHttpClient.Builder()
+                .connectTimeout(cfg.getLlm().getClient().getConnectTimeoutSeconds(), TimeUnit.SECONDS)
+                .readTimeout(cfg.getLlm().getClient().getReadTimeoutSeconds(), TimeUnit.SECONDS)
+                .build();
+    }
 
     private final ConcurrentHashMap<String, okhttp3.Call> activeCalls = new ConcurrentHashMap<>();
 
@@ -50,7 +55,7 @@ public class LlmClient {
 
     public LlmResult chat(ModelConfigEntity model, List<Map<String, Object>> messages,
                           List<ToolDef> tools, SseEmitter emitter, String cancelKey) throws IOException {
-        String apiKey = AESUtil.decrypt(model.getApiKeyEncrypted(), aesKey, aesIv, StandardCharsets.UTF_8);
+        String apiKey = AESUtil.decrypt(model.getApiKeyEncrypted(), cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8);
         String baseUrl = model.getBaseUrl();
         if (!baseUrl.endsWith("/")) baseUrl += "/";
 
@@ -121,6 +126,7 @@ public class LlmClient {
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(response.body().byteStream(), StandardCharsets.UTF_8));
             String line;
+            try {
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("data: ")) {
                     String data = line.substring(6).trim();
@@ -223,6 +229,14 @@ public class LlmClient {
                     } catch (com.google.gson.JsonSyntaxException e) {
                         log.warn("解析 SSE 事件失败: {}", e.getMessage());
                     }
+                }
+            }
+            } catch (IOException e) {
+                // cancelCall 触发的是预期行为，不抛异常
+                if (!activeCalls.containsKey(cancelKey)) {
+                    log.debug("LLM 调用已被取消: {}", cancelKey);
+                } else {
+                    throw e;
                 }
             }
         } finally {

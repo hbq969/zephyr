@@ -46,14 +46,19 @@ public class ContextBuilder {
     private WorkspaceDao workspaceDao;
     @Resource
     private ChatDao chatDao;
-
-    private static final int MAX_HISTORY_ROUNDS = 20;
+    @Resource
+    private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
 
     private static final String ROLE_PROMPT = """
             你是一个 AI 助手，名为 zephyr。
 
             你可以使用 MCP 工具获取实时数据，使用技能（Skill）获取特定任务的详细指导，
             查看用户记忆（Memory）了解历史上下文和偏好。
+
+            ## 文件处理
+            用户上传文件后，消息中会包含文件名、路径和推荐的 skill。
+            **必须先用 use_skill 加载对应技能，获得处理该类型文件的完整指导，然后严格按指导操作。**
+            你不具备直接读取文件内容的能力，依赖技能中的工具来完成解析。
 
             ## 工具使用说明
             - 优先使用 MCP 工具获取实时准确的数据
@@ -238,8 +243,9 @@ public class ContextBuilder {
         if (conversationId != null) {
             List<MessageEntity> history = chatDao.queryMessages(conversationId);
             List<MessageEntity> recent = history;
-            if (history.size() > MAX_HISTORY_ROUNDS * 2) {
-                recent = history.subList(history.size() - MAX_HISTORY_ROUNDS * 2, history.size());
+            int maxHistory = cfg.getChat().getMaxHistoryMessages();
+            if (history.size() > maxHistory) {
+                recent = history.subList(history.size() - maxHistory, history.size());
             }
             for (MessageEntity e : recent) {
                 Map<String, Object> msg = new HashMap<>();
@@ -267,8 +273,61 @@ public class ContextBuilder {
                 }
                 messages.add(msg);
             }
+            // 清理不完整的 tool_calls：如果 assistant 消息的 tool_calls 没有对应的 tool 消息跟随，则移除
+            sanitizeToolCalls(messages);
         }
         return messages;
+    }
+
+    /**
+     * 双向清理不完整的 tool 调用链，防止 API 400 错误：
+     * 1. 移除 assistant 消息中没有对应 tool 结果的 tool_calls
+     * 2. 移除没有前置 assistant tool_calls 的孤立 tool 消息
+     */
+    private void sanitizeToolCalls(List<Map<String, Object>> messages) {
+        // 第一遍：收集所有有效的 tool_call_id（有 assistant tool_calls 声明且有 tool 响应的）
+        Set<String> validToolCallIds = new HashSet<>();
+        for (int i = 0; i < messages.size(); i++) {
+            Map<String, Object> msg = messages.get(i);
+            if (!"assistant".equals(msg.get("role"))) continue;
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) msg.get("tool_calls");
+            if (toolCalls == null || toolCalls.isEmpty()) continue;
+
+            Set<String> requiredIds = new HashSet<>();
+            for (Map<String, Object> tc : toolCalls) {
+                Object id = tc.get("id");
+                if (id != null) requiredIds.add(id.toString());
+            }
+            if (requiredIds.isEmpty()) continue;
+
+            Set<String> foundIds = new HashSet<>();
+            for (int j = i + 1; j < messages.size(); j++) {
+                Map<String, Object> next = messages.get(j);
+                if (!"tool".equals(next.get("role"))) break;
+                Object tci = next.get("tool_call_id");
+                if (tci != null) foundIds.add(tci.toString());
+            }
+
+            if (foundIds.containsAll(requiredIds)) {
+                validToolCallIds.addAll(requiredIds);
+            } else {
+                log.warn("历史消息中 assistant tool_calls 缺少 tool 响应，已移除 tool_calls: 需要={}, 找到={}", requiredIds, foundIds);
+                msg.remove("tool_calls");
+            }
+        }
+
+        // 第二遍：移除没有对应 assistant tool_calls 的孤立 tool 消息
+        for (int i = 0; i < messages.size(); i++) {
+            Map<String, Object> msg = messages.get(i);
+            if (!"tool".equals(msg.get("role"))) continue;
+            Object tci = msg.get("tool_call_id");
+            if (tci != null && !validToolCallIds.contains(tci.toString())) {
+                log.warn("历史消息中存在孤立 tool 消息（无前置 assistant tool_calls），已移除: tool_call_id={}", tci);
+                messages.remove(i);
+                i--;
+            }
+        }
     }
 
     private ToolDef buildUseSkillTool() {

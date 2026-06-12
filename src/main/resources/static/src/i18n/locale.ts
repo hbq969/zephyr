@@ -273,6 +273,14 @@ const locale: any = {
         "memoryMgmt_nameRequired": "请输入名称",
         "memoryMgmt_contentRequired": "请输入内容",
 
+        // 工作空间管理
+        "workspaceMgmt_title": "工作空间管理",
+        "workspaceMgmt_subtitle": "管理已创建的工作空间",
+        "workspaceMgmt_noWorkspace": "暂无工作空间",
+        "workspaceMgmt_noWorkspaceDesc": "在对话页面中点击工作区选择器来创建第一个工作空间。",
+        "workspaceMgmt_path": "目录路径",
+        "workspaceMgmt_confirmDeleteMsg": "确定删除工作空间 \"{name}\" 吗？此操作不可撤销。",
+
         // 上下文
         "context_helpTitle": "可用命令:\n\n/clear — 清空当前对话\n/context — 查看上下文占比\n/resume — 恢复之前的对话\n/help — 查看帮助\n\nCtrl+Enter 发送 · Enter 换行",
         "context_usageInfo": "上下文使用情况:\n",
@@ -558,6 +566,14 @@ const locale: any = {
         "memoryMgmt_nameRequired": "Please enter a name",
         "memoryMgmt_contentRequired": "Please enter content",
 
+        // Workspace Management
+        "workspaceMgmt_title": "Workspace Management",
+        "workspaceMgmt_subtitle": "Manage your workspaces",
+        "workspaceMgmt_noWorkspace": "No workspaces",
+        "workspaceMgmt_noWorkspaceDesc": "Create your first workspace from the chat page workspace selector.",
+        "workspaceMgmt_path": "Path",
+        "workspaceMgmt_confirmDeleteMsg": "Delete workspace \"{name}\"? This cannot be undone.",
+
         // Context
         "context_helpTitle": "Available commands:\n\n/clear — Clear current chat\n/context — View context usage\n/resume — Resume previous conversation\n/help — View help\n\nCtrl+Enter to send · Enter for new line",
         "context_usageInfo": "Context usage:\n",
@@ -842,6 +858,14 @@ const locale: any = {
         "memoryMgmt_updated": "更新日: {date}",
         "memoryMgmt_nameRequired": "名前を入力してください",
         "memoryMgmt_contentRequired": "内容を入力してください",
+
+        // ワークスペース管理
+        "workspaceMgmt_title": "ワークスペース管理",
+        "workspaceMgmt_subtitle": "作成したワークスペースを管理",
+        "workspaceMgmt_noWorkspace": "ワークスペースがありません",
+        "workspaceMgmt_noWorkspaceDesc": "チャットページのワークスペースセレクターから最初のワークスペースを作成してください。",
+        "workspaceMgmt_path": "パス",
+        "workspaceMgmt_confirmDeleteMsg": "ワークスペース \"{name}\" を削除しますか？この操作は元に戻せません。",
 
         // Context
         "context_helpTitle": "使用可能なコマンド:\n\n/clear — 現在の会話をクリア\n/context — コンテキスト使用率を表示\n/resume — 前の会話を復元\n/help — ヘルプを表示\n\nCtrl+Enter 送信 · Enter 改行",

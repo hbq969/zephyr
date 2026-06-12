@@ -17,4 +17,5 @@ public interface WorkspaceDao {
     void insert(WorkspaceEntity entity);
     void delete(@Param("id") String id, @Param("userName") String userName);
     WorkspaceEntity queryById(@Param("id") String id);
+    WorkspaceEntity queryByPath(@Param("path") String path, @Param("userName") String userName);
 }

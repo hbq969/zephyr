@@ -33,6 +33,10 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         if (path == null || path.isBlank()) {
             throw new RuntimeException("目录路径不能为空");
         }
+        WorkspaceEntity existing = workspaceDao.queryByPath(path, userName);
+        if (existing != null) {
+            return existing;
+        }
         if (name == null || name.isBlank()) {
             name = java.nio.file.Path.of(path).getFileName().toString();
         }

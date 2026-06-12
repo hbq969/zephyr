@@ -28,6 +28,11 @@ const router = createRouter({
       component: () => import('../views/settings/ModelSettings.vue'),
     },
     {
+      path: '/settings/workspace',
+      name: 'WorkspaceSettings',
+      component: () => import('../views/settings/WorkspaceSettings.vue'),
+    },
+    {
       path: '/settings/memory',
       name: 'MemorySettings',
       component: () => import('../views/settings/MemorySettings.vue'),

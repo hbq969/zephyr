@@ -2,7 +2,9 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/store/settings'
+import { useWorkspaceStore } from '@/store/workspace'
 import { Icon } from '@iconify/vue'
+import axios from '@/network'
 import { getLangData } from '@/i18n/locale'
 
 const langData = getLangData()
@@ -10,8 +12,16 @@ const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const router = useRouter()
 const settingsStore = useSettingsStore()
+const workspaceStore = useWorkspaceStore()
 
-watch(() => props.visible, (v) => { if (v) { settingsStore.loadMcpServers(); settingsStore.loadSkills(); settingsStore.loadMemories() } })
+watch(() => props.visible, (v) => {
+  if (v) {
+    settingsStore.loadMcpServers(); settingsStore.loadSkills(); settingsStore.loadMemories()
+    axios({ url: '/workspace/list', method: 'get' }).then(res => {
+      if (res.data.state === 'OK') workspaceStore.setWorkspaces(res.data.body || [])
+    }).catch(() => {})
+  }
+})
 const isDark = ref(false)
 if (typeof document !== 'undefined') isDark.value = document.documentElement.classList.contains('dark')
 
@@ -60,6 +70,12 @@ function toggleDark() {
           <Icon icon="lucide:hard-drive" class="sp-item-icon" />
           <span>{{ langData.settingsPanel_memoryMgmt }}</span>
           <span class="sp-value">{{ settingsStore.memories.length > 0 ? langData.settingsPanel_memorySummary.replace('{user}', settingsStore.memories.filter((m: any) => m.type === 'user').length).replace('{project}', settingsStore.memories.filter((m: any) => m.type === 'project').length) : langData.settingsPanel_noMemory }}</span>
+          <Icon icon="lucide:chevron-right" class="sp-arrow" />
+        </div>
+        <div class="sp-item" @click="goTo('/settings/workspace')">
+          <Icon icon="lucide:folder-open" class="sp-item-icon" />
+          <span>工作空间</span>
+          <span class="sp-value">{{ workspaceStore.workspaces.length > 0 ? workspaceStore.workspaces.length + ' 个' : '无' }}</span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
         <div class="sp-divider"></div>

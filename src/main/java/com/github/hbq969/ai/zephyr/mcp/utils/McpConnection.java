@@ -13,6 +13,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -28,6 +31,7 @@ public class McpConnection {
     private final McpServerEntity server;
     @Getter
     private volatile long lastUsedAt;
+    private final int toolTimeoutSeconds;
 
     // stdio
     private Process process;
@@ -37,15 +41,17 @@ public class McpConnection {
     // http
     private String sessionId;
 
-    private McpConnection(Type type, McpServerEntity server) {
+    private McpConnection(Type type, McpServerEntity server, int toolTimeoutSeconds) {
         this.type = type;
         this.server = server;
+        this.toolTimeoutSeconds = toolTimeoutSeconds;
     }
 
-    public static McpConnection create(McpServerEntity server) {
+    public static McpConnection create(McpServerEntity server, int toolTimeoutSeconds) {
         McpConnection conn = new McpConnection(
                 "http".equals(server.getTransport()) ? Type.HTTP : Type.STDIO,
-                server
+                server,
+                toolTimeoutSeconds
         );
         conn.init();
         return conn;
@@ -202,13 +208,27 @@ public class McpConnection {
     }
 
     private String readMsg() throws Exception {
-        for (int i = 0; i < 200; i++) {
-            String line = reader.readLine();
-            if (line == null) return null;
-            String trimmed = line.trim();
-            if (trimmed.startsWith("{")) return trimmed;
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                for (int i = 0; i < 200; i++) {
+                    String line = reader.readLine();
+                    if (line == null) return null;
+                    String trimmed = line.trim();
+                    if (trimmed.startsWith("{")) return trimmed;
+                }
+                return null;
+            } catch (Exception e) {
+                return null;
+            }
+        });
+        try {
+            return future.get(toolTimeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            log.warn("STDIO MCP 工具执行超时（{}秒），取消等待并强制关闭进程", toolTimeoutSeconds);
+            future.cancel(true);
+            if (process != null) process.destroyForcibly();
+            return null;
         }
-        return null;
     }
 
     private String _httpPost(String json) throws Exception {
