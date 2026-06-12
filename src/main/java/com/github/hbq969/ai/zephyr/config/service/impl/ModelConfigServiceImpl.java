@@ -40,6 +40,18 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     }
 
     @Override
+    public List<ModelConfigEntity> listByType(String modelType, String userName) {
+        List<ModelConfigEntity> list = modelConfigDao.queryByType(userName, modelType);
+        for (ModelConfigEntity e : list) {
+            String key = e.getApiKeyEncrypted();
+            if (key != null && !key.isEmpty()) {
+                e.setApiKeyEncrypted(maskApiKey(key));
+            }
+        }
+        return list;
+    }
+
+    @Override
     @Transactional
     public ModelConfigEntity create(Map<String, String> body, String userName) {
         ModelConfigEntity entity = new ModelConfigEntity();
@@ -119,7 +131,12 @@ public class ModelConfigServiceImpl implements ModelConfigService {
     @Override
     @Transactional
     public void setDefault(String id, String userName) {
-        modelConfigDao.clearDefault(userName);
+        ModelConfigEntity entity = modelConfigDao.queryById(id);
+        if (entity != null && entity.getModelType() != null) {
+            modelConfigDao.clearDefaultByType(entity.getModelType());
+        } else {
+            modelConfigDao.clearDefault(userName);
+        }
         modelConfigDao.setDefault(id, userName);
     }
 

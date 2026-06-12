@@ -30,8 +30,12 @@ public class ModelConfigCtrl {
     @RequestMapping(path = "/list", method = RequestMethod.GET)
     @ResponseBody
     @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "modelConfig_list", apiDesc = "模型配置_模型列表")
-    public ReturnMessage<?> list() {
-        return ReturnMessage.success(modelConfigService.list(userName()));
+    public ReturnMessage<?> list(@RequestParam(required = false) String modelType) {
+        String userName = userName();
+        if (modelType != null && !modelType.isEmpty()) {
+            return ReturnMessage.success(modelConfigService.listByType(modelType, userName));
+        }
+        return ReturnMessage.success(modelConfigService.list(userName));
     }
 
     @Operation(summary = "新增模型")

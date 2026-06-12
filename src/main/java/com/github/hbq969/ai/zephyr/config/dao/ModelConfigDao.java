@@ -20,6 +20,12 @@ public interface ModelConfigDao {
     void clearDefault(@Param("userName") String userName);
     void setDefault(@Param("id") String id, @Param("userName") String userName);
 
+    List<ModelConfigEntity> queryByType(@Param("userName") String userName, @Param("modelType") String modelType);
+
+    ModelConfigEntity queryDefaultByType(@Param("modelType") String modelType);
+
+    void clearDefaultByType(@Param("modelType") String modelType);
+
     @Update("update zephyr_model_configs set max_context_tokens = #{maxTokens}, updated_at = #{updatedAt} where id = #{id} and user_name = #{userName}")
     void updateMaxContextTokens(@Param("id") String id, @Param("maxTokens") Long maxTokens, @Param("updatedAt") Long updatedAt, @Param("userName") String userName);
 }

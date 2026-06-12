@@ -6,6 +6,7 @@ import java.util.Map;
 
 public interface ModelConfigService {
     List<ModelConfigEntity> list(String userName);
+    List<ModelConfigEntity> listByType(String modelType, String userName);
     ModelConfigEntity create(Map<String, String> body, String userName);
     void update(Map<String, String> body, String userName);
     void delete(String id, String userName);

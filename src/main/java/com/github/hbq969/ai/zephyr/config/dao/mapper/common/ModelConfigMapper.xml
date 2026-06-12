@@ -43,4 +43,25 @@
     update zephyr_model_configs set is_default = 1 where id = #{id} and user_name = #{userName}
   </update>
 
+  <select id="queryByType" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
+    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted,
+      is_default as isDefault, created_at as createdAt, updated_at as updatedAt,
+      max_context_tokens as maxContextTokens, params, model_type as modelType, dimensions
+    from zephyr_model_configs
+    where user_name = #{userName} and model_type = #{modelType}
+    order by created_at desc
+  </select>
+
+  <select id="queryDefaultByType" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
+    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted,
+      is_default as isDefault, created_at as createdAt, updated_at as updatedAt,
+      max_context_tokens as maxContextTokens, params, model_type as modelType, dimensions
+    from zephyr_model_configs
+    where model_type = #{modelType} and is_default = 1 limit 1
+  </select>
+
+  <update id="clearDefaultByType">
+    update zephyr_model_configs set is_default = 0 where model_type = #{modelType}
+  </update>
+
 </mapper>
