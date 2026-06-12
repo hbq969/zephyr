@@ -37,6 +37,16 @@ const router = createRouter({
       name: 'MemorySettings',
       component: () => import('../views/settings/MemorySettings.vue'),
     },
+    {
+      path: '/settings/knowledge',
+      name: 'KnowledgeSettings',
+      component: () => import('../views/settings/KnowledgeSettings.vue'),
+    },
+    {
+      path: '/settings/knowledge/:kbId/docs',
+      name: 'KnowledgeDocs',
+      component: () => import('../views/settings/KnowledgeDocs.vue'),
+    },
   ],
 })
 
