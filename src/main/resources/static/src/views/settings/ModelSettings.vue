@@ -491,29 +491,6 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           </div>
         </el-tab-pane>
       </el-tabs>
-        <div class="row-left">
-          <Icon icon="lucide:cpu" class="row-icon" />
-          <div>
-            <div class="row-title">
-              {{ m.name }}
-              <span class="model-type-tag" :class="m.modelType === 'embedding' ? 'tag-embedding' : 'tag-llm'">
-                {{ m.modelType === 'embedding' ? langData.modelConfig_typeEmbedding : langData.modelConfig_typeLlm }}
-              </span>
-            </div>
-            <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
-            <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ langData.modelConfig_contextLabel }}: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
-            <div v-if="m.modelType === 'embedding' && m.dimensions" class="row-sub dim-info">{{ langData.modelConfig_dimensionsLabel }}: {{ m.dimensions }}</div>
-          </div>
-        </div>
-        <div class="row-right">
-          <button class="action-icon" @click="startEdit(m)" :title="langData.btnEdit"><Icon icon="lucide:pencil" /></button>
-          <button class="action-icon danger" @click="m.id && removeModel(m.id)" :title="langData.btnDelete"><Icon icon="lucide:trash-2" /></button>
-          <template v-if="!m.modelType || m.modelType === 'llm'">
-            <button v-if="settingsStore.currentModel !== m.name" class="set-btn" @click="onSetCurrent(m.name)">{{ langData.modelConfig_use }}</button>
-            <span v-else class="current-badge">{{ langData.modelConfig_current }}</span>
-          </template>
-        </div>
-      </div>
 
       <div v-if="showForm" class="form-area">
         <div class="section-title">基本配置</div>
