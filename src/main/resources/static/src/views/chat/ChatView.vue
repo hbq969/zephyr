@@ -142,15 +142,6 @@ function onSend(text: string, filePaths?: string[]) {
               status: isError ? 'error' : 'success',
               output: event.toolOutput,
             })
-          } else if (event.type === 'artifact') {
-            if (event.artifactName && event.artifactPath) {
-              chatStore.addArtifact({
-                name: event.artifactName,
-                path: event.artifactPath,
-                contentType: event.artifactType || 'application/octet-stream',
-                size: event.artifactSize || 0
-              })
-            }
           } else if (event.type === 'meta') {
             convStore.currentId = event.content
             refreshConversationList()
@@ -250,41 +241,6 @@ function restoreConversation(id: string) {
         chatStore.clearMessages()
         if (body.workspaceId) {
           workspaceStore.selectWorkspace(body.workspaceId)
-        }
-        // 为 assistant 消息重建 artifacts（从关联的 tool 消息内容中解析路径）
-        for (let i = 1; i < msgs.length; i++) {
-          if (msgs[i].role === 'assistant' && msgs[i].toolCalls && msgs[i].toolCalls.length > 0) {
-            const artifacts: { name: string; path: string; contentType: string; size: number }[] = []
-            // 从前面的 tool 消息中查找产物文件路径
-            for (let j = i - 1; j >= 0 && msgs[j].role === 'tool'; j--) {
-              const content = msgs[j].content || ''
-              // 匹配 Write 工具输出中的文件路径模式
-              const artifactRe = /(?:output|saved to|写入|created?|生成)[:\s]+[`"']?([^\s`"']+\.(?:html|css|js|json|png|jpg|jpeg|gif|svg|webp|pdf))[`"']?/gi
-              let match: RegExpExecArray | null
-              artifactRe.lastIndex = 0
-              while ((match = artifactRe.exec(content)) !== null) {
-                const filePath = match[1]
-                const fileName = filePath.split('/').pop() || filePath
-                const ext = fileName.substring(fileName.lastIndexOf('.'))
-                const mimeMap: Record<string, string> = {
-                  '.html': 'text/html', '.htm': 'text/html',
-                  '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json',
-                  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-                  '.gif': 'image/gif', '.svg': 'image/svg+xml', '.webp': 'image/webp',
-                  '.pdf': 'application/pdf'
-                }
-                artifacts.push({
-                  name: fileName,
-                  path: filePath,
-                  contentType: mimeMap[ext] || 'application/octet-stream',
-                  size: 0
-                })
-              }
-            }
-            if (artifacts.length > 0) {
-              msgs[i].artifacts = artifacts
-            }
-          }
         }
         msgs.forEach((m: any) => chatStore.addMessage(m))
       }

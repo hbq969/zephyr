@@ -187,7 +187,7 @@ public class ChatServiceImpl implements ChatService {
 
                         // 4c. 分发工具调用
                         List<String> enabledKbIds = cid != null ? knowledgeDao.queryKbIdsByConversation(cid) : List.of();
-                        List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName, enabledKbIds, emitter);
+                        List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName, enabledKbIds);
 
                         // 推送工具执行结果
                         for (int i = 0; i < result.getToolCalls().size(); i++) {
@@ -356,7 +356,7 @@ public class ChatServiceImpl implements ChatService {
         return "请调用 " + cmdName;
     }
 
-    private List<Map<String, Object>> dispatchTools(List<LlmResult.ToolCall> toolCalls, String userName, List<String> enabledKbIds, SseEmitter emitter) {
+    private List<Map<String, Object>> dispatchTools(List<LlmResult.ToolCall> toolCalls, String userName, List<String> enabledKbIds) {
         List<Map<String, Object>> results = new ArrayList<>();
         for (LlmResult.ToolCall tc : toolCalls) {
             String content;
@@ -371,79 +371,12 @@ public class ChatServiceImpl implements ChatService {
                 content = "工具执行错误: " + e.getMessage();
             }
             content = sanitizeToolOutput(content);
-            try {
-                detectArtifacts(tc, emitter, userName);
-            } catch (Exception ignored) {}
             results.add(Map.of("role", "tool", "tool_call_id", tc.getId(), "content",
                     content.length() > cfg.getChat().getToolOutput().getMaxLength() ? content.substring(0, cfg.getChat().getToolOutput().getMaxLength()) + "..." : content));
         }
         return results;
     }
 
-    /**
-     * 检测工具调用产生的文件产物，通过 SSE 推送 artifact 事件。
-     * 仅处理在工作空间目录内的文件写入。
-     */
-    private void detectArtifacts(LlmResult.ToolCall tc, SseEmitter emitter, String userName) {
-        String toolName = tc.getName();
-        Map<String, Object> args = tc.getArguments();
-
-        Set<String> writeTools = Set.of("Write", "write", "write_file", "write_to_file", "create_file", "edit_file");
-        if (!writeTools.contains(toolName)) return;
-
-        String filePathStr = null;
-        if (args != null) {
-            for (String key : args.keySet()) {
-                String kl = key.toLowerCase();
-                if (kl.contains("file") || kl.contains("path") || kl.equals("target")
-                        || kl.equals("destination") || kl.equals("output")) {
-                    Object v = args.get(key);
-                    if (v instanceof String s && !s.isBlank()) {
-                        filePathStr = s;
-                        break;
-                    }
-                }
-            }
-        }
-        if (filePathStr == null || filePathStr.isBlank()) return;
-
-        log.info("[artifact] 检测到产物: tool={}, path={}", toolName, filePathStr);
-
-        // 检查路径是否在工作空间内
-        java.nio.file.Path target = java.nio.file.Paths.get(filePathStr);
-        if (!java.nio.file.Files.isRegularFile(target)) return;
-
-        try {
-            java.nio.file.Path abs = target.toRealPath();
-            List<com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity> wss =
-                    workspaceDao.queryByUserName(userName);
-            for (com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity ws : wss) {
-                java.nio.file.Path wsDir = java.nio.file.Paths.get(ws.getPath()).toRealPath();
-                if (abs.startsWith(wsDir)) {
-                    java.nio.file.Path rel = wsDir.relativize(abs);
-                    String relPath = rel.toString().replace('\\', '/');
-                    String fileName = abs.getFileName().toString();
-                    String mimeType = java.nio.file.Files.probeContentType(abs);
-                    if (mimeType == null) {
-                        mimeType = fileName.toLowerCase().endsWith(".html") ? "text/html"
-                                : fileName.toLowerCase().endsWith(".pdf") ? "application/pdf"
-                                : "application/octet-stream";
-                    }
-                    long size = java.nio.file.Files.size(abs);
-
-                    emitter.send(SseEmitter.event().name("message")
-                            .data(ChatEvent.builder()
-                                    .type("artifact")
-                                    .artifactName(fileName)
-                                    .artifactPath(relPath)
-                                    .artifactType(mimeType)
-                                    .artifactSize(size)
-                                    .build()));
-                    break;
-                }
-            }
-        } catch (Exception ignored) {}
-    }
 
     /** 清除 NULL byte 并检测/截断二进制内容 */
     private String sanitizeToolOutput(String raw) {

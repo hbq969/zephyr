@@ -17,8 +17,4 @@ public class ChatEvent {
     private String toolOutput;
     private Object usage;
     private String error;
-    private String artifactName;
-    private String artifactPath;
-    private String artifactType;
-    private Long artifactSize;
 }
