@@ -88,6 +88,7 @@ const locale: any = {
 
         // 消息气泡
         "msgBubble_copy": "复制",
+        "msgBubble_download": "下载",
         "msgBubble_collapse": "收起",
         "msgBubble_expand": "展开",
         "msgBubble_toolResult": "工具返回",
@@ -459,6 +460,7 @@ const locale: any = {
 
         // Message bubble
         "msgBubble_copy": "Copy",
+        "msgBubble_download": "Download",
         "msgBubble_collapse": "Collapse",
         "msgBubble_expand": "Expand",
         "msgBubble_toolResult": "Tool result",
@@ -830,6 +832,7 @@ const locale: any = {
 
         // Message bubble
         "msgBubble_copy": "コピー",
+        "msgBubble_download": "ダウンロード",
         "msgBubble_collapse": "折りたたむ",
         "msgBubble_expand": "展開",
         "msgBubble_toolResult": "ツール結果",

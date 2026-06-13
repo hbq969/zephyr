@@ -72,6 +72,9 @@ function setupCodeBlocks() {
       wrapper.className = 'code-block-wrapper'
       wrapper.innerHTML = `
         <div class="code-actions">
+          <span class="code-icon code-download" :title="langData.msgBubble_download || '下载'">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          </span>
           <span class="code-icon code-copy" :title="langData.msgBubble_copy">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           </span>
@@ -88,6 +91,27 @@ function setupCodeBlocks() {
         setTimeout(() => {
           copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>'
         }, 2000)
+      })
+      const downloadBtn = wrapper.querySelector('.code-download')!
+      downloadBtn.addEventListener('click', () => {
+        const text = pre.textContent || ''
+        const lang = pre.className.replace('language-', '').replace('lang-', '').trim()
+        const extMap: Record<string, string> = {
+          html: '.html', htm: '.html', css: '.css', js: '.js', ts: '.ts', json: '.json',
+          xml: '.xml', yaml: '.yml', yml: '.yml', md: '.md', txt: '.txt',
+          py: '.py', java: '.java', go: '.go', rs: '.rs', c: '.c', cpp: '.cpp',
+          sh: '.sh', bash: '.sh', sql: '.sql', svg: '.svg'
+        }
+        const ext = extMap[lang] || (lang ? '.' + lang : '.txt')
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'code' + ext
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       })
       const toggleBtn = wrapper.querySelector('.code-toggle')!
       toggleBtn.addEventListener('click', () => {
