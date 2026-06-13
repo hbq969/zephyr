@@ -6,7 +6,7 @@
     <select id="queryServersByUserName" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
-               url, headers, status,
+               url, headers, status, scope,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers
         where user_name = #{userName}
@@ -14,8 +14,8 @@
     </select>
 
     <insert id="insertServer">
-        insert into zephyr_mcp_servers (id, user_name, name, transport, command, args, env_vars, url, headers, status, created_at, updated_at)
-        values (#{id}, #{userName}, #{name}, #{transport}, #{command}, #{args}, #{envVars}, #{url}, #{headers}, #{status}, #{createdAt}, #{updatedAt})
+        insert into zephyr_mcp_servers (id, user_name, name, transport, command, args, env_vars, url, headers, status, scope, created_at, updated_at)
+        values (#{id}, #{userName}, #{name}, #{transport}, #{command}, #{args}, #{envVars}, #{url}, #{headers}, #{status}, #{scope}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="updateServer">
@@ -34,7 +34,7 @@
     <select id="queryServerById" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
-               url, headers, status,
+               url, headers, status, scope,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers where id = #{id}
     </select>
@@ -42,6 +42,13 @@
     <update id="updateServerStatus">
         update zephyr_mcp_servers set status = #{status} where id = #{id} and user_name = #{userName}
     </update>
+
+    <select id="queryToolById" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
+        select id, user_name as userName, server_id as serverId,
+               tool_name as toolName, description, parameters_json as parametersJson,
+               enabled, source, created_at as createdAt
+        from zephyr_mcp_tools where id = #{id}
+    </select>
 
     <select id="queryToolsByServerId" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
         select id, user_name as userName, server_id as serverId,
@@ -100,5 +107,41 @@
           and s.status = 'connected'
         order by t.source desc, t.tool_name asc
     </select>
+
+    <select id="querySharedServers" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
+        select id, user_name as userName, name, transport,
+               command, args, env_vars as envVars,
+               url, headers, status, scope,
+               created_at as createdAt, updated_at as updatedAt
+        from zephyr_mcp_servers
+        where scope = 'shared'
+        order by created_at desc
+    </select>
+
+    <select id="queryEnabledToolsBySharedServers" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
+        select t.id, t.user_name as userName, t.server_id as serverId,
+               t.tool_name as toolName, t.description, t.parameters_json as parametersJson,
+               t.enabled, t.source, t.created_at as createdAt
+        from zephyr_mcp_tools t
+        inner join zephyr_mcp_servers s on s.id = t.server_id and s.user_name = t.user_name
+        where s.scope = 'shared' and t.enabled = 1
+          and s.status = 'connected'
+        order by t.source desc, t.tool_name asc
+    </select>
+
+    <select id="queryToolsBySharedServers" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
+        select t.id, t.user_name as userName, t.server_id as serverId,
+               t.tool_name as toolName, t.description, t.parameters_json as parametersJson,
+               t.enabled, t.source, t.created_at as createdAt
+        from zephyr_mcp_tools t
+        inner join zephyr_mcp_servers s on s.id = t.server_id and s.user_name = t.user_name
+        where s.scope = 'shared'
+          and s.status = 'connected'
+        order by t.source desc, t.tool_name asc
+    </select>
+
+    <update id="updateServerScope">
+        update zephyr_mcp_servers set scope = #{scope} where id = #{id}
+    </update>
 
 </mapper>

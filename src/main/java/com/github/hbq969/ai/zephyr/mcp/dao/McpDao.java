@@ -22,6 +22,7 @@ public interface McpDao {
     McpServerEntity queryServerById(@Param("id") String id);
     void updateServerStatus(@Param("id") String id, @Param("status") String status, @Param("userName") String userName);
 
+    McpToolEntity queryToolById(@Param("id") String id);
     List<McpToolEntity> queryToolsByServerId(@Param("serverId") String serverId, @Param("userName") String userName);
     void insertTool(McpToolEntity entity);
     void updateTool(McpToolEntity entity);
@@ -32,4 +33,9 @@ public interface McpDao {
     int countEnabledTools(@Param("userName") String userName);
     List<McpToolEntity> queryEnabledToolsByUserName(@Param("userName") String userName);
     List<McpToolEntity> queryToolsByUserName(@Param("userName") String userName);
+
+    List<McpServerEntity> querySharedServers();
+    List<McpToolEntity> queryEnabledToolsBySharedServers();
+    List<McpToolEntity> queryToolsBySharedServers();
+    void updateServerScope(@Param("id") String id, @Param("scope") String scope);
 }

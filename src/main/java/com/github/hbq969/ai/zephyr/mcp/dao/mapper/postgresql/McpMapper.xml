@@ -15,6 +15,7 @@
       url varchar(512),
       headers text,
       status varchar(16) default 'disconnected',
+      scope varchar(16) default 'user',
       created_at bigint,
       updated_at bigint
     );

@@ -19,7 +19,7 @@ const showAbility = ref(false)
 const showCommand = ref(false)
 const hoveredAbility = ref('')
 const hasInput = ref(false)
-const mcpGroups = ref<{ server: string; tools: { name: string; desc: string }[] }[]>([])
+const mcpGroups = ref<{ server: string; tools: { name: string; desc: string; scope: string }[] }[]>([])
 const skillList = ref<{ name: string; desc: string; scope: string }[]>([])
 const mcpLoading = ref(false)
 const mcpLoaded = ref(false)
@@ -343,19 +343,20 @@ async function selectModel(name: string) {
 
 function closeModelList() { showModelList.value = false }
 
-const mcpFilterRef = ref<HTMLInputElement>()
-const skillFilterRef = ref<HTMLInputElement>()
-
-function onAbilityHover(key: string) {
+async function onAbilityHover(key: string) {
   hoveredAbility.value = key
   mcpFilter.value = ''
   skillFilter.value = ''
-  if (key === 'mcp' && !mcpLoaded.value) loadMcpTools()
-  if (key === 'skills' && !skillLoaded.value) loadSkills()
-  nextTick(() => {
-    if (key === 'mcp') mcpFilterRef.value?.focus()
-    if (key === 'skills') skillFilterRef.value?.focus()
-  })
+  if (key === 'mcp') {
+    if (!mcpLoaded.value) await loadMcpTools()
+    await nextTick()
+    ;(document.querySelector('.sub-search-input') as HTMLInputElement)?.focus()
+  }
+  if (key === 'skills') {
+    if (!skillLoaded.value) await loadSkills()
+    await nextTick()
+    ;(document.querySelector('.sub-search-input') as HTMLInputElement)?.focus()
+  }
 }
 
 async function loadMcpTools() {
@@ -368,7 +369,7 @@ async function loadMcpTools() {
     const groups: typeof mcpGroups.value = []
     const toolReqs = servers.map((s: any) =>
       axios({ url: '/mcp/tool/list', method: 'get', params: { serverId: s.id } })
-        .then(r => ({ server: s.name, tools: (r.data.state === 'OK' ? r.data.body : []).filter((t: any) => t.enabled === 1).map((t: any) => ({ name: t.toolName, desc: t.description })) }))
+        .then(r => ({ server: s.name, tools: (r.data.state === 'OK' ? r.data.body : []).filter((t: any) => t.enabled === 1).map((t: any) => ({ name: t.toolName, desc: t.description, scope: s.scope || 'user' })) }))
         .catch(() => ({ server: s.name, tools: [] }))
     )
     const results = await Promise.all(toolReqs)
@@ -603,13 +604,15 @@ function closeAll() {
                   <template v-if="it.key === 'mcp'">
                     <template v-if="mcpLoaded">
                       <div class="sub-search">
-                        <input ref="mcpFilterRef" v-model="mcpFilter" class="sub-search-input" :placeholder="langData.inputArea_searchPlaceholder" @click.stop @keydown="onMcpKeydown" />
+                        <input v-model="mcpFilter" class="sub-search-input" :placeholder="langData.inputArea_searchPlaceholder" @click.stop @keydown="onMcpKeydown" />
                       </div>
                       <template v-if="filteredMcpGroups.length > 0">
                         <template v-for="(g, gIdx) in filteredMcpGroups" :key="g.server">
                           <div class="sub-group-label">{{ g.server }}</div>
                           <div v-for="(t, tIdx) in g.tools" :key="t.name" class="pick-option sub-option" :class="{ 'sub-active': mcpFlatIdx(gIdx, tIdx) === mcpActiveIdx }" @click="insertTag('mcp', t.name)">
                             <span class="cmd-name">{{ t.name }}</span>
+                            <span v-if="t.scope === 'shared'" class="skill-scope-badge scope-shared">{{ langData.skillMgmt_scope_shared_badge || '共享' }}</span>
+                            <span v-else class="skill-scope-badge scope-user">{{ langData.skillMgmt_scope_user_badge || '个人' }}</span>
                             <span class="cmd-desc" v-if="t.desc">{{ t.desc }}</span>
                           </div>
                         </template>
@@ -622,7 +625,7 @@ function closeAll() {
                   <template v-if="it.key === 'skills'">
                     <template v-if="skillLoaded">
                       <div class="sub-search">
-                        <input ref="skillFilterRef" v-model="skillFilter" class="sub-search-input" :placeholder="langData.inputArea_searchPlaceholder" @click.stop @keydown="onSkillKeydown" />
+                        <input v-model="skillFilter" class="sub-search-input" :placeholder="langData.inputArea_searchPlaceholder" @click.stop @keydown="onSkillKeydown" />
                       </div>
                       <template v-if="filteredSkills.length > 0">
                         <div v-for="(s, idx) in filteredSkills" :key="s.name" class="pick-option sub-option" :class="{ 'sub-active': idx === skillActiveIdx }" @click="insertTag('skill', s.name)">

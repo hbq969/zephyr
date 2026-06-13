@@ -73,7 +73,14 @@ public class McpConnectionManager {
     }
 
     public List<McpToolEntity> getAllEnabledTools(String userName) {
-        return mcpDao.queryEnabledToolsByUserName(userName);
+        List<McpToolEntity> tools = new java.util.ArrayList<>(mcpDao.queryEnabledToolsByUserName(userName));
+        tools.addAll(mcpDao.queryEnabledToolsBySharedServers());
+        return tools;
+    }
+
+    public String getServerOwner(String serverId) {
+        McpServerEntity server = mcpDao.queryServerById(serverId);
+        return server != null ? server.getUserName() : null;
     }
 
     private void evictLru() {

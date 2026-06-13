@@ -64,6 +64,8 @@ export interface McpServer {
   url?: string
   headers?: string
   status: 'connected' | 'disconnected' | 'error'
+  scope?: 'user' | 'shared'
+  canManage?: boolean
   createdAt?: number
   updatedAt?: number
 }

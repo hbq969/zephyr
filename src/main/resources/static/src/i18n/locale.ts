@@ -224,6 +224,15 @@ const locale: any = {
         "mcpMgmt_customHeadersPlaceholder": "KEY=VALUE\n每行一个（可选）",
         "mcpMgmt_disconnectTooltip": "断开",
         "mcpMgmt_connectTooltip": "连接",
+        "mcpMgmt_sharedTab": "共享 MCP",
+        "mcpMgmt_userTab": "我的 MCP",
+        "mcpMgmt_shared": "共享",
+        "mcpMgmt_scope": "范围",
+        "mcpMgmt_personal": "个人",
+        "mcpMgmt_shareToAll": "设为共享",
+        "mcpMgmt_unshare": "取消共享",
+        "mcpMgmt_noShared": "暂无共享 MCP 服务器",
+        "mcpMgmt_noUser": "暂无个人 MCP 服务器",
 
         // Skill 管理
         "skillMgmt_title": "Skill 管理",

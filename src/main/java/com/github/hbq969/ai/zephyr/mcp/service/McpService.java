@@ -21,4 +21,5 @@ public interface McpService {
     void toggleTool(String id, Integer enabled, String userName);
 
     int countEnabledTools(String userName);
+    void toggleServerScope(String id, String scope);
 }

@@ -14,8 +14,7 @@ import com.github.hbq969.ai.zephyr.memory.model.MemoryVO;
 import com.github.hbq969.ai.zephyr.memory.service.MemoryService;
 import com.github.hbq969.ai.zephyr.skill.dao.SkillDao;
 import com.github.hbq969.ai.zephyr.skill.dao.entity.SkillConfigEntity;
-import com.github.hbq969.ai.zephyr.skill.model.SkillVO;
-import com.github.hbq969.ai.zephyr.skill.service.SkillService;
+
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import jakarta.annotation.Resource;
@@ -38,8 +37,6 @@ public class ContextBuilder {
     private McpDao mcpDao;
     @Resource
     private SkillDao skillDao;
-    @Resource
-    private SkillService skillService;
     @Resource
     private MemoryService memoryService;
     @Resource
@@ -198,22 +195,9 @@ public class ContextBuilder {
 
     private List<ToolDef> buildMcpToolDefs(String userName) {
         List<ToolDef> defs = new ArrayList<>();
-        List<McpToolEntity> allTools = mcpDao.queryToolsByUserName(userName);
-        List<String> enabledTools = new ArrayList<>();
-        List<String> disabledTools = new ArrayList<>();
-        for (McpToolEntity t : allTools) {
-            if (t.getEnabled() != null && t.getEnabled() == 1) {
-                enabledTools.add(t.getToolName());
-            } else {
-                disabledTools.add(t.getToolName());
-            }
-        }
-        log.info("[MCP工具] 用户={} | 已启用({}): {} | 已停用({}): {}",
-                userName,
-                enabledTools.size(), enabledTools,
-                disabledTools.size(), disabledTools);
 
-        List<McpToolEntity> tools = mcpDao.queryEnabledToolsByUserName(userName);
+        List<McpToolEntity> tools = new ArrayList<>(mcpDao.queryEnabledToolsByUserName(userName));
+        tools.addAll(mcpDao.queryEnabledToolsBySharedServers());
         for (McpToolEntity t : tools) {
             Map<String, Object> params;
             if (t.getParametersJson() != null && !t.getParametersJson().isEmpty()) {
@@ -240,20 +224,6 @@ public class ContextBuilder {
 
     private String buildSkillIndex(String userName) {
         StringBuilder sb = new StringBuilder();
-        List<SkillConfigEntity> allSkills = skillDao.queryByUserName(userName);
-        List<String> enabledSkills = new ArrayList<>();
-        List<String> disabledSkills = new ArrayList<>();
-        for (SkillConfigEntity s : allSkills) {
-            if (s.getEnabled() != null && s.getEnabled() == 1) {
-                enabledSkills.add(s.getSkillName());
-            } else {
-                disabledSkills.add(s.getSkillName());
-            }
-        }
-        log.info("[Skill] 用户={} | 已启用({}): {} | 已停用({}): {}",
-                userName,
-                enabledSkills.size(), enabledSkills,
-                disabledSkills.size(), disabledSkills);
 
         // 用户私有 + 共享合并，用户私有覆盖同名共享
         Map<String, SkillConfigEntity> dedup = new LinkedHashMap<>();
@@ -274,12 +244,6 @@ public class ContextBuilder {
             seen.add(s.getSkillName());
         }
 
-        // 补充本地方可同步的 skill（未被 DB 记录覆盖的）
-        List<SkillVO> synced = skillService.syncScan(userName);
-        for (SkillVO s : synced) {
-            if (seen.contains(s.getSkillName())) continue;
-            sb.append("- ").append(s.getSkillName()).append(": ").append(s.getDescription()).append("\n");
-        }
         return sb.toString();
     }
 

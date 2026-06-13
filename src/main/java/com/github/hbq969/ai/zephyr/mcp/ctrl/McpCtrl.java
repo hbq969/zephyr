@@ -126,4 +126,13 @@ public class McpCtrl {
     public ReturnMessage<?> countEnabledTools() {
         return ReturnMessage.success(mcpService.countEnabledTools(userName()));
     }
+
+    @Operation(summary = "切换服务器共享状态（仅admin）")
+    @RequestMapping(path = "/server/share/toggle", method = RequestMethod.POST)
+    @ResponseBody
+    @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "mcp_toggleServerScope", apiDesc = "MCP管理_切换服务器共享状态")
+    public ReturnMessage<?> toggleServerScope(@RequestBody Map<String, String> body) {
+        mcpService.toggleServerScope(body.get("id"), body.get("scope"));
+        return ReturnMessage.success("ok");
+    }
 }

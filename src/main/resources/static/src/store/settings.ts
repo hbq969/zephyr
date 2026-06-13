@@ -121,6 +121,7 @@ export const useSettingsStore = defineStore('settings', () => {
           id: s.id, name: s.name, transport: s.transport,
           command: s.command, args: s.args, envVars: s.envVars,
           url: s.url, headers: s.headers, status: s.status,
+          scope: s.scope || 'user', canManage: s.canManage || false,
           createdAt: s.createdAt, updatedAt: s.updatedAt
         }))
       }
@@ -184,6 +185,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function toggleMcpTool(id: string, enabled: boolean) {
     await axios({ url: '/mcp/tool/toggle', method: 'post', data: { id, enabled: enabled ? 1 : 0 } })
+  }
+
+  async function toggleServerScope(id: string, scope: string) {
+    await axios({ url: '/mcp/server/share/toggle', method: 'post', data: { id, scope } })
+    await loadMcpServers()
   }
 
   // === Skill API 方法 ===
@@ -337,7 +343,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loadContextUsage,
     loadMcpServers, createMcpServer, updateMcpServer, deleteMcpServer,
     connectMcpServer, disconnectMcpServer,
-    loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, loadMcpToolCount,
+    loadMcpTools, createMcpTool, deleteMcpTool, toggleMcpTool, toggleServerScope, loadMcpToolCount,
     loadSkills, loadUserInfo, installSkill, uploadSkill, uninstallSkill, batchUninstallSkills, toggleSkill,
     syncScanSkills, syncInstallSkills,
     loadMemories, loadMemoryDetail, createMemory, updateMemory, deleteMemories, toggleMemory,

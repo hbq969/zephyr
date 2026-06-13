@@ -488,8 +488,10 @@ public class ChatServiceImpl implements ChatService {
                 mcpConnectionManager.getAllEnabledTools(userName);
         for (com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity t : tools) {
             if (t.getToolName().equals(toolName)) {
+                // 共享工具使用工具归属用户的连接
+                String connUser = t.getUserName().equals(userName) ? userName : t.getUserName();
                 JsonObject args = gson.toJsonTree(arguments).getAsJsonObject();
-                return mcpConnectionManager.getConnection(userName, t.getServerId()).callTool(toolName, args);
+                return mcpConnectionManager.getConnection(connUser, t.getServerId()).callTool(toolName, args);
             }
         }
         return "MCP 工具未找到: " + toolName;

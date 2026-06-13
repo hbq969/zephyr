@@ -14,6 +14,9 @@ public class McpServerEntity {
     private String url;
     private String headers;
     private String status;
+    private String scope = "user";
     private Long createdAt;
     private Long updatedAt;
+
+    private boolean canManage;
 }
