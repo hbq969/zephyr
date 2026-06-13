@@ -162,7 +162,9 @@ public class ChatCtrl {
             // 6. Content-Disposition（?download=1 强制下载）
             boolean forceDownload = "1".equals(request.getParameter("download"));
             boolean inline = !forceDownload && (contentType.startsWith("text/")
-                    || contentType.startsWith("image/") || contentType.equals("application/pdf"));
+                    || contentType.startsWith("image/") || contentType.equals("application/pdf")
+                    || contentType.equals("application/javascript")
+                    || contentType.equals("application/json"));
             String disposition = inline
                     ? "inline; filename=\"" + fileName + "\""
                     : "attachment; filename=\"" + fileName + "\"";
