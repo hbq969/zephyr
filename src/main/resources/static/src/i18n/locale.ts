@@ -343,6 +343,32 @@ const locale: any = {
         "knowledgeMgmt_docStatus_error": "错误",
         "knowledgeMgmt_deleteDocConfirm": "确定删除此文档？",
 
+        // 在线编辑
+        "knowledgeMgmt_createInlineDoc": "新建 Markdown",
+        "knowledgeMgmt_editInlineDoc": "编辑",
+        "knowledgeMgmt_inlineDocBadge": "在线编写",
+        "knowledgeMgmt_uploadDocBadge": "上传",
+        "knowledgeMgmt_docTitle": "文档标题",
+        "knowledgeMgmt_docTitlePlaceholder": "输入文档标题",
+        "knowledgeMgmt_docContent": "内容",
+        "knowledgeMgmt_preview": "预览",
+        "knowledgeMgmt_editDoc": "编辑文档",
+        "knowledgeMgmt_createDoc": "新建文档",
+        "knowledgeMgmt_onlyInlineEdit": "仅在线编写的文档支持编辑",
+
+        // 召回测试
+        "knowledgeMgmt_recallTest": "召回测试",
+        "knowledgeMgmt_recallQuery": "查询文本",
+        "knowledgeMgmt_recallQueryPlaceholder": "输入要测试的查询文本...",
+        "knowledgeMgmt_recallSearch": "搜索",
+        "knowledgeMgmt_recallResultCount": "检索结果 · 共 {count} 条",
+        "knowledgeMgmt_recallEmpty": "输入查询后结果显示在上方",
+        "knowledgeMgmt_recallTopk": "返回数量",
+        "knowledgeMgmt_recallVecScore": "向量分",
+        "knowledgeMgmt_recallKwScore": "关键词分",
+        "knowledgeMgmt_recallRrfScore": "RRF融合分",
+        "knowledgeMgmt_recallSource": "来源",
+
         // 工作空间管理
         "workspaceMgmt_title": "工作空间管理",
         "workspaceMgmt_subtitle": "管理已创建的工作空间",
@@ -717,6 +743,32 @@ const locale: any = {
         "knowledgeMgmt_docStatus_error": "Error",
         "knowledgeMgmt_deleteDocConfirm": "Delete this document?",
 
+        // Inline edit
+        "knowledgeMgmt_createInlineDoc": "New Markdown",
+        "knowledgeMgmt_editInlineDoc": "Edit",
+        "knowledgeMgmt_inlineDocBadge": "Inline",
+        "knowledgeMgmt_uploadDocBadge": "Upload",
+        "knowledgeMgmt_docTitle": "Document Title",
+        "knowledgeMgmt_docTitlePlaceholder": "Enter document title",
+        "knowledgeMgmt_docContent": "Content",
+        "knowledgeMgmt_preview": "Preview",
+        "knowledgeMgmt_editDoc": "Edit Document",
+        "knowledgeMgmt_createDoc": "Create Document",
+        "knowledgeMgmt_onlyInlineEdit": "Only inline documents can be edited",
+
+        // Recall test
+        "knowledgeMgmt_recallTest": "Recall Test",
+        "knowledgeMgmt_recallQuery": "Query Text",
+        "knowledgeMgmt_recallQueryPlaceholder": "Enter a query to test...",
+        "knowledgeMgmt_recallSearch": "Search",
+        "knowledgeMgmt_recallResultCount": "Results · {count} items",
+        "knowledgeMgmt_recallEmpty": "Enter a query to see results",
+        "knowledgeMgmt_recallTopk": "Return Count",
+        "knowledgeMgmt_recallVecScore": "Vector",
+        "knowledgeMgmt_recallKwScore": "Keyword",
+        "knowledgeMgmt_recallRrfScore": "RRF Fusion",
+        "knowledgeMgmt_recallSource": "Source",
+
         // Workspace Management
         "workspaceMgmt_title": "Workspace Management",
         "workspaceMgmt_subtitle": "Manage your workspaces",
@@ -1090,6 +1142,32 @@ const locale: any = {
         "knowledgeMgmt_docStatus_ready": "準備完了",
         "knowledgeMgmt_docStatus_error": "エラー",
         "knowledgeMgmt_deleteDocConfirm": "このドキュメントを削除しますか？",
+
+        // インライン編集
+        "knowledgeMgmt_createInlineDoc": "Markdown作成",
+        "knowledgeMgmt_editInlineDoc": "編集",
+        "knowledgeMgmt_inlineDocBadge": "インライン",
+        "knowledgeMgmt_uploadDocBadge": "アップロード",
+        "knowledgeMgmt_docTitle": "ドキュメントタイトル",
+        "knowledgeMgmt_docTitlePlaceholder": "タイトルを入力",
+        "knowledgeMgmt_docContent": "内容",
+        "knowledgeMgmt_preview": "プレビュー",
+        "knowledgeMgmt_editDoc": "ドキュメント編集",
+        "knowledgeMgmt_createDoc": "ドキュメント作成",
+        "knowledgeMgmt_onlyInlineEdit": "インラインドキュメントのみ編集可能",
+
+        // 検索テスト
+        "knowledgeMgmt_recallTest": "検索テスト",
+        "knowledgeMgmt_recallQuery": "検索クエリ",
+        "knowledgeMgmt_recallQueryPlaceholder": "テストするクエリを入力...",
+        "knowledgeMgmt_recallSearch": "検索",
+        "knowledgeMgmt_recallResultCount": "結果 · {count} 件",
+        "knowledgeMgmt_recallEmpty": "クエリを入力すると結果が表示されます",
+        "knowledgeMgmt_recallTopk": "取得件数",
+        "knowledgeMgmt_recallVecScore": "ベクトル",
+        "knowledgeMgmt_recallKwScore": "キーワード",
+        "knowledgeMgmt_recallRrfScore": "RRF融合",
+        "knowledgeMgmt_recallSource": "ソース",
 
         // ワークスペース管理
         "workspaceMgmt_title": "ワークスペース管理",
