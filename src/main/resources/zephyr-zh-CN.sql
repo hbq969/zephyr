@@ -17,3 +17,8 @@ insert into h_icons(name,icon_desc,icon_svg,icon_size,update_at) values('agent',
 
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS model_type varchar(16) DEFAULT 'llm';
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS dimensions int DEFAULT NULL;
+
+-- 在线编写文档功能：增加 content 和 source_type 字段
+alter table if exists zephyr_knowledge_doc add column if not exists content text;
+alter table if exists zephyr_knowledge_doc add column if not exists source_type varchar(16) default 'upload';
+alter table if exists zephyr_knowledge_doc add column if not exists updated_at bigint;

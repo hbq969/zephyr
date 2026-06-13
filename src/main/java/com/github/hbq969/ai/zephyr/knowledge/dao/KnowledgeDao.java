@@ -28,6 +28,7 @@ public interface KnowledgeDao {
     List<KnowledgeDocEntity> queryDocsByKbId(@Param("kbId") String kbId);
     KnowledgeDocEntity queryDocById(@Param("id") String id);
     void insertDoc(KnowledgeDocEntity entity);
+    void updateDoc(KnowledgeDocEntity entity);
     void updateDocStatus(@Param("id") String id, @Param("status") String status,
                          @Param("chunkCount") Integer chunkCount, @Param("errorMsg") String errorMsg);
     void deleteDoc(@Param("id") String id);

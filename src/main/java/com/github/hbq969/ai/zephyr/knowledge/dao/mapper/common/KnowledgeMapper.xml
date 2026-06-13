@@ -45,7 +45,8 @@
 
   <select id="queryDocsByKbId" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     select id, kb_id as kbId, file_name as fileName, file_type as fileType, file_size as fileSize,
-      chunk_count as chunkCount, status, error_msg as errorMsg, created_at as createdAt
+           content, source_type as sourceType, chunk_count as chunkCount, status, error_msg as errorMsg,
+           created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_doc
     where kb_id = #{kbId}
     order by created_at desc
@@ -53,14 +54,15 @@
 
   <select id="queryDocById" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     select id, kb_id as kbId, file_name as fileName, file_type as fileType, file_size as fileSize,
-      chunk_count as chunkCount, status, error_msg as errorMsg, created_at as createdAt
+           content, source_type as sourceType, chunk_count as chunkCount, status, error_msg as errorMsg,
+           created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_doc
     where id = #{id}
   </select>
 
-  <insert id="insertDoc">
-    insert into zephyr_knowledge_doc (id, kb_id, file_name, file_type, file_size, chunk_count, status, error_msg, created_at)
-    values (#{id}, #{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{chunkCount}, #{status}, #{errorMsg}, #{createdAt})
+  <insert id="insertDoc" parameterType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
+    insert into zephyr_knowledge_doc (id, kb_id, file_name, file_type, file_size, content, source_type, chunk_count, status, error_msg, created_at)
+    values (#{id}, #{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{content}, #{sourceType}, #{chunkCount}, #{status}, #{errorMsg}, #{createdAt})
   </insert>
 
   <update id="updateDocStatus">
@@ -94,5 +96,12 @@
   <delete id="deleteConversationKbByKbId">
     delete from zephyr_conversation_kb where kb_id = #{kbId}
   </delete>
+
+  <update id="updateDoc" parameterType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
+    update zephyr_knowledge_doc
+    set file_name = #{fileName}, content = #{content}, status = #{status},
+        chunk_count = #{chunkCount}, updated_at = #{updatedAt}
+    where id = #{id}
+  </update>
 
 </mapper>
