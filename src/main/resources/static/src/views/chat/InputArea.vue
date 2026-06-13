@@ -100,6 +100,11 @@ const workspaceStore = useWorkspaceStore()
 const convStore = useConversationsStore()
 const showWorkspaceList = ref(false)
 const showNewWorkspace = ref(false)
+// 对话绑定工作空间后不可修改
+const workspaceLocked = computed(() => !!convStore.currentId)
+const workspaceLockedTooltip = computed(() =>
+  workspaceLocked.value ? langData.inputArea_workspaceLocked : ''
+)
 const showKbList = ref(false)
 const selectedKbIds = ref<string[]>([])
 
@@ -515,16 +520,20 @@ function closeAll() {
           </div>
 
           <!-- 工作空间选择 -->
-          <div class="tool-pick" @click.stop="toggleWorkspaceList">
+          <div class="tool-pick" :class="{ 'ws-locked': workspaceLocked }"
+               @click.stop="!workspaceLocked && toggleWorkspaceList()"
+               :title="workspaceLockedTooltip">
             <template v-if="workspaceStore.current">
               <Icon icon="lucide:folder" class="ws-icon" />
               <span>{{ workspaceStore.current.name }}</span>
             </template>
             <template v-else>
               <Icon icon="lucide:folder" class="ws-icon dim" />
+              <span class="ws-placeholder">{{ workspaceLocked ? langData.inputArea_noWorkspace : '' }}</span>
             </template>
-            <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showWorkspaceList" class="pick-dropdown ws-dropdown" @click.stop>
+            <Icon v-if="!workspaceLocked" icon="lucide:chevron-down" class="pick-arrow" />
+            <Icon v-else icon="lucide:lock" class="ws-lock-icon" />
+            <div v-if="showWorkspaceList && !workspaceLocked" class="pick-dropdown ws-dropdown" @click.stop>
               <div v-for="ws in workspaceStore.workspaces" :key="ws.id"
                    class="pick-option ws-option"
                    :class="{ current: workspaceStore.currentId === ws.id }"
@@ -838,6 +847,9 @@ html.dark .think-tag { background: var(--el-color-primary-light-3); color: var(-
 
 .ws-icon { font-size: 14px; color: var(--el-text-color-secondary); }
 .ws-icon.dim { color: var(--el-text-color-placeholder); }
+.ws-locked { opacity: 0.75; cursor: default; }
+.ws-placeholder { color: var(--el-text-color-placeholder); font-size: 12px; }
+.ws-lock-icon { font-size: 12px; color: var(--el-text-color-placeholder); margin-left: 4px; flex-shrink: 0; }
 .pick-icon { font-size: 14px; color: var(--el-text-color-secondary); }
 .ws-option { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
 .ws-name { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
