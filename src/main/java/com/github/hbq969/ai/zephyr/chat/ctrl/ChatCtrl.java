@@ -24,6 +24,9 @@ public class ChatCtrl {
     @Resource
     private ChatService chatService;
 
+    @Resource
+    private com.github.hbq969.ai.zephyr.workspace.dao.WorkspaceDao workspaceDao;
+
     private String userName() {
         UserInfo ui = UserContext.getNoCheck();
         log.info("++++ 会话信息: {}", ui == null ? "无" : ui.getUserName());
@@ -101,5 +104,78 @@ public class ChatCtrl {
                                          @RequestParam(required = false) String mode) {
         return ReturnMessage.success(chatService.contextUsage(
                 userName(), conversationId, mode));
+    }
+
+    @Operation(summary = "获取工作空间产物文件")
+    @RequestMapping(path = "/files/{workspaceId}/**", method = RequestMethod.GET)
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<?> serveArtifact(
+            @PathVariable String workspaceId,
+            jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            // 1. workspace 归属校验
+            com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity ws =
+                    workspaceDao.queryById(workspaceId);
+            if (ws == null) {
+                return org.springframework.http.ResponseEntity.notFound().build();
+            }
+            String currentUser = userName();
+            if (!ws.getUserName().equals(currentUser)) {
+                return org.springframework.http.ResponseEntity.status(403).build();
+            }
+
+            // 2. 提取 filePath（/files/{workspaceId}/** 中 ** 的部分）
+            String fullPath = request.getRequestURI();
+            String prefix = "/zephyr-ui/chat/files/" + workspaceId + "/";
+            if (!fullPath.startsWith(prefix)) {
+                return org.springframework.http.ResponseEntity.badRequest().build();
+            }
+            String filePath = fullPath.substring(prefix.length());
+
+            // 3. 路径穿越防护
+            java.nio.file.Path wsDir = java.nio.file.Paths.get(ws.getPath()).toRealPath();
+            java.nio.file.Path target = wsDir.resolve(filePath).toRealPath();
+            if (!target.startsWith(wsDir)) {
+                return org.springframework.http.ResponseEntity.status(403).build();
+            }
+
+            // 4. 读取文件
+            byte[] bytes = java.nio.file.Files.readAllBytes(target);
+
+            // 5. Content-Type
+            String fileName = target.getFileName().toString();
+            String lower = fileName.toLowerCase();
+            String contentType = switch (true) {
+                case lower.endsWith(".html") || lower.endsWith(".htm") -> "text/html; charset=utf-8";
+                case lower.endsWith(".css") -> "text/css; charset=utf-8";
+                case lower.endsWith(".js") -> "application/javascript; charset=utf-8";
+                case lower.endsWith(".json") -> "application/json; charset=utf-8";
+                case lower.endsWith(".png") -> "image/png";
+                case lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg";
+                case lower.endsWith(".gif") -> "image/gif";
+                case lower.endsWith(".svg") -> "image/svg+xml";
+                case lower.endsWith(".webp") -> "image/webp";
+                case lower.endsWith(".pdf") -> "application/pdf";
+                default -> "application/octet-stream";
+            };
+
+            // 6. Content-Disposition（?download=1 强制下载）
+            boolean forceDownload = "1".equals(request.getParameter("download"));
+            boolean inline = !forceDownload && (contentType.startsWith("text/")
+                    || contentType.startsWith("image/") || contentType.equals("application/pdf"));
+            String disposition = inline
+                    ? "inline; filename=\"" + fileName + "\""
+                    : "attachment; filename=\"" + fileName + "\"";
+
+            return org.springframework.http.ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, disposition)
+                    .body(bytes);
+        } catch (java.nio.file.NoSuchFileException e) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("读取产物文件失败", e);
+            return org.springframework.http.ResponseEntity.internalServerError().build();
+        }
     }
 }
