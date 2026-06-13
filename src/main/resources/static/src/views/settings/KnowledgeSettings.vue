@@ -72,18 +72,17 @@ onMounted(() => { store.loadKnowledgeBases() })
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <button class="back-btn" @click="router.push('/chat')">
-        <Icon icon="lucide:chevron-left" />
+      <div>
+        <button class="back-btn" @click="router.push('/chat')">
+          <Icon icon="lucide:chevron-left" />
+        </button>
+        <h1>{{ langData.knowledgeMgmt_title }}</h1>
+      </div>
+      <button v-if="store.knowledgeBases.length > 0" class="btn-primary" @click="openCreate">
+        <Icon icon="lucide:plus" /> {{ langData.knowledgeMgmt_createKb }}
       </button>
-      <h2>{{ langData.knowledgeMgmt_title }}</h2>
     </div>
-
-    <div v-if="store.knowledgeBases.length > 0" class="page-toolbar">
-      <div style="flex:1"></div>
-      <el-button type="primary" @click="openCreate">
-        <Icon icon="lucide:plus" style="margin-right:4px" /> {{ langData.knowledgeMgmt_createKb }}
-      </el-button>
-    </div>
+    <p class="subtitle">{{ langData.knowledgeMgmt_subtitle }}</p>
 
     <div v-if="store.knowledgeBases.length === 0" class="empty-state">
       <Icon icon="lucide:library" width="48" style="color: var(--el-text-color-placeholder)" />
@@ -148,19 +147,19 @@ onMounted(() => { store.loadKnowledgeBases() })
 </template>
 
 <style scoped>
-.settings-page { max-width: 720px; margin: 0 auto; padding: 24px; }
+.settings-page { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
 
-.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.page-header > div:first-child { display: flex; align-items: center; gap: 12px; }
 .back-btn {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   border: 1px solid var(--el-border-color); background: var(--el-bg-color);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: var(--el-text-color-secondary); font-size: 18px;
+  color: var(--el-text-color-secondary);
 }
 .back-btn:hover { background: var(--el-fill-color-light); }
-h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 0; }
-
-.page-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weight: 400; color: var(--el-text-color-primary); letter-spacing: -0.5px; margin: 0; }
+.subtitle { font-size: 15px; color: var(--el-text-color-secondary); margin: 0 0 36px 44px; }
 
 .empty-state { text-align: center; padding: 80px 24px; }
 .empty-title { font-family: Georgia, serif; font-size: 22px; color: var(--el-text-color-primary); margin: 16px 0 8px; }

@@ -439,9 +439,13 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <button class="back-btn" @click="$router.push('/chat')"><Icon icon="lucide:chevron-left" /></button>
-      <h2>{{ langData.modelConfig_title }}</h2>
+      <div>
+        <button class="back-btn" @click="$router.push('/chat')"><Icon icon="lucide:chevron-left" /></button>
+        <h1>{{ langData.modelConfig_title }}</h1>
+      </div>
+      <button v-if="!showForm && settingsStore.models.length > 0" class="btn-primary" @click="showForm = true; initParams()"><Icon icon="lucide:plus" />{{ langData.modelConfig_addModel }}</button>
     </div>
+    <p class="subtitle">{{ langData.modelConfig_subtitle }}</p>
     <div class="page-body">
       <el-tabs v-model="currentTab" class="model-tabs">
         <el-tab-pane label="对话模型" name="llm">
@@ -632,17 +636,20 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           <button class="btn btn-pri" @click="add">{{ editId ? langData.btnSave : langData.btnAdd }}</button>
         </div>
       </div>
-      <button v-else class="add-btn" @click="showForm = true; initParams()"><Icon icon="lucide:plus" />{{ langData.modelConfig_addModel }}</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.settings-page { max-width: 680px; margin: 0 auto; padding: 24px; }
-.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.settings-page { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.page-header > div:first-child { display: flex; align-items: center; gap: 12px; }
 .back-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--el-border-color); background: var(--el-bg-color); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--el-text-color-secondary); }
 .back-btn:hover { background: var(--el-fill-color-light); }
-h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 0; }
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weight: 400; color: var(--el-text-color-primary); letter-spacing: -0.5px; margin: 0; }
+.subtitle { font-size: 15px; color: var(--el-text-color-secondary); margin: 0 0 36px 44px; }
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: 8px; border: none; background: var(--el-color-primary); color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 150ms; }
+.btn-primary:hover { background: var(--el-color-primary-light-3); }
 
 .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--el-border-color); }
 .row-left { display: flex; align-items: center; gap: 10px; }
@@ -661,9 +668,6 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .set-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--el-color-primary); background: transparent; color: var(--el-color-primary); cursor: pointer; font-size: 12px; font-family: inherit; }
 .set-btn:hover { background: rgba(204,120,92,0.08); }
 .current-badge { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: rgba(204,120,92,0.12); color: var(--el-color-primary); }
-.add-btn { display: flex; align-items: center; gap: 6px; margin-top: 16px; padding: 8px 14px; border-radius: 8px; border: 1px dashed var(--el-border-color); background: transparent; cursor: pointer; font-size: 13px; color: var(--el-color-primary); font-family: inherit; width: 100%; justify-content: center; }
-.add-btn:hover { background: var(--el-fill-color-light); }
-
 .form-area { margin-top: 16px; }
 .section-title { font-family: Georgia, serif; font-size: 18px; font-weight: 400; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 20px 0 12px; }
 .section-title:first-child { margin-top: 0; }

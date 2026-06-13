@@ -122,6 +122,7 @@ const locale: any = {
 
         // 模型配置
         "modelConfig_title": "模型配置",
+        "modelConfig_subtitle": "配置对话模型和 Embedding 模型",
         "modelConfig_modelName": "模型名称",
         "modelConfig_baseUrl": "Base URL（可选）",
         "modelConfig_apiKey": "API Key",
@@ -296,6 +297,7 @@ const locale: any = {
 
         // 记忆管理
         "memoryMgmt_title": "记忆管理",
+        "memoryMgmt_subtitle": "管理持久化记忆条目",
         "memoryMgmt_all": "全部",
         "memoryMgmt_user": "用户",
         "memoryMgmt_project": "项目",
@@ -319,6 +321,7 @@ const locale: any = {
 
         // 知识库管理
         "knowledgeMgmt_title": "知识库管理",
+        "knowledgeMgmt_subtitle": "管理知识库和文档",
         "knowledgeMgmt_createKb": "创建知识库",
         "knowledgeMgmt_editKb": "编辑知识库",
         "knowledgeMgmt_deleteKb": "删除知识库",
@@ -490,6 +493,7 @@ const locale: any = {
 
         // Model config
         "modelConfig_title": "Model Configuration",
+        "modelConfig_subtitle": "Configure chat and embedding models",
         "modelConfig_modelName": "Model name",
         "modelConfig_baseUrl": "Base URL (optional)",
         "modelConfig_apiKey": "API Key",
@@ -664,6 +668,7 @@ const locale: any = {
 
         // Memory Management
         "memoryMgmt_title": "Memory Management",
+        "memoryMgmt_subtitle": "Manage persistent memory entries",
         "memoryMgmt_all": "All",
         "memoryMgmt_user": "User",
         "memoryMgmt_project": "Project",
@@ -687,6 +692,7 @@ const locale: any = {
 
         // Knowledge Base Management
         "knowledgeMgmt_title": "Knowledge Base",
+        "knowledgeMgmt_subtitle": "Manage knowledge bases and documents",
         "knowledgeMgmt_createKb": "Create Knowledge Base",
         "knowledgeMgmt_editKb": "Edit Knowledge Base",
         "knowledgeMgmt_deleteKb": "Delete Knowledge Base",
@@ -858,6 +864,7 @@ const locale: any = {
 
         // Model config
         "modelConfig_title": "モデル設定",
+        "modelConfig_subtitle": "対話モデルと埋め込みモデルを設定",
         "modelConfig_modelName": "モデル名",
         "modelConfig_baseUrl": "Base URL（任意）",
         "modelConfig_apiKey": "API Key",
@@ -1032,6 +1039,7 @@ const locale: any = {
 
         // Memory Management
         "memoryMgmt_title": "メモリ管理",
+        "memoryMgmt_subtitle": "永続化メモリエントリを管理",
         "memoryMgmt_all": "すべて",
         "memoryMgmt_user": "ユーザー",
         "memoryMgmt_project": "プロジェクト",
@@ -1055,6 +1063,7 @@ const locale: any = {
 
         // ナレッジベース管理
         "knowledgeMgmt_title": "ナレッジベース管理",
+        "knowledgeMgmt_subtitle": "ナレッジベースとドキュメントを管理",
         "knowledgeMgmt_createKb": "ナレッジベース作成",
         "knowledgeMgmt_editKb": "ナレッジベース編集",
         "knowledgeMgmt_deleteKb": "ナレッジベース削除",
