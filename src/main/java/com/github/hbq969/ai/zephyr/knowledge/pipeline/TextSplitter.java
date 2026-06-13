@@ -8,6 +8,8 @@ public class TextSplitter {
 
     private static final Pattern MARKDOWN_HEADING = Pattern.compile("^#{1,4}\\s+.+$", Pattern.MULTILINE);
     private static final Pattern CODE_BLOCK = Pattern.compile("```[\\s\\S]*?```");
+    // 判断一个 chunk 自身是否就是标题行，避免标题前缀重复拼接
+    private static final Pattern HEADING_LINE = Pattern.compile("^#{1,4}\\s");
 
     // 分隔符优先级：双换行 > 中文句号 > 中文感叹号 > 中文问号 > 单换行
     private static final List<String> SEPARATORS = List.of("\n\n", "。", "！", "？", "\n");
@@ -16,6 +18,10 @@ public class TextSplitter {
     private final int overlap;
     private final int minChunkSize;
 
+    /**
+     * @param chunkSize 最大字符数
+     * @param overlap   char-level 硬切时的重叠量；基于分隔符的切分不产生重叠
+     */
     public TextSplitter(int chunkSize, int overlap) {
         this.chunkSize = chunkSize;
         this.overlap = overlap;
@@ -41,7 +47,8 @@ public class TextSplitter {
         for (String chunk : rawChunks) {
             String restored = restorePlaceholders(chunk, placeholders);
             String heading = findNearestHeading(headings, text, chunk);
-            if (heading != null && !heading.isEmpty()) {
+            // 如果 chunk 自身就是标题行，不再重复拼接
+            if (heading != null && !heading.isEmpty() && !HEADING_LINE.matcher(restored).find()) {
                 result.add(heading + "\n" + restored);
             } else {
                 result.add(restored);
