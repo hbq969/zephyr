@@ -25,7 +25,7 @@
     "jsencrypt": "^3.3.2",
     "markdown-it": "^14.1.0",
     "markdown-it-katex": "^2.0.3",
-    "marked": "^15.0.7",
+    "marked": "^15.0.12",
     "monaco-editor": "^0.52.2",
     "pinia": "^3.0.3",
     "vue": "^3.5.13",
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@tsconfig/node22": "^22.0.1",
     "@types/markdown-it": "^14.1.2",
+    "@types/marked": "^5.0.2",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-vue": "^5.2.3",
     "@vue/tsconfig": "^0.7.0",
