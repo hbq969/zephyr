@@ -188,7 +188,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         List<ChromaClient.QueryResult> allResults = new ArrayList<>();
         for (String kbId : kbIds) {
             try {
-                allResults.addAll(chromaClient.query("kb_" + kbId, embeddings.get(0), topK));
+                String collId = chromaClient.getOrCreateCollection("kb_" + kbId);
+                allResults.addAll(chromaClient.query(collId, embeddings.get(0), topK));
             } catch (Exception e) {
                 log.warn("知识库 {} 检索失败: {}", kbId, e.getMessage());
             }
@@ -222,7 +223,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
 
             String collection = "kb_" + kbId;
-            chromaClient.createCollection(collection);
+            String collId = chromaClient.getOrCreateCollection(collection);
 
             List<String> ids = new ArrayList<>();
             List<Map<String, String>> metadatas = new ArrayList<>();
@@ -236,7 +237,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
 
             List<float[]> embeddings = embeddingClient.embed(chunks, embedModel);
-            chromaClient.add(collection, ids, embeddings, metadatas, chunks);
+            chromaClient.add(collId, ids, embeddings, metadatas, chunks);
 
             knowledgeDao.updateDocStatus(docId, "ready", chunks.size(), null);
             log.info("文档处理完成: docId={}, chunks={}", docId, chunks.size());

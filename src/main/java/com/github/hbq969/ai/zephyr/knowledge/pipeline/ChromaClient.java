@@ -19,6 +19,7 @@ public class ChromaClient implements InitializingBean {
 
     private static final Gson gson = new Gson();
     private static final MediaType JSON = MediaType.get("application/json");
+    private static final String API_PREFIX = "/api/v2/tenants/default_tenant/databases/default_database";
 
     @Resource
     private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
@@ -56,24 +57,48 @@ public class ChromaClient implements InitializingBean {
         }
     }
 
-    public void createCollection(String collectionName) {
+    // === Collection operations ===
+
+    public String getOrCreateCollection(String collectionName) {
+        String id = getCollectionId(collectionName);
+        if (id != null) return id;
         Map<String, Object> body = Map.of("name", collectionName);
-        try {
-            post("/api/v1/collections", body);
-        } catch (Exception e) {
-            log.warn("创建 Chroma collection 失败（可能已存在）: {}", e.getMessage());
-        }
+        String resp = post(API_PREFIX + "/collections", body);
+        Map<String, Object> result = gson.fromJson(resp, new TypeToken<Map<String, Object>>() {}.getType());
+        String newId = result.get("id").toString();
+        log.info("创建 Chroma collection: name={}, id={}", collectionName, newId);
+        return newId;
     }
 
     public void deleteCollection(String collectionName) {
+        String id = getCollectionId(collectionName);
+        if (id == null) return;
         try {
-            delete("/api/v1/collections/" + collectionName);
+            delete(API_PREFIX + "/collections/" + id);
+            log.info("删除 Chroma collection: name={}, id={}", collectionName, id);
         } catch (Exception e) {
-            log.warn("删除 Chroma collection 失败: {}", e.getMessage());
+            log.warn("删除 Chroma collection 失败: name={}", collectionName, e);
         }
     }
 
-    public void add(String collectionName, List<String> ids, List<float[]> embeddings,
+    private String getCollectionId(String name) {
+        try {
+            String resp = get(API_PREFIX + "/collections");
+            List<Map<String, Object>> collections = gson.fromJson(resp, new TypeToken<List<Map<String, Object>>>() {}.getType());
+            for (Map<String, Object> col : collections) {
+                if (name.equals(col.get("name"))) {
+                    return col.get("id").toString();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("查询 Chroma collection 失败: name={}", name, e);
+        }
+        return null;
+    }
+
+    // === Data operations ===
+
+    public void add(String collectionId, List<String> ids, List<float[]> embeddings,
                     List<Map<String, String>> metadatas, List<String> documents) {
         List<List<Float>> embList = new ArrayList<>();
         for (float[] vec : embeddings) {
@@ -86,10 +111,10 @@ public class ChromaClient implements InitializingBean {
         body.put("embeddings", embList);
         body.put("metadatas", metadatas);
         body.put("documents", documents);
-        post("/api/v1/collections/" + collectionName + "/add", body);
+        post(API_PREFIX + "/collections/" + collectionId + "/add", body);
     }
 
-    public List<QueryResult> query(String collectionName, float[] queryEmbedding, int topK) {
+    public List<QueryResult> query(String collectionId, float[] queryEmbedding, int topK) {
         List<Float> qEmb = new ArrayList<>();
         for (float v : queryEmbedding) qEmb.add(v);
 
@@ -97,7 +122,7 @@ public class ChromaClient implements InitializingBean {
         body.put("query_embeddings", List.of(qEmb));
         body.put("n_results", topK);
 
-        String resp = post("/api/v1/collections/" + collectionName + "/query", body);
+        String resp = post(API_PREFIX + "/collections/" + collectionId + "/query", body);
         Map<String, Object> result = gson.fromJson(resp, new TypeToken<Map<String, Object>>(){}.getType());
 
         List<QueryResult> results = new ArrayList<>();
@@ -126,6 +151,21 @@ public class ChromaClient implements InitializingBean {
             }
         }
         return results;
+    }
+
+    // === HTTP helpers ===
+
+    private String get(String path) {
+        try (Response response = client.newCall(new Request.Builder()
+                .url(baseUrl + path).get().build()).execute()) {
+            if (!response.isSuccessful()) {
+                String errBody = response.body() != null ? response.body().string() : "";
+                throw new RuntimeException("Chroma API error: " + response.code() + " " + errBody);
+            }
+            return response.body() != null ? response.body().string() : "{}";
+        } catch (IOException e) {
+            throw new RuntimeException("Chroma 请求失败: " + e.getMessage(), e);
+        }
     }
 
     private String post(String path, Map<String, Object> body) {
