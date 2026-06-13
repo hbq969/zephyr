@@ -386,54 +386,63 @@ public class ChatServiceImpl implements ChatService {
      */
     private void detectArtifacts(LlmResult.ToolCall tc, SseEmitter emitter, String userName) {
         String toolName = tc.getName();
-        Set<String> writeTools = Set.of("Write", "write_to_file", "create_file", "edit_file");
-        if (writeTools.contains(toolName)) {
-            Map<String, Object> args = tc.getArguments();
-            if (args == null) return;
-            // 尝试从 arguments 中提取 filePath
-            Object filePathObj = args.get("filePath");
-            if (filePathObj == null) filePathObj = args.get("file_path");
-            if (filePathObj == null) filePathObj = args.get("path");
-            if (filePathObj == null) return;
-            String filePathStr = filePathObj.toString();
-            if (filePathStr.isBlank()) return;
+        Set<String> writeTools = Set.of("Write", "write", "write_to_file", "create_file", "edit_file");
+        if (!writeTools.contains(toolName)) return;
 
-            // 检查路径是否在工作空间内
-            java.nio.file.Path target = java.nio.file.Paths.get(filePathStr);
-            if (!java.nio.file.Files.isRegularFile(target)) return;
-
-            try {
-                java.nio.file.Path abs = target.toRealPath();
-                // 遍历用户的工作空间，看文件是否在其中
-                List<com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity> wss =
-                        workspaceDao.queryByUserName(userName);
-                for (com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity ws : wss) {
-                    java.nio.file.Path wsDir = java.nio.file.Paths.get(ws.getPath()).toRealPath();
-                    if (abs.startsWith(wsDir)) {
-                        java.nio.file.Path rel = wsDir.relativize(abs);
-                        String relPath = rel.toString().replace('\\', '/');
-                        String fileName = abs.getFileName().toString();
-                        String mimeType = java.nio.file.Files.probeContentType(abs);
-                        if (mimeType == null) {
-                            mimeType = fileName.toLowerCase().endsWith(".html") ? "text/html"
-                                    : fileName.toLowerCase().endsWith(".pdf") ? "application/pdf"
-                                    : "application/octet-stream";
-                        }
-                        long size = java.nio.file.Files.size(abs);
-
-                        emitter.send(SseEmitter.event().name("message")
-                                .data(ChatEvent.builder()
-                                        .type("artifact")
-                                        .artifactName(fileName)
-                                        .artifactPath(relPath)
-                                        .artifactType(mimeType)
-                                        .artifactSize(size)
-                                        .build()));
+        Map<String, Object> args = tc.getArguments();
+        String filePathStr = null;
+        if (args != null) {
+            // 尝试从 arguments 中提取文件路径，覆盖常见参数名
+            for (String key : args.keySet()) {
+                String kl = key.toLowerCase();
+                if (kl.contains("file") || kl.contains("path") || kl.equals("target")
+                        || kl.equals("destination") || kl.equals("output")) {
+                    Object v = args.get(key);
+                    if (v instanceof String s && !s.isBlank()) {
+                        filePathStr = s;
                         break;
                     }
                 }
-            } catch (Exception ignored) {}
+            }
         }
+        if (filePathStr == null || filePathStr.isBlank()) return;
+
+        log.info("[artifact] 检测到写文件工具: tool={}, path={}", toolName, filePathStr);
+
+        // 检查路径是否在工作空间内
+        java.nio.file.Path target = java.nio.file.Paths.get(filePathStr);
+        if (!java.nio.file.Files.isRegularFile(target)) return;
+
+        try {
+            java.nio.file.Path abs = target.toRealPath();
+            List<com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity> wss =
+                    workspaceDao.queryByUserName(userName);
+            for (com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity ws : wss) {
+                java.nio.file.Path wsDir = java.nio.file.Paths.get(ws.getPath()).toRealPath();
+                if (abs.startsWith(wsDir)) {
+                    java.nio.file.Path rel = wsDir.relativize(abs);
+                    String relPath = rel.toString().replace('\\', '/');
+                    String fileName = abs.getFileName().toString();
+                    String mimeType = java.nio.file.Files.probeContentType(abs);
+                    if (mimeType == null) {
+                        mimeType = fileName.toLowerCase().endsWith(".html") ? "text/html"
+                                : fileName.toLowerCase().endsWith(".pdf") ? "application/pdf"
+                                : "application/octet-stream";
+                    }
+                    long size = java.nio.file.Files.size(abs);
+
+                    emitter.send(SseEmitter.event().name("message")
+                            .data(ChatEvent.builder()
+                                    .type("artifact")
+                                    .artifactName(fileName)
+                                    .artifactPath(relPath)
+                                    .artifactType(mimeType)
+                                    .artifactSize(size)
+                                    .build()));
+                    break;
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     /** 清除 NULL byte 并检测/截断二进制内容 */
