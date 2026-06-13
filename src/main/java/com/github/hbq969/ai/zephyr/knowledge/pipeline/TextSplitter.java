@@ -46,6 +46,7 @@ public class TextSplitter {
 
         for (String chunk : rawChunks) {
             String restored = restorePlaceholders(chunk, placeholders);
+            if (restored.isEmpty()) continue;
             String heading = findNearestHeading(headings, text, chunk);
             // 如果 chunk 自身就是标题行，不再重复拼接
             if (heading != null && !heading.isEmpty() && !HEADING_LINE.matcher(restored).find()) {
@@ -73,7 +74,8 @@ public class TextSplitter {
             if (part.length() > chunkSize) {
                 // 单个 part 超过 chunkSize：先提交 current，再递归切分大 part
                 if (current.length() >= minChunkSize) {
-                    chunks.add(current.toString().trim());
+                    String s = current.toString().trim();
+                    if (!s.isEmpty()) chunks.add(s);
                     current = new StringBuilder();
                 }
                 splitRecursive(part, chunks);
@@ -81,7 +83,8 @@ public class TextSplitter {
             }
             String candidate = current.length() > 0 ? current + sep + part : part;
             if (candidate.length() > chunkSize && current.length() >= minChunkSize) {
-                chunks.add(current.toString().trim());
+                String s2 = current.toString().trim();
+                if (!s2.isEmpty()) chunks.add(s2);
                 current = new StringBuilder(part);
             } else {
                 if (current.length() > 0) current.append(sep);
@@ -101,7 +104,8 @@ public class TextSplitter {
         int start = 0;
         while (start < text.length()) {
             int end = Math.min(start + chunkSize, text.length());
-            chunks.add(text.substring(start, end).trim());
+            String s = text.substring(start, end).trim();
+            if (!s.isEmpty()) chunks.add(s);
             if (end >= text.length()) break;
             start = end - overlap;
         }
