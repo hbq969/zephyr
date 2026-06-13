@@ -8,6 +8,11 @@ import { matchTemplate, getTemplate, TEMPLATES, type ModelTemplate } from '@/mod
 
 const langData = getLangData()
 const settingsStore = useSettingsStore()
+const currentTab = ref('llm')
+const filteredModels = computed(() => settingsStore.models.filter(m => {
+  if (currentTab.value === 'embedding') return m.modelType === 'embedding'
+  return !m.modelType || m.modelType === 'llm'
+}))
 const showForm = ref(false)
 const name = ref('')
 const baseUrl = ref('')
@@ -440,7 +445,11 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
       <h2>{{ langData.modelConfig_title }}</h2>
     </div>
     <div class="page-body">
-      <div v-for="m in settingsStore.models" :key="m.name" class="setting-row">
+      <div class="model-tabs">
+        <button :class="['model-tab', { active: currentTab === 'llm' }]" @click="currentTab = 'llm'">对话模型</button>
+        <button :class="['model-tab', { active: currentTab === 'embedding' }]" @click="currentTab = 'embedding'">Embedding 模型</button>
+      </div>
+      <div v-for="m in filteredModels" :key="m.name" class="setting-row">
         <div class="row-left">
           <Icon icon="lucide:cpu" class="row-icon" />
           <div>
@@ -616,6 +625,11 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
 .back-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--el-border-color); background: var(--el-bg-color); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--el-text-color-secondary); }
 .back-btn:hover { background: var(--el-fill-color-light); }
 h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 0; }
+
+.model-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.model-tab { padding: 6px 16px; border-radius: 8px; border: none; background: transparent; color: var(--el-text-color-secondary); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.model-tab:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
+.model-tab.active { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 
 .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--el-border-color); }
 .row-left { display: flex; align-items: center; gap: 10px; }
