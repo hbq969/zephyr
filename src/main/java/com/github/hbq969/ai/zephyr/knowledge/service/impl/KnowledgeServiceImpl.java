@@ -279,19 +279,37 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             String collection = "kb_" + kbId;
             String collId = chromaClient.getOrCreateCollection(collection);
 
-            List<String> ids = new ArrayList<>();
-            List<Map<String, String>> metadatas = new ArrayList<>();
-            for (int i = 0; i < chunks.size(); i++) {
-                ids.add(docId + "_" + i);
-                Map<String, String> meta = new HashMap<>();
-                meta.put("doc_id", docId);
-                meta.put("file_name", filePath.getFileName().toString().replace(docId + "_", ""));
-                meta.put("chunk_index", String.valueOf(i));
-                metadatas.add(meta);
+            // 分批 embedding，单批最多 100 条，避免请求体过大
+            int batchSize = 100;
+            List<float[]> allEmbeddings = new ArrayList<>();
+            List<String> allIds = new ArrayList<>();
+            List<Map<String, String>> allMetadatas = new ArrayList<>();
+
+            for (int batchStart = 0; batchStart < chunks.size(); batchStart += batchSize) {
+                int batchEnd = Math.min(batchStart + batchSize, chunks.size());
+                List<String> batchChunks = chunks.subList(batchStart, batchEnd);
+
+                List<String> batchIds = new ArrayList<>();
+                List<Map<String, String>> batchMetas = new ArrayList<>();
+                for (int i = batchStart; i < batchEnd; i++) {
+                    batchIds.add(docId + "_" + i);
+                    Map<String, String> meta = new HashMap<>();
+                    meta.put("doc_id", docId);
+                    meta.put("file_name", filePath.getFileName().toString().replace(docId + "_", ""));
+                    meta.put("chunk_index", String.valueOf(i));
+                    batchMetas.add(meta);
+                }
+
+                List<float[]> batchEmbeddings = embeddingClient.embed(batchChunks, embedModel);
+                chromaClient.add(collId, batchIds, batchEmbeddings, batchMetas, batchChunks);
+
+                allEmbeddings.addAll(batchEmbeddings);
+                allIds.addAll(batchIds);
+                allMetadatas.addAll(batchMetas);
+
+                log.info("文档处理进度: docId={}, {}/{} chunks", docId, batchEnd, chunks.size());
             }
 
-            List<float[]> embeddings = embeddingClient.embed(chunks, embedModel);
-            chromaClient.add(collId, ids, embeddings, metadatas, chunks);
             keywordIndex.addChunks(kbId, docId, chunks);
 
             knowledgeDao.updateDocStatus(docId, "ready", chunks.size(), null);
