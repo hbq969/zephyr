@@ -9,6 +9,8 @@ import com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity;
 import com.github.hbq969.ai.zephyr.knowledge.model.KnowledgeVO;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.ChromaClient;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.EmbeddingClient;
+import com.github.hbq969.ai.zephyr.knowledge.pipeline.KeywordIndex;
+import com.github.hbq969.ai.zephyr.knowledge.pipeline.RrfMerger;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TextSplitter;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TikaParser;
 import com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService;
@@ -47,6 +49,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Resource
     private ChromaClient chromaClient;
+
+    @Resource
+    private KeywordIndex keywordIndex;
 
     @Override
     public List<KnowledgeVO> listKb(String userName) {
@@ -108,6 +113,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (kb == null) {
             throw new RuntimeException("知识库不存在");
         }
+        knowledgeDao.deleteConversationKbByKbId(id);
+        keywordIndex.removeKb(id);
         knowledgeDao.deleteDocsByKbId(id);
         knowledgeDao.deleteKb(id);
     }
@@ -119,6 +126,10 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public void deleteDoc(String id) {
+        KnowledgeDocEntity doc = knowledgeDao.queryDocById(id);
+        if (doc != null) {
+            keywordIndex.removeDoc(doc.getKbId(), id);
+        }
         knowledgeDao.deleteDoc(id);
     }
 
@@ -179,7 +190,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public List<SearchResult> search(String query, List<String> kbIds, int topK) {
         if (kbIds == null || kbIds.isEmpty()) return List.of();
 
-        // 按 embedModelId 分组知识库，同一模型只做一次 Embedding
         Map<String, List<String>> kbByModel = new LinkedHashMap<>();
         for (String kbId : kbIds) {
             KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
@@ -191,7 +201,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         }
         if (kbByModel.isEmpty()) throw new RuntimeException("所选知识库均未配置 Embedding 模型");
 
-        List<ChromaClient.QueryResult> allResults = new ArrayList<>();
+        int fetchSize = topK * 2;
+        List<ChromaClient.QueryResult> allVecResults = new ArrayList<>();
+
         for (Map.Entry<String, List<String>> entry : kbByModel.entrySet()) {
             ModelConfigEntity embedModel = modelConfigDao.queryById(entry.getKey());
             if (embedModel == null) {
@@ -200,24 +212,43 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
             List<float[]> embeddings = embeddingClient.embed(List.of(query), embedModel);
             if (embeddings.isEmpty()) continue;
-
             for (String kbId : entry.getValue()) {
                 try {
                     String collId = chromaClient.getOrCreateCollection("kb_" + kbId);
-                    allResults.addAll(chromaClient.query(collId, embeddings.get(0), topK));
+                    allVecResults.addAll(chromaClient.query(collId, embeddings.get(0), fetchSize));
                 } catch (Exception e) {
-                    log.warn("知识库 {} 检索失败: {}", kbId, e.getMessage());
+                    log.warn("知识库 {} 向量检索失败: {}", kbId, e.getMessage());
                 }
             }
         }
 
-        return allResults.stream()
-                .sorted((a, b) -> Double.compare(b.getScore(), a.getScore()))
-                .limit(topK)
-                .map(r -> new SearchResult(r.getDocument(),
-                        r.getMetadata() != null ? r.getMetadata().getOrDefault("file_name", "") : "",
-                        r.getScore()))
-                .toList();
+        Map<String, Float> kwResults = keywordIndex.search(query, kbIds, fetchSize);
+
+        allVecResults.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
+
+        RrfMerger merger = new RrfMerger(60);
+        List<String> mergedIds = merger.merge(allVecResults, kwResults, topK);
+
+        Map<String, ChromaClient.QueryResult> vecMap = new HashMap<>();
+        for (ChromaClient.QueryResult r : allVecResults) {
+            vecMap.put(r.getId(), r);
+        }
+
+        List<SearchResult> results = new ArrayList<>();
+        for (String chunkId : mergedIds) {
+            ChromaClient.QueryResult vr = vecMap.get(chunkId);
+            if (vr != null) {
+                results.add(new SearchResult(vr.getDocument(),
+                        vr.getMetadata() != null ? vr.getMetadata().getOrDefault("file_name", "") : "",
+                        vr.getScore()));
+            } else {
+                String text = keywordIndex.getChunkText(chunkId);
+                if (text != null) {
+                    results.add(new SearchResult(text, "关键词匹配", 0.0));
+                }
+            }
+        }
+        return results;
     }
 
     @Async
@@ -254,6 +285,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
             List<float[]> embeddings = embeddingClient.embed(chunks, embedModel);
             chromaClient.add(collId, ids, embeddings, metadatas, chunks);
+            keywordIndex.addChunks(kbId, docId, chunks);
 
             knowledgeDao.updateDocStatus(docId, "ready", chunks.size(), null);
             log.info("文档处理完成: docId={}, chunks={}", docId, chunks.size());
