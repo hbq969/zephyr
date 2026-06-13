@@ -11,29 +11,30 @@ import java.util.stream.Collectors;
 public class KeywordIndex {
 
     // kbId -> (term -> Set<chunkId>)
-    private final Map<String, Map<String, Set<String>>> idx = new HashMap<>();
+    private final Map<String, Map<String, Set<String>>> invertedIndex = new HashMap<>();
     // kbId -> (chunkId -> chunkText)
-    private final Map<String, Map<String, String>> texts = new HashMap<>();
+    private final Map<String, Map<String, String>> chunkTexts = new HashMap<>();
+    // chunkId -> text (flat reverse index for O(1) lookup)
+    private final Map<String, String> textById = new HashMap<>();
 
     public synchronized void addChunks(String kbId, String docId, List<String> chunks) {
-        idx.computeIfAbsent(kbId, k -> new HashMap<>());
-        texts.computeIfAbsent(kbId, k -> new HashMap<>());
-
-        Map<String, Set<String>> kbIdx = idx.get(kbId);
-        Map<String, String> kbTexts = texts.get(kbId);
+        Map<String, Set<String>> kbIdx = invertedIndex.computeIfAbsent(kbId, k -> new HashMap<>());
+        Map<String, String> kbTexts = chunkTexts.computeIfAbsent(kbId, k -> new HashMap<>());
 
         for (int i = 0; i < chunks.size(); i++) {
             String chunkId = docId + "_" + i;
-            kbTexts.put(chunkId, chunks.get(i));
-            for (String term : tokenize(chunks.get(i))) {
+            String chunkText = chunks.get(i);
+            kbTexts.put(chunkId, chunkText);
+            textById.put(chunkId, chunkText);
+            for (String term : tokenize(chunkText)) {
                 kbIdx.computeIfAbsent(term, k -> new HashSet<>()).add(chunkId);
             }
         }
     }
 
     public synchronized void removeDoc(String kbId, String docId) {
-        Map<String, Set<String>> kbIdx = idx.get(kbId);
-        Map<String, String> kbTexts = texts.get(kbId);
+        Map<String, Set<String>> kbIdx = invertedIndex.get(kbId);
+        Map<String, String> kbTexts = chunkTexts.get(kbId);
         if (kbIdx == null || kbTexts == null) return;
 
         List<String> toRemove = new ArrayList<>();
@@ -42,14 +43,26 @@ public class KeywordIndex {
         }
         for (String chunkId : toRemove) {
             kbTexts.remove(chunkId);
-            for (Set<String> s : kbIdx.values()) s.remove(chunkId);
+            textById.remove(chunkId);
+            Iterator<Map.Entry<String, Set<String>>> it = kbIdx.entrySet().iterator();
+            while (it.hasNext()) {
+                Set<String> s = it.next().getValue();
+                s.remove(chunkId);
+                if (s.isEmpty()) it.remove();
+            }
         }
         log.info("关键词索引已移除文档: kbId={}, docId={}, chunks={}", kbId, docId, toRemove.size());
     }
 
     public synchronized void removeKb(String kbId) {
-        idx.remove(kbId);
-        texts.remove(kbId);
+        Map<String, String> kbTexts = chunkTexts.get(kbId);
+        if (kbTexts != null) {
+            for (String chunkId : kbTexts.keySet()) {
+                textById.remove(chunkId);
+            }
+        }
+        invertedIndex.remove(kbId);
+        chunkTexts.remove(kbId);
     }
 
     public synchronized Map<String, Float> search(String query, List<String> kbIds, int topK) {
@@ -59,8 +72,8 @@ public class KeywordIndex {
         Map<String, Float> scores = new HashMap<>();
 
         for (String kbId : kbIds) {
-            Map<String, Set<String>> kbIdx = idx.get(kbId);
-            Map<String, String> kbTexts = texts.get(kbId);
+            Map<String, Set<String>> kbIdx = invertedIndex.get(kbId);
+            Map<String, String> kbTexts = chunkTexts.get(kbId);
             if (kbIdx == null || kbTexts == null) continue;
 
             for (String term : queryTerms) {
@@ -69,7 +82,7 @@ public class KeywordIndex {
                 for (String chunkId : matched) {
                     String chunkText = kbTexts.get(chunkId);
                     if (chunkText == null) continue;
-                    float tf = termFrequency(chunkText, term);
+                    float tf = countTerm(chunkText, term);
                     scores.merge(chunkId, tf, Float::sum);
                 }
             }
@@ -83,11 +96,7 @@ public class KeywordIndex {
     }
 
     public synchronized String getChunkText(String chunkId) {
-        for (Map<String, String> m : texts.values()) {
-            String t = m.get(chunkId);
-            if (t != null) return t;
-        }
-        return null;
+        return textById.get(chunkId);
     }
 
     private Set<String> tokenize(String text) {
@@ -103,11 +112,10 @@ public class KeywordIndex {
         for (int i = 0; i < cn.length(); i++) {
             terms.add(cn.substring(i, i + 1));
         }
-        terms.add(text.trim().toLowerCase());
         return terms;
     }
 
-    private float termFrequency(String text, String term) {
+    private float countTerm(String text, String term) {
         int count = 0, idx = 0;
         while ((idx = text.indexOf(term, idx)) != -1) {
             count++;
