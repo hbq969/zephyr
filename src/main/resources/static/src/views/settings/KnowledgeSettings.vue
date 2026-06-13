@@ -108,6 +108,11 @@ onMounted(() => { store.loadKnowledgeBases() })
               </div>
             </div>
             <div class="card-actions" @click.stop>
+              <el-tooltip :content="langData.knowledgeMgmt_recallTest">
+                <el-button circle size="small" @click="router.push('/settings/knowledge/' + kb.id + '/recall-test')">
+                  <Icon icon="lucide:search" />
+                </el-button>
+              </el-tooltip>
               <el-tooltip :content="langData.btnEdit">
                 <el-button circle size="small" @click="openEdit(kb)">
                   <Icon icon="lucide:edit-3" />

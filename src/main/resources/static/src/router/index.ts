@@ -47,6 +47,11 @@ const router = createRouter({
       name: 'KnowledgeDocs',
       component: () => import('../views/settings/KnowledgeDocs.vue'),
     },
+    {
+      path: '/settings/knowledge/:kbId/recall-test',
+      name: 'KnowledgeRecallTest',
+      component: () => import('../views/settings/KnowledgeRecallTest.vue'),
+    },
   ],
 })
 
