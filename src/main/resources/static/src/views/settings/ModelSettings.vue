@@ -9,10 +9,8 @@ import { matchTemplate, getTemplate, TEMPLATES, type ModelTemplate } from '@/mod
 const langData = getLangData()
 const settingsStore = useSettingsStore()
 const currentTab = ref('llm')
-const filteredModels = computed(() => settingsStore.models.filter(m => {
-  if (currentTab.value === 'embedding') return m.modelType === 'embedding'
-  return !m.modelType || m.modelType === 'llm'
-}))
+const llmModels = computed(() => settingsStore.models.filter(m => !m.modelType || m.modelType === 'llm'))
+const embeddingModels = computed(() => settingsStore.models.filter(m => m.modelType === 'embedding'))
 const showForm = ref(false)
 const name = ref('')
 const baseUrl = ref('')
@@ -445,11 +443,54 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
       <h2>{{ langData.modelConfig_title }}</h2>
     </div>
     <div class="page-body">
-      <div class="model-tabs">
-        <button :class="['model-tab', { active: currentTab === 'llm' }]" @click="currentTab = 'llm'">对话模型</button>
-        <button :class="['model-tab', { active: currentTab === 'embedding' }]" @click="currentTab = 'embedding'">Embedding 模型</button>
-      </div>
-      <div v-for="m in filteredModels" :key="m.name" class="setting-row">
+      <el-tabs v-model="currentTab" class="model-tabs">
+        <el-tab-pane label="对话模型" name="llm">
+          <div v-for="m in llmModels" :key="m.name" class="setting-row">
+            <div class="row-left">
+              <Icon icon="lucide:cpu" class="row-icon" />
+              <div>
+                <div class="row-title">
+                  {{ m.name }}
+                  <span class="model-type-tag tag-llm">对话</span>
+                </div>
+                <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
+                <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ langData.modelConfig_contextLabel }}: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
+              </div>
+            </div>
+            <div class="row-right">
+              <button class="action-icon" @click="startEdit(m)" :title="langData.btnEdit"><Icon icon="lucide:pencil" /></button>
+              <button class="action-icon danger" @click="m.id && removeModel(m.id)" :title="langData.btnDelete"><Icon icon="lucide:trash-2" /></button>
+              <button v-if="settingsStore.currentModel !== m.name" class="set-btn" @click="onSetCurrent(m.name)">{{ langData.modelConfig_use }}</button>
+              <span v-else class="current-badge">{{ langData.modelConfig_current }}</span>
+            </div>
+          </div>
+          <div v-if="llmModels.length === 0" class="empty-state" style="text-align:center;padding:40px 0;color:var(--el-text-color-secondary)">
+            <p>暂无对话模型</p>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="Embedding 模型" name="embedding">
+          <div v-for="m in embeddingModels" :key="m.name" class="setting-row">
+            <div class="row-left">
+              <Icon icon="lucide:cpu" class="row-icon" />
+              <div>
+                <div class="row-title">
+                  {{ m.name }}
+                  <span class="model-type-tag tag-embedding">Embedding</span>
+                </div>
+                <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
+                <div v-if="m.dimensions" class="row-sub dim-info">{{ langData.modelConfig_dimensionsLabel }}: {{ m.dimensions }}</div>
+              </div>
+            </div>
+            <div class="row-right">
+              <button class="action-icon" @click="startEdit(m)" :title="langData.btnEdit"><Icon icon="lucide:pencil" /></button>
+              <button class="action-icon danger" @click="m.id && removeModel(m.id)" :title="langData.btnDelete"><Icon icon="lucide:trash-2" /></button>
+            </div>
+          </div>
+          <div v-if="embeddingModels.length === 0" class="empty-state" style="text-align:center;padding:40px 0;color:var(--el-text-color-secondary)">
+            <p>暂无 Embedding 模型</p>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
         <div class="row-left">
           <Icon icon="lucide:cpu" class="row-icon" />
           <div>
@@ -625,11 +666,6 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
 .back-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--el-border-color); background: var(--el-bg-color); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--el-text-color-secondary); }
 .back-btn:hover { background: var(--el-fill-color-light); }
 h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin: 0; }
-
-.model-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
-.model-tab { padding: 6px 16px; border-radius: 8px; border: none; background: transparent; color: var(--el-text-color-secondary); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-.model-tab:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
-.model-tab.active { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 
 .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--el-border-color); }
 .row-left { display: flex; align-items: center; gap: 10px; }
