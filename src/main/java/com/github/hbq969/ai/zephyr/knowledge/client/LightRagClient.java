@@ -25,7 +25,7 @@ public class LightRagClient {
 
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
             .build();
 
     private String baseUrl() {
