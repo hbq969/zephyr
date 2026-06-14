@@ -343,7 +343,7 @@ function parseParamsJson(raw?: string): Record<string, any> | undefined {
   try { return JSON.parse(raw) } catch { return undefined }
 }
 
-onMounted(() => { settingsStore.loadModels() })
+onMounted(async () => { await Promise.all([settingsStore.loadModels(), settingsStore.loadUserInfo()]) })
 
 async function add() {
   if (!name.value.trim()) return
