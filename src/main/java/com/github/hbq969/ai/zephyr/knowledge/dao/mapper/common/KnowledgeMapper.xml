@@ -7,7 +7,7 @@
     select id, user_name as userName, name, description, embed_model_id as embedModelId, scope,
       created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_base
-    where user_name = #{userName}
+    where user_name = #{userName} and scope = 'user'
     order by created_at desc
   </select>
 

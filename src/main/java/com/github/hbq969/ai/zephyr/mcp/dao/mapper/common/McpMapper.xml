@@ -9,7 +9,7 @@
                url, headers, status, scope,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers
-        where user_name = #{userName}
+        where user_name = #{userName} and scope = 'user'
         order by created_at desc
     </select>
 
@@ -93,7 +93,7 @@
         from zephyr_mcp_tools t
         inner join zephyr_mcp_servers s on s.id = t.server_id and s.user_name = t.user_name
         where t.user_name = #{userName} and t.enabled = 1
-          and s.status = 'connected'
+          and s.status = 'connected' and s.scope = 'user'
         order by t.source desc, t.tool_name asc
     </select>
 
@@ -104,7 +104,7 @@
         from zephyr_mcp_tools t
         inner join zephyr_mcp_servers s on s.id = t.server_id and s.user_name = t.user_name
         where t.user_name = #{userName}
-          and s.status = 'connected'
+          and s.status = 'connected' and s.scope = 'user'
         order by t.source desc, t.tool_name asc
     </select>
 
