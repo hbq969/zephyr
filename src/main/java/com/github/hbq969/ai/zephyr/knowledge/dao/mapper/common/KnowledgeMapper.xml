@@ -4,7 +4,7 @@
 <mapper namespace="com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao">
 
   <select id="queryKbByUserName" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity">
-    select id, user_name as userName, name, description, embed_model_id as embedModelId,
+    select id, user_name as userName, name, description, embed_model_id as embedModelId, scope,
       created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_base
     where user_name = #{userName}
@@ -12,14 +12,14 @@
   </select>
 
   <select id="queryKbById" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity">
-    select id, user_name as userName, name, description, embed_model_id as embedModelId,
+    select id, user_name as userName, name, description, embed_model_id as embedModelId, scope,
       created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_base
     where id = #{id}
   </select>
 
   <select id="queryKbByIds" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity">
-    select id, user_name as userName, name, description, embed_model_id as embedModelId,
+    select id, user_name as userName, name, description, embed_model_id as embedModelId, scope,
       created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_base
     where id in
@@ -29,8 +29,8 @@
   </select>
 
   <insert id="insertKb">
-    insert into zephyr_knowledge_base (id, user_name, name, description, embed_model_id, created_at, updated_at)
-    values (#{id}, #{userName}, #{name}, #{description}, #{embedModelId}, #{createdAt}, #{updatedAt})
+    insert into zephyr_knowledge_base (id, user_name, name, description, embed_model_id, scope, created_at, updated_at)
+    values (#{id}, #{userName}, #{name}, #{description}, #{embedModelId}, #{scope}, #{createdAt}, #{updatedAt})
   </insert>
 
   <update id="updateKb">
@@ -42,6 +42,18 @@
   <delete id="deleteKb">
     delete from zephyr_knowledge_base where id = #{id}
   </delete>
+
+  <select id="querySharedKbs" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity">
+    select id, user_name as userName, name, description, embed_model_id as embedModelId, scope,
+      created_at as createdAt, updated_at as updatedAt
+    from zephyr_knowledge_base
+    where scope = 'shared'
+    order by created_at desc
+  </select>
+
+  <update id="updateKbScope">
+    update zephyr_knowledge_base set scope = #{scope} where id = #{id}
+  </update>
 
   <select id="queryDocsByKbId" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     select id, kb_id as kbId, file_name as fileName, file_type as fileType, file_size as fileSize,
