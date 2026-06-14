@@ -13,6 +13,7 @@ import com.github.hbq969.ai.zephyr.knowledge.pipeline.KeywordIndex;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.RrfMerger;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TextSplitter;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TikaParser;
+import com.github.hbq969.ai.zephyr.knowledge.client.LightRagClient;
 import com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService;
 import com.github.hbq969.code.sm.login.model.UserInfo;
 import com.github.hbq969.code.sm.login.session.UserContext;
@@ -56,6 +57,9 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Resource
     private KeywordIndex keywordIndex;
 
+    @Resource
+    private LightRagClient lightRagClient;
+
     private static final String SCOPE_SHARED = "shared";
     private static final String SCOPE_USER = "user";
 
@@ -87,6 +91,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             vo.setDescription(kb.getDescription());
             vo.setEmbedModelId(kb.getEmbedModelId());
             vo.setScope(kb.getScope() != null ? kb.getScope() : SCOPE_USER);
+            vo.setGraphEnabled(Boolean.TRUE.equals(kb.getGraphEnabled()));
             if (kb.getEmbedModelId() != null) {
                 var model = modelConfigDao.queryById(kb.getEmbedModelId());
                 if (model != null) vo.setEmbedModelName(model.getName());
@@ -106,16 +111,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public KnowledgeBaseEntity createKb(Map<String, String> body, String userName) {
-        String scope = body.getOrDefault("scope", SCOPE_USER);
+    public KnowledgeBaseEntity createKb(Map<String, Object> body, String userName) {
+        String scope = (String) body.getOrDefault("scope", SCOPE_USER);
         if (SCOPE_SHARED.equals(scope)) checkSharedManage();
         KnowledgeBaseEntity entity = new KnowledgeBaseEntity();
         entity.setId(UUID.randomUUID().toString());
         entity.setUserName(userName);
-        entity.setName(body.get("name"));
-        entity.setDescription(body.getOrDefault("description", ""));
-        entity.setEmbedModelId(body.get("embedModelId"));
+        entity.setName((String) body.get("name"));
+        entity.setDescription((String) body.getOrDefault("description", ""));
+        entity.setEmbedModelId((String) body.get("embedModelId"));
         entity.setScope(scope);
+        Object ge = body.get("graphEnabled");
+        entity.setGraphEnabled(ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge))));
         long now = System.currentTimeMillis() / 1000;
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -124,15 +131,17 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public void updateKb(Map<String, String> body, String userName) {
-        KnowledgeBaseEntity entity = knowledgeDao.queryKbById(body.get("id"));
+    public void updateKb(Map<String, Object> body, String userName) {
+        KnowledgeBaseEntity entity = knowledgeDao.queryKbById((String) body.get("id"));
         if (entity == null) {
             throw new RuntimeException("知识库不存在");
         }
         if (SCOPE_SHARED.equals(entity.getScope())) checkSharedManage();
-        entity.setName(body.get("name"));
-        entity.setDescription(body.getOrDefault("description", ""));
-        entity.setEmbedModelId(body.get("embedModelId"));
+        entity.setName((String) body.get("name"));
+        entity.setDescription((String) body.getOrDefault("description", ""));
+        entity.setEmbedModelId((String) body.get("embedModelId"));
+        Object ge = body.get("graphEnabled");
+        entity.setGraphEnabled(ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge))));
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         knowledgeDao.updateKb(entity);
     }
@@ -148,6 +157,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         knowledgeDao.deleteConversationKbByKbId(id);
         keywordIndex.removeKb(id);
         knowledgeDao.deleteDocsByKbId(id);
+        lightRagClient.deleteKb(id);
         knowledgeDao.deleteKb(id);
     }
 
@@ -163,6 +173,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             KnowledgeBaseEntity kb = knowledgeDao.queryKbById(doc.getKbId());
             if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
             keywordIndex.removeDoc(doc.getKbId(), id);
+            lightRagClient.deleteDoc(doc.getKbId(), id);
         }
         knowledgeDao.deleteDoc(id);
     }
@@ -220,6 +231,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
         knowledgeDao.updateDocStatus(docId, "processing", 0, null);
         keywordIndex.removeDoc(kbId, docId);
+        lightRagClient.deleteDoc(kbId, docId);
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
         processDocAsync(docId, kbId, dataDir.resolve(docId + "_" + doc.getFileName()));
     }
@@ -276,6 +288,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
         // 删除旧索引
         keywordIndex.removeDoc(doc.getKbId(), docId);
+        lightRagClient.deleteDoc(doc.getKbId(), docId);
 
         doc.setFileName(fileName);
         doc.setContent(content);
@@ -361,6 +374,20 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 }
             }
         }
+        // 图谱检索增强 — 结果作为独立上下文区块（不参与 RRF 混排）
+        for (String kbId : kbIds) {
+            KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
+            if (kb == null || !Boolean.TRUE.equals(kb.getGraphEnabled())) continue;
+            List<LightRagClient.GraphSearchResult> graphResults =
+                    lightRagClient.search(kbId, query, "hybrid", topK);
+            for (LightRagClient.GraphSearchResult gr : graphResults) {
+                SearchResult sr = new SearchResult(
+                        gr.getContent() != null ? gr.getContent() : "",
+                        "图谱",
+                        0.0);
+                results.add(sr);
+            }
+        }
         return results;
     }
 
@@ -422,6 +449,13 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
 
             keywordIndex.addChunks(kbId, docId, chunks);
+
+            // 图谱索引（异步，失败不影响主流程）
+            KnowledgeBaseEntity kbRef = knowledgeDao.queryKbById(kbId);
+            if (kbRef != null && Boolean.TRUE.equals(kbRef.getGraphEnabled())) {
+                lightRagClient.index(kbId, docId, text);
+            }
+
             knowledgeDao.updateDocStatus(docId, "ready", chunks.size(), null);
             log.info("文档处理完成: docId={}, chunks={}", docId, chunks.size());
         } catch (Exception e) {
