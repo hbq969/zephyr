@@ -592,6 +592,7 @@ function closeAll() {
                 <div class="kb-section-label">共享模型</div>
                 <div v-for="m in sharedModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
+                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-name">{{ m.name }}</span>
                     <span class="model-tags">
                       <span class="skill-scope-badge scope-shared">共享</span>
@@ -599,7 +600,6 @@ function closeAll() {
                       <span v-if="m.maxContextTokens" class="model-tag ctx-tag">{{ formatContextSize(m.maxContextTokens) }}</span>
                     </span>
                   </div>
-                  <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                 </div>
               </template>
               <div v-if="sharedModels.length > 0 && userModels.length > 0" class="kb-section-divider"></div>
@@ -607,6 +607,7 @@ function closeAll() {
                 <div class="kb-section-label">我的模型</div>
                 <div v-for="m in userModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
+                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-name">{{ m.name }}</span>
                     <span class="model-tags">
                       <span class="skill-scope-badge scope-user">个人</span>
@@ -614,7 +615,6 @@ function closeAll() {
                       <span v-if="m.maxContextTokens" class="model-tag ctx-tag">{{ formatContextSize(m.maxContextTokens) }}</span>
                     </span>
                   </div>
-                  <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                 </div>
               </template>
             </div>
