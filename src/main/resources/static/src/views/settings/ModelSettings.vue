@@ -8,9 +8,44 @@ import { matchTemplate, getTemplate, TEMPLATES, type ModelTemplate } from '@/mod
 
 const langData = getLangData()
 const settingsStore = useSettingsStore()
-const currentTab = ref('llm')
-const llmModels = computed(() => settingsStore.models.filter(m => !m.modelType || m.modelType === 'llm'))
-const embeddingModels = computed(() => settingsStore.models.filter(m => m.modelType === 'embedding'))
+const currentTab = ref('user')
+const userModels = computed(() => settingsStore.models.filter(m => m.scope !== 'shared'))
+const sharedModels = computed(() => settingsStore.models.filter(m => m.scope === 'shared'))
+
+const userTypeFilter = ref('')
+const sharedTypeFilter = ref('')
+
+const filteredUserModels = computed(() => {
+  const list = userModels.value
+  if (!userTypeFilter.value) {
+    return [...list].sort((a, b) => {
+      const ta = a.modelType || 'llm'
+      const tb = b.modelType || 'llm'
+      if (ta !== tb) return ta === 'llm' ? -1 : 1
+      return (a.name || '').localeCompare(b.name || '')
+    })
+  }
+  return list.filter(m => (m.modelType || 'llm') === userTypeFilter.value)
+})
+
+const filteredSharedModels = computed(() => {
+  const list = sharedModels.value
+  if (!sharedTypeFilter.value) {
+    return [...list].sort((a, b) => {
+      const ta = a.modelType || 'llm'
+      const tb = b.modelType || 'llm'
+      if (ta !== tb) return ta === 'llm' ? -1 : 1
+      return (a.name || '').localeCompare(b.name || '')
+    })
+  }
+  return list.filter(m => (m.modelType || 'llm') === sharedTypeFilter.value)
+})
+
+async function toggleScope(m: any) {
+  if (!m.id) return
+  const newScope = m.scope === 'shared' ? 'user' : 'shared'
+  await settingsStore.toggleModelScope(m.id, newScope)
+}
 const showForm = ref(false)
 const name = ref('')
 const baseUrl = ref('')
@@ -454,51 +489,76 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
     <p class="subtitle">{{ langData.modelConfig_subtitle }}</p>
     <div class="page-body">
       <el-tabs v-model="currentTab" class="model-tabs">
-        <el-tab-pane label="对话模型" name="llm">
-          <div v-for="m in llmModels" :key="m.name" class="setting-row">
+        <el-tab-pane :label="'我的模型 (' + userModels.length + ')'" name="user">
+          <div v-if="userModels.length > 0" class="type-filter-bar">
+            <el-select v-model="userTypeFilter" class="type-filter-select" placeholder="类型筛选" clearable>
+              <el-option label="全部" value="" />
+              <el-option label="对话模型" value="llm" />
+              <el-option label="Embedding 模型" value="embedding" />
+            </el-select>
+          </div>
+          <div v-for="m in filteredUserModels" :key="m.name" class="setting-row">
             <div class="row-left">
               <Icon icon="lucide:cpu" class="row-icon" />
               <div>
                 <div class="row-title">
                   {{ m.name }}
-                  <span class="model-type-tag tag-llm">对话</span>
+                  <span class="model-type-tag" :class="(m.modelType || 'llm') === 'llm' ? 'tag-llm' : 'tag-embedding'">
+                    {{ (m.modelType || 'llm') === 'llm' ? '对话' : 'Embedding' }}
+                  </span>
                 </div>
                 <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
-                <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ langData.modelConfig_contextLabel }}: {{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
+                <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
               </div>
             </div>
             <div class="row-right">
-              <button class="action-icon" @click="startEdit(m)" :title="langData.btnEdit"><Icon icon="lucide:pencil" /></button>
-              <button class="action-icon danger" @click="m.id && removeModel(m.id)" :title="langData.btnDelete"><Icon icon="lucide:trash-2" /></button>
-              <button v-if="settingsStore.currentModel !== m.name" class="set-btn" @click="onSetCurrent(m.name)">{{ langData.modelConfig_use }}</button>
-              <span v-else class="current-badge">{{ langData.modelConfig_current }}</span>
+              <button class="action-icon" @click="startEdit(m)"><Icon icon="lucide:pencil" /></button>
+              <button class="action-icon danger" @click="m.id && removeModel(m.id)"><Icon icon="lucide:trash-2" /></button>
+              <el-tooltip v-if="settingsStore.isAdmin" content="设为共享">
+                <button class="action-icon" @click="toggleScope(m)"><Icon icon="lucide:share-2" /></button>
+              </el-tooltip>
+              <button v-if="settingsStore.currentModel !== m.name" class="set-btn" @click="onSetCurrent(m.name)">使用</button>
+              <span v-else class="current-badge">当前</span>
             </div>
           </div>
-          <div v-if="llmModels.length === 0" class="empty-state" style="text-align:center;padding:40px 0;color:var(--el-text-color-secondary)">
-            <p>暂无对话模型</p>
-          </div>
+          <div v-if="userModels.length === 0" class="empty-hint"><p>暂无个人模型，请先创建</p></div>
         </el-tab-pane>
-        <el-tab-pane label="Embedding 模型" name="embedding">
-          <div v-for="m in embeddingModels" :key="m.name" class="setting-row">
+        <el-tab-pane :label="'共享模型 (' + sharedModels.length + ')'" name="shared">
+          <div v-if="sharedModels.length > 0" class="type-filter-bar">
+            <el-select v-model="sharedTypeFilter" class="type-filter-select" placeholder="类型筛选" clearable>
+              <el-option label="全部" value="" />
+              <el-option label="对话模型" value="llm" />
+              <el-option label="Embedding 模型" value="embedding" />
+            </el-select>
+          </div>
+          <div v-for="m in filteredSharedModels" :key="m.name" class="setting-row">
             <div class="row-left">
               <Icon icon="lucide:cpu" class="row-icon" />
               <div>
                 <div class="row-title">
                   {{ m.name }}
-                  <span class="model-type-tag tag-embedding">Embedding</span>
+                  <span class="model-type-tag" :class="(m.modelType || 'llm') === 'llm' ? 'tag-llm' : 'tag-embedding'">
+                    {{ (m.modelType || 'llm') === 'llm' ? '对话' : 'Embedding' }}
+                  </span>
+                  <span class="badge badge-scope-shared">共享</span>
                 </div>
                 <div v-if="m.baseUrl" class="row-sub">{{ m.baseUrl }}</div>
-                <div v-if="m.dimensions" class="row-sub dim-info">{{ langData.modelConfig_dimensionsLabel }}: {{ m.dimensions }}</div>
+                <div v-if="m.maxContextTokens" class="row-sub ctx-info">{{ (m.maxContextTokens / 1024).toFixed(0) }}K</div>
               </div>
             </div>
             <div class="row-right">
-              <button class="action-icon" @click="startEdit(m)" :title="langData.btnEdit"><Icon icon="lucide:pencil" /></button>
-              <button class="action-icon danger" @click="m.id && removeModel(m.id)" :title="langData.btnDelete"><Icon icon="lucide:trash-2" /></button>
+              <template v-if="settingsStore.isAdmin">
+                <button class="action-icon" @click="startEdit(m)"><Icon icon="lucide:pencil" /></button>
+                <button class="action-icon danger" @click="m.id && removeModel(m.id)"><Icon icon="lucide:trash-2" /></button>
+                <el-tooltip content="取消共享">
+                  <button class="action-icon" @click="toggleScope(m)"><Icon icon="lucide:lock" /></button>
+                </el-tooltip>
+              </template>
+              <button v-if="settingsStore.currentModel !== m.name" class="set-btn" @click="onSetCurrent(m.name)">使用</button>
+              <span v-else class="current-badge">当前</span>
             </div>
           </div>
-          <div v-if="embeddingModels.length === 0" class="empty-state" style="text-align:center;padding:40px 0;color:var(--el-text-color-secondary)">
-            <p>暂无 Embedding 模型</p>
-          </div>
+          <div v-if="sharedModels.length === 0" class="empty-hint"><p>暂无共享模型</p></div>
         </el-tab-pane>
       </el-tabs>
 
@@ -724,4 +784,9 @@ h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weigh
 .toggle-switch input:checked + .toggle-slider { background: var(--el-color-primary); }
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
 html.dark .toggle-slider::before { background: var(--el-bg-color); }
+
+.type-filter-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.type-filter-select { width: 160px; }
+.badge-scope-shared { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; background: rgba(204,120,92,0.12); color: var(--el-color-primary); margin-left: 6px; vertical-align: middle; }
+.empty-hint { text-align: center; padding: 40px 0; color: var(--el-text-color-secondary); font-size: 14px; }
 </style>
