@@ -57,7 +57,7 @@ search mode: `hybrid`（默认）/ `local` / `global`。
 `zephyr_knowledge_base` 新增 `graph_enabled` 字段，按已有表加列 checklist：
 
 - [ ] **Mapper XML DDL**：`postgresql`/`mysql`/`embedded` 三方言 `createKnowledgeBaseTable` 的 `CREATE TABLE` 语句加列
-- [ ] **增量 DDL**：`knowledge-(zh-CN|en-US|ja-JP).sql` 中添加 `ALTER TABLE zephyr_knowledge_base ADD COLUMN graph_enabled TINYINT DEFAULT 0;`
+- [ ] **增量 DDL**：`knowledge-(zh-CN|en-US|ja-JP).sql` 中添加 `ALTER TABLE zephyr_knowledge_base ADD COLUMN graph_enabled SMALLINT DEFAULT 0;`
 - [ ] **DML 语句**：`common` 目录 Mapper XML 的 `insertKb`/`queryKb*` 语句加字段
 - [ ] **实体类**：`KnowledgeBaseEntity` 加 `graphEnabled` 属性
 
