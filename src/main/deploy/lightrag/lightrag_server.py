@@ -16,9 +16,9 @@ log = logging.getLogger("lightrag-sidecar")
 
 # --- config from env ---
 DATA_DIR = Path(os.environ.get("LIGHTRAG_DATA_DIR", os.path.expanduser("~/.zephyr/lightrag")))
-LLM_BASE_URL = os.environ.get("LIGHTRAG_LLM_BASE_URL", "http://localhost:11434/v1")
-LLM_MODEL = os.environ.get("LIGHTRAG_LLM_MODEL", "qwen2.5:7b")
-LLM_API_KEY = os.environ.get("LIGHTRAG_LLM_API_KEY", "ollama")
+LLM_BASE_URL = os.environ.get("LIGHTRAG_LLM_BASE_URL", "https://api.deepseek.com")
+LLM_MODEL = os.environ.get("LIGHTRAG_LLM_MODEL", "deepseek-v4-pro")
+LLM_API_KEY = os.environ.get("LIGHTRAG_LLM_API_KEY", "sk-87bdc10630034af1b107ed43fccd7cfe")
 EMBED_BASE_URL = os.environ.get("LIGHTRAG_EMBED_BASE_URL", LLM_BASE_URL)
 EMBED_MODEL = os.environ.get("LIGHTRAG_EMBED_MODEL", "nomic-embed-text")
 EMBED_API_KEY = os.environ.get("LIGHTRAG_EMBED_API_KEY", LLM_API_KEY)

@@ -91,7 +91,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             vo.setDescription(kb.getDescription());
             vo.setEmbedModelId(kb.getEmbedModelId());
             vo.setScope(kb.getScope() != null ? kb.getScope() : SCOPE_USER);
-            vo.setGraphEnabled(Boolean.TRUE.equals(kb.getGraphEnabled()));
+            vo.setGraphEnabled(Integer.valueOf(1).equals(kb.getGraphEnabled()));
             if (kb.getEmbedModelId() != null) {
                 var model = modelConfigDao.queryById(kb.getEmbedModelId());
                 if (model != null) vo.setEmbedModelName(model.getName());
@@ -122,7 +122,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         entity.setEmbedModelId((String) body.get("embedModelId"));
         entity.setScope(scope);
         Object ge = body.get("graphEnabled");
-        entity.setGraphEnabled(ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge))));
+        entity.setGraphEnabled((ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge)))) ? 1 : 0);
         long now = System.currentTimeMillis() / 1000;
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -141,7 +141,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         entity.setDescription((String) body.getOrDefault("description", ""));
         entity.setEmbedModelId((String) body.get("embedModelId"));
         Object ge = body.get("graphEnabled");
-        entity.setGraphEnabled(ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge))));
+        entity.setGraphEnabled((ge != null && (Boolean.TRUE.equals(ge) || "true".equals(String.valueOf(ge)))) ? 1 : 0);
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         knowledgeDao.updateKb(entity);
     }
@@ -377,7 +377,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         // 图谱检索增强 — 结果作为独立上下文区块（不参与 RRF 混排）
         for (String kbId : kbIds) {
             KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
-            if (kb == null || !Boolean.TRUE.equals(kb.getGraphEnabled())) continue;
+            if (kb == null || !Integer.valueOf(1).equals(kb.getGraphEnabled())) continue;
             List<LightRagClient.GraphSearchResult> graphResults =
                     lightRagClient.search(kbId, query, "hybrid", topK);
             for (LightRagClient.GraphSearchResult gr : graphResults) {
@@ -452,7 +452,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
             // 图谱索引（异步，失败不影响主流程）
             KnowledgeBaseEntity kbRef = knowledgeDao.queryKbById(kbId);
-            if (kbRef != null && Boolean.TRUE.equals(kbRef.getGraphEnabled())) {
+            if (kbRef != null && Integer.valueOf(1).equals(kbRef.getGraphEnabled())) {
                 lightRagClient.index(kbId, docId, text);
             }
 
