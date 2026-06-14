@@ -329,12 +329,10 @@ public class SkillServiceImpl implements SkillService {
                 throw new RuntimeException("已存在同名共享 Skill \"" + skillName + "\"，请使用其他名称");
             }
 
-            SkillConfigEntity existing = SCOPE_SHARED.equals(scope)
-                    ? sharedDup
-                    : skillDao.queryBySkillName(skillName, userName);
-            if (existing != null) {
-                log.warn("Skill {} 已安装，跳过", skillName);
-                continue;
+            // 检查是否已安装同名个人 Skill
+            SkillConfigEntity ownDup = skillDao.queryBySkillName(skillName, userName);
+            if (ownDup != null) {
+                throw new RuntimeException("已存在同名 Skill \"" + skillName + "\"，请使用其他名称");
             }
 
             Path destDir = destBase.resolve(skillName);
@@ -515,12 +513,10 @@ public class SkillServiceImpl implements SkillService {
                 throw new RuntimeException("已存在同名共享 Skill \"" + fullName + "\"，请使用其他名称");
             }
 
-            SkillConfigEntity existing = SCOPE_SHARED.equals(scope)
-                    ? sharedDup
-                    : skillDao.queryBySkillName(fullName, userName);
-            if (existing != null) {
-                log.warn("Skill {} 已安装，跳过", fullName);
-                continue;
+            // 检查是否已安装同名个人 Skill
+            SkillConfigEntity ownDup = skillDao.queryBySkillName(fullName, userName);
+            if (ownDup != null) {
+                throw new RuntimeException("已存在同名 Skill \"" + fullName + "\"，请使用其他名称");
             }
 
             Path destDir = packName != null
