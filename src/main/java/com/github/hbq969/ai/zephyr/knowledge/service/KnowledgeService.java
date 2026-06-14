@@ -36,6 +36,8 @@ public interface KnowledgeService {
 
     void updateInlineDoc(String docId, String title, String content, String userName);
 
+    void toggleKbScope(String id, String scope, String userName);
+
     @Data
     class SearchResult {
         private String content;
