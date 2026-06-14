@@ -76,6 +76,7 @@ Think of it as a personal AI workbench: configure your models once, connect MCP 
         <li>Connection pool with configurable <strong>idle timeout & cleanup</strong></li>
         <li>Per-tool <strong>execution timeout</strong> — stuck tools get killed</li>
         <li>Enable/disable individual tools per server</li>
+        <li><strong>Server sharing</strong> — MCP servers can be shared across users or kept personal</li>
       </ul>
     </td>
     <td>
@@ -86,6 +87,7 @@ Think of it as a personal AI workbench: configure your models once, connect MCP 
         <li><strong>Probe</strong> button to verify connectivity</li>
         <li>Context window sizes, thinking/reasoning capability flags</li>
         <li>Default model selection persisted to backend</li>
+        <li><strong>Model sharing</strong> — set models as shared (all users) or personal</li>
       </ul>
     </td>
   </tr>
@@ -93,9 +95,9 @@ Think of it as a personal AI workbench: configure your models once, connect MCP 
     <td>
       <h3>Skills</h3>
       <ul>
-        <li>Install skills from files</li>
+        <li>Install skills from files, Git repos, URLs, or platform sync</li>
         <li><strong>Sync</strong> from Claude Skills, Codex Skills, or OpenCode Skills directories</li>
-        <li>Enable/disable per skill</li>
+        <li>Enable/disable per skill with <strong>scope</strong> (shared / personal)</li>
         <li>Skills auto-injected into system prompt based on conversation context</li>
       </ul>
     </td>

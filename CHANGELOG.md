@@ -2,7 +2,7 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
-## [1.1.0] - 2026-06-12
+## [1.1.0] - 2026-06-14
 
 ### 新增
 
@@ -12,6 +12,17 @@
 - **Chroma 向量数据库集成**：本地 embed 模式 + 生产独立部署，OkHttp HTTP 客户端封装
 - **文档处理流水线**：Apache Tika 文本提取 → 递归字符切分 → Embedding 向量化 → Chroma 存储
 - **对话级知识库选择**：对话中可勾选/取消知识库，切换对话自动恢复勾选状态
+- **模型共享**：模型配置支持 `user`/`shared` scope，私有模型仅自己可见，共享模型所有用户可见；新增 `user_model_prefs` 偏好表存储默认模型选择
+- **MCP/Skill scope 资源隔离**：Skill 和 MCP 支持按 scope 分栏（共享/我的），安装时自动检测同名冲突
+
+### 修复
+
+- **SSE 流式响应偶发丢失**：axios `onDownloadProgress` 节流导致快速 LLM 响应时 assistant 消息被误删，改为 `fetch` + `ReadableStream` 行缓冲解析
+- Skill 安装/同步失败时前端显示明确错误提示
+- Skill 全选/取消全选按 tab 页（共享/个人）区分
+- MCP 工具重名检查只查共享+当前用户，不误拦他人私有工具
+- MCP 连接/创建失败时前端显示错误提示
+- Embedding 模型隐藏"使用"按钮，仅对话模型可设为默认
 
 ## [1.0.2] - 2026-06-12
 
