@@ -15,10 +15,12 @@
       created_at bigint,
       updated_at bigint,
       model_type varchar(16) default 'llm',
+      scope varchar(16) default 'user',
       dimensions int,
       params text
     );
     create index if not exists idx_zephyr_mc_user on zephyr_model_configs(user_name);
+    create index if not exists idx_zephyr_mc_scope on zephyr_model_configs(scope);
   </update>
 
 </mapper>
