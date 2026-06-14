@@ -978,20 +978,9 @@ zephyr-zh-CN.sql 末尾追加：
 ```sql
 -- 模型配置共享：scope 列（存量环境加列）
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS scope VARCHAR(16) DEFAULT 'user';
-
--- 用户模型偏好表
-CREATE TABLE IF NOT EXISTS zephyr_user_model_prefs (
-    id VARCHAR(64) PRIMARY KEY,
-    user_name VARCHAR(64) NOT NULL,
-    model_type VARCHAR(16) NOT NULL DEFAULT 'llm',
-    model_id VARCHAR(64) NOT NULL,
-    created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_user_model_prefs ON zephyr_user_model_prefs(user_name, model_type);
 ```
 
-> `ALTER TABLE ADD COLUMN IF NOT EXISTS` 在 H2 和 PostgreSQL 中兼容。MySQL 不支持 `IF NOT EXISTS` 语法，如有 MySQL 生产环境需手动执行一次 `ALTER TABLE ADD COLUMN`。存量数据的 `scope` 迁移（`UPDATE ... SET scope='user' WHERE scope IS NULL`）在功能开发完成后单独执行一次即可。
+> `ALTER TABLE ADD COLUMN IF NOT EXISTS` 在 H2 和 PostgreSQL 中兼容。MySQL 不支持 `IF NOT EXISTS` 语法，如有 MySQL 生产环境需手动执行一次。存量数据的 `scope` 迁移（`UPDATE ... SET scope='user' WHERE scope IS NULL`）在功能开发完成后单独执行一次即可。建表和建索引已在 Mapper XML（Task 1 + Task 5）和 InitialServiceImpl（Task 6）中处理。
 
 - [ ] **Step 2: 对 en-US 和 ja-JP SQL 做同样改动**
 
