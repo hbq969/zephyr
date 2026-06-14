@@ -23,6 +23,8 @@ public interface KnowledgeDao {
     void insertKb(KnowledgeBaseEntity entity);
     void updateKb(KnowledgeBaseEntity entity);
     void deleteKb(@Param("id") String id);
+    List<KnowledgeBaseEntity> querySharedKbs();
+    void updateKbScope(@Param("id") String id, @Param("scope") String scope);
 
     // Document CRUD
     List<KnowledgeDocEntity> queryDocsByKbId(@Param("kbId") String kbId);
