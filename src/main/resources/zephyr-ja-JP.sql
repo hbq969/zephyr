@@ -19,3 +19,5 @@ ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS dimensions int DEFAULT
 ALTER TABLE zephyr_knowledge_base ADD COLUMN IF NOT EXISTS scope varchar(16) DEFAULT 'user';
 
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS scope VARCHAR(16) DEFAULT 'user';
+
+ALTER TABLE zephyr_knowledge_base ADD COLUMN IF NOT EXISTS graph_enabled SMALLINT DEFAULT 0;
