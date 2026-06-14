@@ -41,12 +41,13 @@ function toggleSelect(id: string) {
   next.has(id) ? next.delete(id) : next.add(id)
   selectedIds.value = next
 }
-function toggleBatchSelectAll() {
-  if (selectedIds.value.size === filteredSkills.value.length) {
-    selectedIds.value = new Set()
+function toggleBatchSelectAll(list: SkillConfig[]) {
+  if (list.every(s => s.id && selectedIds.value.has(s.id))) {
+    list.forEach(s => s.id && selectedIds.value.delete(s.id))
   } else {
-    selectedIds.value = new Set(filteredSkills.value.map(s => s.id!).filter(Boolean))
+    list.forEach(s => s.id && selectedIds.value.add(s.id))
   }
+  selectedIds.value = new Set(selectedIds.value)
 }
 async function doBatchUninstall() {
   const count = selectedIds.value.size
@@ -275,24 +276,22 @@ function goBack() { window.history.back() }
       </button>
     </div>
 
-    <!-- 批量操作栏 -->
-    <div v-if="filteredSkills.length > 0" class="batch-bar">
-      <label class="batch-check" @click.stop>
-        <input type="checkbox" :checked="selectedIds.size === filteredSkills.length && filteredSkills.length > 0" @change="toggleBatchSelectAll" />
-        <span class="batch-label">{{ langData.skillMgmt_selectAll }} ({{ selectedIds.size }})</span>
-      </label>
-      <button
-        v-if="selectedIds.size > 0"
-        class="btn-danger btn-sm"
-        :disabled="batchDeleting"
-        @click="doBatchUninstall"
-      >
-        <Icon icon="lucide:trash-2" width="14" /> {{ langData.skillMgmt_batchUninstall }}
-      </button>
-    </div>
-
     <el-tabs v-if="filteredSkills.length > 0" v-model="activeTab" class="skill-tabs">
       <el-tab-pane :label="(langData.skillMgmt_sharedSection || '共享 Skill') + ' (' + sharedSkills.length + ')'" name="shared">
+        <div v-if="sharedSkills.length > 0" class="batch-bar">
+          <label class="batch-check" @click.stop>
+            <input type="checkbox" :checked="selectedIds.size > 0 && sharedSkills.every(s => s.id && selectedIds.has(s.id))" @change="toggleBatchSelectAll(sharedSkills)" />
+            <span class="batch-label">{{ langData.skillMgmt_selectAll }} ({{ sharedSkills.filter(s => s.id && selectedIds.has(s.id)).length }})</span>
+          </label>
+          <button
+            v-if="selectedIds.size > 0"
+            class="btn-danger btn-sm"
+            :disabled="batchDeleting"
+            @click="doBatchUninstall"
+          >
+            <Icon icon="lucide:trash-2" width="14" /> {{ langData.skillMgmt_batchUninstall }}
+          </button>
+        </div>
         <div v-if="sharedSkills.length > 0" class="skill-list">
           <div v-for="s in sharedSkills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
             <label class="card-check" @click.stop>
@@ -327,6 +326,20 @@ function goBack() { window.history.back() }
         </div>
       </el-tab-pane>
       <el-tab-pane :label="(langData.skillMgmt_userSection || '我的 Skill') + ' (' + userSkills.length + ')'" name="user">
+        <div v-if="userSkills.length > 0" class="batch-bar">
+          <label class="batch-check" @click.stop>
+            <input type="checkbox" :checked="selectedIds.size > 0 && userSkills.every(s => s.id && selectedIds.has(s.id))" @change="toggleBatchSelectAll(userSkills)" />
+            <span class="batch-label">{{ langData.skillMgmt_selectAll }} ({{ userSkills.filter(s => s.id && selectedIds.has(s.id)).length }})</span>
+          </label>
+          <button
+            v-if="selectedIds.size > 0"
+            class="btn-danger btn-sm"
+            :disabled="batchDeleting"
+            @click="doBatchUninstall"
+          >
+            <Icon icon="lucide:trash-2" width="14" /> {{ langData.skillMgmt_batchUninstall }}
+          </button>
+        </div>
         <div v-if="userSkills.length > 0" class="skill-list">
           <div v-for="s in userSkills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
             <label class="card-check" @click.stop>
