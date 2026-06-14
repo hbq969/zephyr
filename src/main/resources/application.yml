@@ -277,6 +277,9 @@ zephyr:
       mode: embedded
       data-dir: ${user.home}/.zephyr/chroma
       port: 18951
+    lightrag:
+      enabled: false
+      base-url: http://localhost:9621
   skill:
     upload:
       max-size-bytes: 104857600  # 100MB

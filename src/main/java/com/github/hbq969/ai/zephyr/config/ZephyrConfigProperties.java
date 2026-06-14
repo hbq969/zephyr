@@ -185,6 +185,8 @@ public class ZephyrConfigProperties {
     public static class Knowledge {
         /** Chroma 向量数据库 */
         private Chroma chroma = new Chroma();
+        /** LightRAG 图谱增强配置 */
+        private LightRag lightrag = new LightRag();
         /** 文档存储根目录，默认 ~/.zephyr/knowledge */
         private String dataDir = System.getProperty("user.home") + "/.zephyr/knowledge";
 
@@ -198,6 +200,14 @@ public class ZephyrConfigProperties {
             private int port = 18951;
             /** server 模式 Chroma 地址 */
             private String baseUrl;
+        }
+
+        @Data
+        public static class LightRag {
+            /** 是否启用 LightRAG sidecar，默认 false（未部署时不影响系统运行） */
+            private boolean enabled = false;
+            /** LightRAG sidecar 地址 */
+            private String baseUrl = "http://localhost:9621";
         }
     }
 
