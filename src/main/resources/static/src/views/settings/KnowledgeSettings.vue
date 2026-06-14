@@ -18,7 +18,7 @@ const userBases = computed(() => store.knowledgeBases.filter((kb: any) => kb.sco
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const editingId = ref('')
-const form = reactive({ name: '', description: '', embedModelId: '' })
+const form = reactive({ name: '', description: '', embedModelId: '', graphEnabled: false })
 const embedModels = ref<any[]>([])
 
 const fetchEmbedModels = () => {
@@ -29,7 +29,7 @@ const fetchEmbedModels = () => {
 const openCreate = () => {
   dialogTitle.value = langData.knowledgeMgmt_createKb
   editingId.value = ''
-  form.name = ''; form.description = ''; form.embedModelId = ''; serverScope.value = 'user'
+  form.name = ''; form.description = ''; form.embedModelId = ''; form.graphEnabled = false; serverScope.value = 'user'
   fetchEmbedModels()
   dialogVisible.value = true
 }
@@ -37,7 +37,8 @@ const openCreate = () => {
 const openEdit = (kb: any) => {
   dialogTitle.value = langData.knowledgeMgmt_editKb
   editingId.value = kb.id
-  form.name = kb.name; form.description = kb.description || ''; form.embedModelId = kb.embedModelId || ''; serverScope.value = kb.scope || 'user'
+  form.name = kb.name; form.description = kb.description || ''; form.embedModelId = kb.embedModelId || ''
+  form.graphEnabled = !!kb.graphEnabled; serverScope.value = kb.scope || 'user'
   fetchEmbedModels()
   dialogVisible.value = true
 }
@@ -45,7 +46,7 @@ const openEdit = (kb: any) => {
 const saveKb = async () => {
   if (!form.name.trim()) { msg(langData.memoryMgmt_nameRequired, 'warning'); return }
   const url = editingId.value ? '/knowledge/kb/update' : '/knowledge/kb/create'
-  const data: any = { name: form.name.trim(), description: form.description.trim(), embedModelId: form.embedModelId, scope: serverScope.value }
+  const data: any = { name: form.name.trim(), description: form.description.trim(), embedModelId: form.embedModelId, graphEnabled: form.graphEnabled, scope: serverScope.value }
   if (editingId.value) data.id = editingId.value
   try {
     const res = await axios({ url, method: 'post', data })
@@ -108,6 +109,7 @@ onMounted(() => { store.loadKnowledgeBases() })
                   <div class="card-desc" v-if="kb.description">{{ kb.description }}</div>
                   <div class="card-meta">
                     <span class="kb-embed-badge">{{ kb.embedModelName || langData.knowledgeMgmt_embedModel }}</span>
+                    <span v-if="kb.graphEnabled" class="kb-graph-badge">图谱</span>
                     <span class="badge-scope-shared">{{ langData.knowledgeMgmt_shared || '共享' }}</span>
                     <span>{{ langData.knowledgeMgmt_docCount.replace('{count}', kb.docCount || 0) }}</span>
                     <span>{{ fmtTime(kb.updatedAt) }}</span>
@@ -155,6 +157,7 @@ onMounted(() => { store.loadKnowledgeBases() })
                   <div class="card-desc" v-if="kb.description">{{ kb.description }}</div>
                   <div class="card-meta">
                     <span class="kb-embed-badge">{{ kb.embedModelName || langData.knowledgeMgmt_embedModel }}</span>
+                    <span v-if="kb.graphEnabled" class="kb-graph-badge">图谱</span>
                     <span>{{ langData.knowledgeMgmt_docCount.replace('{count}', kb.docCount || 0) }}</span>
                     <span>{{ fmtTime(kb.updatedAt) }}</span>
                   </div>
@@ -220,6 +223,12 @@ onMounted(() => { store.loadKnowledgeBases() })
             <button :class="{ active: serverScope === 'shared' }" @click="serverScope = 'shared'">{{ langData.knowledgeMgmt_shared || '共享' }}</button>
           </div>
         </el-form-item>
+        <el-form-item :label="langData.knowledgeMgmt_graphLabel || '图谱增强'">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <el-switch v-model="form.graphEnabled" />
+            <span style="font-size:12px;color:var(--el-text-color-secondary);">{{ langData.knowledgeMgmt_graphHint || '额外构建实体关系图谱，提升多跳推理和全局理解能力' }}</span>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">{{ langData.btnCancel }}</el-button>
@@ -263,6 +272,7 @@ h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 36px; font-weigh
 .card-desc { font-size: 13px; color: var(--el-text-color-secondary); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--el-text-color-placeholder); }
 .kb-embed-badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+.kb-graph-badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: rgba(204,120,92,0.12); color: var(--el-color-primary); }
 
 .card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
