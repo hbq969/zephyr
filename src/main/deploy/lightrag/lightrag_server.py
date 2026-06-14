@@ -48,9 +48,10 @@ async def _get_rag(kb_id: str) -> LightRAG:
                     )
 
                 async def embed_func(texts: list[str]) -> list[list[float]]:
-                    return await openai_embed(
+                    # openai_embed 装饰器默认 embedding_dim=1536，调用 .func 绕过
+                    return await openai_embed.func(
                         texts, model=EMBED_MODEL, base_url=EMBED_BASE_URL,
-                        api_key=EMBED_API_KEY
+                        api_key=EMBED_API_KEY, embedding_dim=EMBED_DIM
                     )
 
                 rag = LightRAG(
