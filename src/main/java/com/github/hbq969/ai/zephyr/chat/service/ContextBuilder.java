@@ -8,6 +8,7 @@ import com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity;
 import com.github.hbq969.ai.zephyr.chat.model.ToolDef;
 import com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao;
 import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
+import com.github.hbq969.ai.zephyr.config.dao.entity.UserModelPreferenceEntity;
 import com.github.hbq969.ai.zephyr.mcp.dao.McpDao;
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity;
 import com.github.hbq969.ai.zephyr.memory.model.MemoryVO;
@@ -49,6 +50,8 @@ public class ContextBuilder {
     private com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao knowledgeDao;
     @Resource
     private com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService knowledgeService;
+    @Resource
+    private com.github.hbq969.ai.zephyr.config.dao.UserModelPreferenceDao userModelPreferenceDao;
 
     private static final String FS_DEFAULT = """
             ## 文件系统安全（Default 模式）
@@ -119,12 +122,45 @@ public class ContextBuilder {
     }
 
     public Context build(String userName, String conversationId, String mode) {
-        // 1. 加载模型配置
-        List<ModelConfigEntity> models = modelConfigDao.queryByUserName(userName);
-        ModelConfigEntity model = models.stream()
-                .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
-                .findFirst()
-                .orElse(models.isEmpty() ? null : models.get(0));
+        // 1. 加载模型配置（合并共享 + 私有）
+        List<ModelConfigEntity> ownModels = modelConfigDao.queryByUserName(userName);
+        List<ModelConfigEntity> sharedModels = modelConfigDao.queryShared();
+
+        // 私有优先，共享补充（同名时私有覆盖共享）
+        Map<String, ModelConfigEntity> modelMap = new LinkedHashMap<>();
+        for (ModelConfigEntity m : ownModels) {
+            modelMap.put(m.getName(), m);
+        }
+        for (ModelConfigEntity m : sharedModels) {
+            modelMap.putIfAbsent(m.getName(), m);
+        }
+        List<ModelConfigEntity> allModels = new ArrayList<>(modelMap.values());
+
+        // 1.1 优先读用户偏好表
+        ModelConfigEntity model = null;
+        String modelType = "llm";
+        UserModelPreferenceEntity pref =
+                userModelPreferenceDao.queryByUserAndType(userName, modelType);
+        if (pref != null) {
+            String prefId = pref.getModelId();
+            model = ownModels.stream().filter(m -> prefId.equals(m.getId())).findFirst()
+                    .orElseGet(() -> allModels.stream().filter(m -> prefId.equals(m.getId())).findFirst().orElse(null));
+        }
+        // 1.2 回退：用户私有默认 > 共享默认 > 第一个 llm
+        if (model == null) {
+            model = ownModels.stream()
+                    .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
+                    .findFirst()
+                    .orElseGet(() -> allModels.stream()
+                            .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
+                            .findFirst().orElse(null));
+        }
+        if (model == null) {
+            model = allModels.stream()
+                    .filter(m -> "llm".equals(m.getModelType()) || m.getModelType() == null)
+                    .findFirst()
+                    .orElse(null);
+        }
         if (model == null) throw new RuntimeException("请先配置模型");
 
         // 2. 加载 MCP 工具 → OpenAI tool definitions
