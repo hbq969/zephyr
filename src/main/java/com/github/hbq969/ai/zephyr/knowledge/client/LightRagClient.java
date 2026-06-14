@@ -23,10 +23,18 @@ public class LightRagClient {
     @Resource
     private ZephyrConfigProperties cfg;
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(300, TimeUnit.SECONDS)
-            .build();
+    private OkHttpClient client;
+
+    private OkHttpClient client() {
+        if (client == null) {
+            var lightrag = cfg.getKnowledge().getLightrag();
+            client = new OkHttpClient.Builder()
+                    .connectTimeout(lightrag.getConnectTimeoutSeconds(), TimeUnit.SECONDS)
+                    .readTimeout(lightrag.getReadTimeoutSeconds(), TimeUnit.SECONDS)
+                    .build();
+        }
+        return client;
+    }
 
     private String baseUrl() {
         return cfg.getKnowledge().getLightrag().getBaseUrl();
@@ -98,7 +106,7 @@ public class LightRagClient {
     // --- HTTP helpers ---
     private String get(String path) throws IOException {
         Request request = new Request.Builder().url(baseUrl() + path).get().build();
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client().newCall(request).execute()) {
             if (!response.isSuccessful()) throw new IOException(response.code() + " " + response.message());
             return response.body() != null ? response.body().string() : "{}";
         }
@@ -110,7 +118,7 @@ public class LightRagClient {
                 .header("Content-Type", "application/json")
                 .post(RequestBody.create(gson.toJson(body), JSON))
                 .build();
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String err = response.body() != null ? response.body().string() : "";
                 throw new IOException(response.code() + " " + err);
@@ -121,7 +129,7 @@ public class LightRagClient {
 
     private void delete(String path) throws IOException {
         Request request = new Request.Builder().url(baseUrl() + path).delete().build();
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = client().newCall(request).execute()) {
             if (!response.isSuccessful()) throw new IOException(response.code() + " " + response.message());
         }
     }

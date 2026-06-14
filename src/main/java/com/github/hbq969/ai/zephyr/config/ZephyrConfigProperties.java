@@ -208,6 +208,10 @@ public class ZephyrConfigProperties {
             private boolean enabled = false;
             /** LightRAG sidecar 地址 */
             private String baseUrl = "http://localhost:9621";
+            /** OkHttp 连接超时（秒），默认 10 */
+            private int connectTimeoutSeconds = 10;
+            /** OkHttp 读取超时（秒），默认 300（索引需调 LLM 抽取实体，耗时较长） */
+            private int readTimeoutSeconds = 300;
         }
     }
 

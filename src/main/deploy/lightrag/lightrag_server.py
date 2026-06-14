@@ -20,7 +20,7 @@ LLM_BASE_URL = os.environ.get("LIGHTRAG_LLM_BASE_URL", "https://api.deepseek.com
 LLM_MODEL = os.environ.get("LIGHTRAG_LLM_MODEL", "deepseek-v4-pro")
 LLM_API_KEY = os.environ.get("LIGHTRAG_LLM_API_KEY", "sk-87bdc10630034af1b107ed43fccd7cfe")
 EMBED_BASE_URL = os.environ.get("LIGHTRAG_EMBED_BASE_URL", LLM_BASE_URL)
-EMBED_MODEL = os.environ.get("LIGHTRAG_EMBED_MODEL", "nomic-embed-text")
+EMBED_MODEL = os.environ.get("LIGHTRAG_EMBED_MODEL", "deepseek-chat")
 EMBED_API_KEY = os.environ.get("LIGHTRAG_EMBED_API_KEY", LLM_API_KEY)
 EMBED_DIM = int(os.environ.get("LIGHTRAG_EMBED_DIM", "768"))
 

@@ -280,6 +280,8 @@ zephyr:
     lightrag:
       enabled: false
       base-url: http://localhost:9621
+      connect-timeout-seconds: 10
+      read-timeout-seconds: 300
   skill:
     upload:
       max-size-bytes: 104857600  # 100MB
