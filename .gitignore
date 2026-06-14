@@ -27,5 +27,6 @@
 **/.superpowers
 **/.cache
 **/.omx
+**/.env.lightrag
 *-preview.png
 *-snapshot.md

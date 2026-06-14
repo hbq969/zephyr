@@ -16,14 +16,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("lightrag-sidecar")
 
 # --- config from env ---
-DATA_DIR = Path(os.environ.get("LIGHTRAG_DATA_DIR", os.path.expanduser("~/.zephyr/lightrag")))
-LLM_BASE_URL = os.environ.get("LIGHTRAG_LLM_BASE_URL", "https://api.deepseek.com")
-LLM_MODEL = os.environ.get("LIGHTRAG_LLM_MODEL", "deepseek-v4-pro")
-LLM_API_KEY = os.environ.get("LIGHTRAG_LLM_API_KEY", "sk-87bdc10630034af1b107ed43fccd7cfe")
-EMBED_BASE_URL = os.environ.get("LIGHTRAG_EMBED_BASE_URL", "https://zhenze-huhehaote.cmecloud.cn/v1")
-EMBED_MODEL = os.environ.get("LIGHTRAG_EMBED_MODEL", "bge-m3")
-EMBED_API_KEY = os.environ.get("LIGHTRAG_EMBED_API_KEY", "t3uLkItDLzacnWdzkEim5c0tnpG7XQTpUC8I26aUSII")
-EMBED_DIM = int(os.environ.get("LIGHTRAG_EMBED_DIM", "1024"))
+DATA_DIR = Path(os.environ["LIGHTRAG_DATA_DIR"])
+LLM_BASE_URL = os.environ["LIGHTRAG_LLM_BASE_URL"]
+LLM_MODEL = os.environ["LIGHTRAG_LLM_MODEL"]
+LLM_API_KEY = os.environ["LIGHTRAG_LLM_API_KEY"]
+EMBED_BASE_URL = os.environ["LIGHTRAG_EMBED_BASE_URL"]
+EMBED_MODEL = os.environ["LIGHTRAG_EMBED_MODEL"]
+EMBED_API_KEY = os.environ["LIGHTRAG_EMBED_API_KEY"]
+EMBED_DIM = int(os.environ["LIGHTRAG_EMBED_DIM"])
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 

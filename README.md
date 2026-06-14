@@ -267,6 +267,7 @@ All runtime behavior is controlled via `application.yml` under the `zephyr` pref
 | Markdown | marked + markdown-it + KaTeX |
 | HTTP Client | OkHttp 4.12 |
 | Authentication | Session-based (h-sm framework) with password encryption |
+| Knowledge Graph | LightRAG (Python sidecar, `deploy/lightrag/`) |
 | API Docs | Knife4j (Swagger) |
 
 ## Development
@@ -287,6 +288,16 @@ mvn spring-boot:run -Dspring-boot.run.profiles=me
 curl -u admin:123456 -H "X-SM-Test: 1" \
   "http://localhost:30733/zephyr/ui/mcp/server/list"
 ```
+
+### LightRAG Sidecar (knowledge graph)
+
+```bash
+cd src/main/deploy/lightrag
+cp .env.lightrag.example .env.lightrag   # 编辑填入真实 API key
+./start_lightrag.sh                       # 自动创建 venv、安装依赖、启动
+```
+
+Server listens on `http://127.0.0.1:9621`.
 
 After modifying the frontend, rebuild and copy to target:
 

@@ -2,6 +2,14 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.1.1] - 2026-06-14
+
+### 变更
+
+- **LightRAG sidecar 配置外置**：所有配置项从代码默认值移至 `.env.lightrag` 环境文件，防止敏感信息泄露
+- **启动脚本**：新增 `start_lightrag.sh`，自动检查必需环境变量、创建 venv、安装依赖并启动
+- **环境配置模板**：新增 `.env.lightrag.example`（可安全提交），`.env.lightrag` 加入 gitignore
+
 ## [1.1.0] - 2026-06-14
 
 ### 新增
