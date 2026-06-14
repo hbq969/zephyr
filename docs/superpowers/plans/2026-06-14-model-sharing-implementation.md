@@ -17,15 +17,13 @@
 - Modify: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/mysql/ModelConfigMapper.xml`
 - Modify: `src/main/java/com/github/hbq969/ai/zephyr/config/dao/mapper/postgresql/ModelConfigMapper.xml`
 
-- [ ] **Step 1: 在三个方言 Mapper XML 的 `createModelConfigsTable` 中加 scope 列 + 存量迁移**
+- [ ] **Step 1: 在三个方言 Mapper XML 的 `createModelConfigsTable` 中加 scope 列 + 索引**
 
-在 `dimensions int,` 之前插入 scope 列 + 索引。同时在 DDL 前加 ALTER TABLE 语句处理存量数据库：
+在 `dimensions int,` 之前插入 scope 列，同时加共享查询索引：
 
-**embedded (H2):**
+完整 DDL（embedded）：
 ```xml
 <update id="createModelConfigsTable">
-  alter table zephyr_model_configs add column if not exists scope varchar(16) default 'user';
-  update zephyr_model_configs set scope = 'user' where scope is null;
   create table if not exists zephyr_model_configs (
     id varchar(64) primary key,
     user_name varchar(64) not null,
@@ -46,57 +44,9 @@
 </update>
 ```
 
-**mysql:**
-```xml
-<update id="createModelConfigsTable">
-  alter table zephyr_model_configs add column if not exists scope varchar(16) default 'user';
-  update zephyr_model_configs set scope = 'user' where scope is null;
-  create table if not exists zephyr_model_configs (
-    id varchar(64) primary key,
-    user_name varchar(64) not null,
-    name varchar(128) not null,
-    base_url varchar(512),
-    api_key_encrypted text,
-    max_context_tokens bigint,
-    is_default smallint default 0,
-    created_at bigint,
-    updated_at bigint,
-    model_type varchar(16) default 'llm',
-    scope varchar(16) default 'user',
-    dimensions int,
-    params text
-  );
-  create index if not exists idx_zephyr_mc_user on zephyr_model_configs(user_name);
-  create index if not exists idx_zephyr_mc_scope on zephyr_model_configs(scope);
-</update>
-```
+mysql 和 postgresql 做同样改动。
 
-**postgresql:**
-```xml
-<update id="createModelConfigsTable">
-  alter table zephyr_model_configs add column if not exists scope varchar(16) default 'user';
-  update zephyr_model_configs set scope = 'user' where scope is null;
-  create table if not exists zephyr_model_configs (
-    id varchar(64) primary key,
-    user_name varchar(64) not null,
-    name varchar(128) not null,
-    base_url varchar(512),
-    api_key_encrypted text,
-    max_context_tokens bigint,
-    is_default smallint default 0,
-    created_at bigint,
-    updated_at bigint,
-    model_type varchar(16) default 'llm',
-    scope varchar(16) default 'user',
-    dimensions int,
-    params text
-  );
-  create index if not exists idx_zephyr_mc_user on zephyr_model_configs(user_name);
-  create index if not exists idx_zephyr_mc_scope on zephyr_model_configs(scope);
-</update>
-```
-
-> 注：`ThrowUtils.call` 吞掉异常，即使 ALTER 失败（如 MySQL 不支持 `IF NOT EXISTS`），后续语句会被跳过。但 `CREATE TABLE IF NOT EXISTS` 对存量表也是安全的空操作，所以最坏情况是存量表的 scope 列未自动添加。MySQL 生产环境需手动执行一次 ALTER。
+> `ALTER TABLE ADD COLUMN` 不放在 Mapper XML 中，已有环境的增量迁移通过 `zephyr-*.sql` 处理（见 Task 14）。
 
 - [ ] **Step 2: Commit**
 
@@ -1023,29 +973,13 @@ git commit -m "feat: InputArea 模型选择器分栏展示（共享/我的）"
 
 - [ ] **Step 1: 在三个 SQL 文件中添加增量 DDL**
 
-查询 `mybatis.config-location` 确定方言 → 此处 H2/PostgreSQL 均可：
+zephyr-zh-CN.sql 末尾追加：
 
 ```sql
--- 模型配置共享：scope 列
+-- 模型配置共享：scope 列（存量环境加列）
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS scope VARCHAR(16) DEFAULT 'user';
 
 -- 用户模型偏好表
-CREATE TABLE IF NOT EXISTS zephyr_user_model_prefs (
-    id VARCHAR(12) PRIMARY KEY,
-    user_name VARCHAR(64) NOT NULL,
-    model_type VARCHAR(16) NOT NULL DEFAULT 'llm',
-    model_id VARCHAR(12) NOT NULL,
-    created_at BIGINT NOT NULL,
-    updated_at BIGINT NOT NULL
-);
-```
-
-注：PostgreSQL 的 `COLUMN IF NOT EXISTS` 仅在 PG 9.6+ 支持；H2 和 MySQL 不支持该语法。对于 H2，使用 H2 兼容写法或直接在代码中做一次尝试性迁移。
-
-由于此项目 me/dev 环境用 H2，增量 SQL 会影响所有环境。为确保跨方言安全，改为在 H2 SQL 中用 Java 代码方式处理。实际只需在 Mapper XML DDL 中加列（已有 `if not exists` 保障），已在 Task 1 覆盖。SQL 文件中只加 `CREATE TABLE IF NOT EXISTS zephyr_user_model_prefs`。
-
-zephyr-zh-CN.sql 末尾追加：
-```sql
 CREATE TABLE IF NOT EXISTS zephyr_user_model_prefs (
     id VARCHAR(64) PRIMARY KEY,
     user_name VARCHAR(64) NOT NULL,
@@ -1057,7 +991,7 @@ CREATE TABLE IF NOT EXISTS zephyr_user_model_prefs (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_model_prefs ON zephyr_user_model_prefs(user_name, model_type);
 ```
 
-> 唯一索引是 MySQL `ON DUPLICATE KEY UPDATE` 和 PostgreSQL `ON CONFLICT` 的前置条件，必须在 SQL 迁移中与建表一起执行。
+> `ALTER TABLE ADD COLUMN IF NOT EXISTS` 在 H2 和 PostgreSQL 中兼容。MySQL 不支持 `IF NOT EXISTS` 语法，如有 MySQL 生产环境需手动执行一次 `ALTER TABLE ADD COLUMN`。存量数据的 `scope` 迁移（`UPDATE ... SET scope='user' WHERE scope IS NULL`）在功能开发完成后单独执行一次即可。
 
 - [ ] **Step 2: 对 en-US 和 ja-JP SQL 做同样改动**
 
