@@ -14,6 +14,8 @@ import com.github.hbq969.ai.zephyr.knowledge.pipeline.RrfMerger;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TextSplitter;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TikaParser;
 import com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService;
+import com.github.hbq969.code.sm.login.model.UserInfo;
+import com.github.hbq969.code.sm.login.session.UserContext;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -54,26 +56,50 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Resource
     private KeywordIndex keywordIndex;
 
+    private static final String SCOPE_SHARED = "shared";
+    private static final String SCOPE_USER = "user";
+
+    private boolean isAdmin() {
+        UserInfo ui = UserContext.getNoCheck();
+        return ui != null && ui.isAdmin();
+    }
+
+    private void checkSharedManage() {
+        if (!isAdmin()) throw new RuntimeException("仅 admin 可管理共享知识库");
+    }
+
     @Override
     public List<KnowledgeVO> listKb(String userName) {
-        List<KnowledgeBaseEntity> kbs = knowledgeDao.queryKbByUserName(userName);
+        List<KnowledgeBaseEntity> all = new ArrayList<>();
+        all.addAll(knowledgeDao.queryKbByUserName(userName));
+        all.addAll(knowledgeDao.querySharedKbs());
+        // deduplicate by id (user's own KB takes precedence)
+        Map<String, KnowledgeBaseEntity> dedup = new LinkedHashMap<>();
+        for (KnowledgeBaseEntity kb : all) {
+            dedup.putIfAbsent(kb.getId(), kb);
+        }
+        boolean admin = isAdmin();
         List<KnowledgeVO> vos = new ArrayList<>();
-        for (KnowledgeBaseEntity kb : kbs) {
+        for (KnowledgeBaseEntity kb : dedup.values()) {
             KnowledgeVO vo = new KnowledgeVO();
             vo.setId(kb.getId());
             vo.setName(kb.getName());
             vo.setDescription(kb.getDescription());
             vo.setEmbedModelId(kb.getEmbedModelId());
+            vo.setScope(kb.getScope() != null ? kb.getScope() : SCOPE_USER);
             if (kb.getEmbedModelId() != null) {
                 var model = modelConfigDao.queryById(kb.getEmbedModelId());
-                if (model != null) {
-                    vo.setEmbedModelName(model.getName());
-                }
+                if (model != null) vo.setEmbedModelName(model.getName());
             }
-            List<KnowledgeDocEntity> docs = knowledgeDao.queryDocsByKbId(kb.getId());
-            vo.setDocCount(docs.size());
+            vo.setDocCount(knowledgeDao.queryDocsByKbId(kb.getId()).size());
             vo.setCreatedAt(kb.getCreatedAt());
             vo.setUpdatedAt(kb.getUpdatedAt());
+            // canManage: shared KBs only admin; own KBs admin + owner
+            if (SCOPE_SHARED.equals(vo.getScope())) {
+                vo.setCanManage(admin);
+            } else {
+                vo.setCanManage(admin || kb.getUserName().equals(userName));
+            }
             vos.add(vo);
         }
         return vos;
@@ -81,12 +107,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public KnowledgeBaseEntity createKb(Map<String, String> body, String userName) {
+        String scope = body.getOrDefault("scope", SCOPE_USER);
+        if (SCOPE_SHARED.equals(scope)) checkSharedManage();
         KnowledgeBaseEntity entity = new KnowledgeBaseEntity();
         entity.setId(UUID.randomUUID().toString());
         entity.setUserName(userName);
         entity.setName(body.get("name"));
         entity.setDescription(body.getOrDefault("description", ""));
         entity.setEmbedModelId(body.get("embedModelId"));
+        entity.setScope(scope);
         long now = System.currentTimeMillis() / 1000;
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -100,6 +129,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (entity == null) {
             throw new RuntimeException("知识库不存在");
         }
+        if (SCOPE_SHARED.equals(entity.getScope())) checkSharedManage();
         entity.setName(body.get("name"));
         entity.setDescription(body.getOrDefault("description", ""));
         entity.setEmbedModelId(body.get("embedModelId"));
@@ -114,6 +144,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (kb == null) {
             throw new RuntimeException("知识库不存在");
         }
+        if (SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
         knowledgeDao.deleteConversationKbByKbId(id);
         keywordIndex.removeKb(id);
         knowledgeDao.deleteDocsByKbId(id);
@@ -129,6 +160,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public void deleteDoc(String id) {
         KnowledgeDocEntity doc = knowledgeDao.queryDocById(id);
         if (doc != null) {
+            KnowledgeBaseEntity kb = knowledgeDao.queryKbById(doc.getKbId());
+            if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
             keywordIndex.removeDoc(doc.getKbId(), id);
         }
         knowledgeDao.deleteDoc(id);
@@ -153,6 +186,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public String uploadDoc(String kbId, MultipartFile file, String userName) {
         KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
         if (kb == null) throw new RuntimeException("知识库不存在");
+        if (SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
 
         String docId = UUID.randomUUID().toString();
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
@@ -192,6 +226,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public String createInlineDoc(String kbId, String title, String content, String userName) {
         KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
         if (kb == null) throw new RuntimeException("知识库不存在");
+        if (SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
 
         String docId = UUID.randomUUID().toString();
         String fileName = title + ".md";
@@ -225,6 +260,8 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
         if (doc == null) throw new RuntimeException("文档不存在");
         if (!"inline".equals(doc.getSourceType())) throw new RuntimeException("仅内联文档支持在线编辑");
+        KnowledgeBaseEntity kb = knowledgeDao.queryKbById(doc.getKbId());
+        if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
 
         String fileName = title + ".md";
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), doc.getKbId());
@@ -395,5 +432,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         if (fileName == null) return "unknown";
         int i = fileName.lastIndexOf('.');
         return i >= 0 ? fileName.substring(i + 1).toLowerCase() : "unknown";
+    }
+
+    @Override
+    @Transactional
+    public void toggleKbScope(String id, String scope, String userName) {
+        checkSharedManage();
+        knowledgeDao.updateKbScope(id, scope);
     }
 }
