@@ -114,18 +114,25 @@ function onSend(text: string, filePaths?: string[]) {
   chatStore.addMessage({ id: nextMsgId(), role: 'assistant', content: '', timestamp: Date.now() / 1000 })
   chatStore.streaming = true
 
-  let lastPos = 0
-  axios({
-    url: `/chat/send`,
-    method: 'post',
-    data: { conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, mode: chatStore.mode, filePaths: filePaths || [] },
-    responseType: 'text',
-    signal: abortController.signal,
-    onDownloadProgress(evt: any) {
-      const raw = evt.event?.target?.responseText || evt.currentTarget?.responseText || ''
-      const newData = raw.substring(lastPos)
-      lastPos = raw.length
-      const lines = newData.split('\n')
+  const baseUrl = import.meta.env.VITE_API_URL || ''
+  fetch(`${baseUrl}/chat/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, mode: chatStore.mode, filePaths: filePaths || [] }),
+    signal: abortController.signal
+  }).then(async resp => {
+    if (!resp.ok || !resp.body) {
+      throw new Error(`HTTP ${resp.status}`)
+    }
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
       for (const line of lines) {
         if (!line.startsWith('data:')) continue
         try {
@@ -150,9 +157,6 @@ function onSend(text: string, filePaths?: string[]) {
             chatStore.clearMessages()
             convStore.currentId = null
             if (oldCid) convStore.removeConversation(oldCid)
-            // 不在这里设 streaming = false，让 done 事件处理
-            // 否则 refreshConversationList 中的 setConversations 会触发
-            // currentId watcher → restoreConversation 加载其他对话的消息
           } else if (event.type === 'done') {
             chatStore.pruneEmptyAssistant()
             refreshConversationList()
@@ -165,16 +169,15 @@ function onSend(text: string, filePaths?: string[]) {
         } catch (_) {}
       }
     }
-  }).catch((err: any) => {
-    if (err?.code !== 'ERR_CANCELED' && err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
-      chatStore.appendToken('\n\n' + langData.context_requestFailed)
-    }
-    chatStore.streaming = false
-  }).then(() => {
     if (chatStore.streaming) {
       chatStore.pruneEmptyAssistant()
       chatStore.streaming = false
     }
+  }).catch((err: any) => {
+    if (err?.name !== 'AbortError') {
+      chatStore.appendToken('\n\n' + langData.context_requestFailed)
+    }
+    chatStore.streaming = false
   })
 }
 
