@@ -592,8 +592,8 @@ function closeAll() {
                 <div class="kb-section-label">共享模型</div>
                 <div v-for="m in sharedModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
-                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-name">{{ m.name }}</span>
+                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-tags">
                       <span class="skill-scope-badge scope-shared">共享</span>
                       <span v-if="hasThinking(m.params)" class="model-tag think-tag">思考</span>
@@ -607,8 +607,8 @@ function closeAll() {
                 <div class="kb-section-label">我的模型</div>
                 <div v-for="m in userModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
-                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-name">{{ m.name }}</span>
+                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-tags">
                       <span class="skill-scope-badge scope-user">个人</span>
                       <span v-if="hasThinking(m.params)" class="model-tag think-tag">思考</span>
