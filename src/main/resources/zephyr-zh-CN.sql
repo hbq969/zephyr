@@ -22,3 +22,5 @@ ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS dimensions int DEFAULT
 alter table if exists zephyr_knowledge_doc add column if not exists content text;
 alter table if exists zephyr_knowledge_doc add column if not exists source_type varchar(16) default 'upload';
 alter table if exists zephyr_knowledge_doc add column if not exists updated_at bigint;
+
+ALTER TABLE zephyr_knowledge_base ADD COLUMN IF NOT EXISTS scope varchar(16) DEFAULT 'user';
