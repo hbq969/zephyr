@@ -118,6 +118,8 @@ async def search_kb(kb_id: str, req: SearchRequest):
         rag = await _get_rag(kb_id)
         param = QueryParam(mode=req.mode, top_k=req.top_k)
         result = await rag.aquery(req.query, param=param)
+        if not result:
+            return []
         return [SearchResult(content=result, source="graph", score=1.0)]
     except Exception as e:
         log.exception("search failed: kb=%s", kb_id)
