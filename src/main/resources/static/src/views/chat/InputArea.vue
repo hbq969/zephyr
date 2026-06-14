@@ -593,8 +593,8 @@ function closeAll() {
                 <div v-for="m in sharedModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
                     <span class="model-name">{{ m.name }}</span>
-                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-tags">
+                      <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon-inline" />
                       <span class="skill-scope-badge scope-shared">共享</span>
                       <span v-if="hasThinking(m.params)" class="model-tag think-tag">思考</span>
                       <span v-if="m.maxContextTokens" class="model-tag ctx-tag">{{ formatContextSize(m.maxContextTokens) }}</span>
@@ -608,8 +608,8 @@ function closeAll() {
                 <div v-for="m in userModels" :key="m.name" class="pick-option" :class="{ current: settingsStore.currentModel === m.name }" @click="selectModel(m.name)">
                   <div class="model-option-main">
                     <span class="model-name">{{ m.name }}</span>
-                    <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon" />
                     <span class="model-tags">
+                      <Icon v-if="settingsStore.currentModel === m.name" icon="lucide:check" class="check-icon-inline" />
                       <span class="skill-scope-badge scope-user">个人</span>
                       <span v-if="hasThinking(m.params)" class="model-tag think-tag">思考</span>
                       <span v-if="m.maxContextTokens" class="model-tag ctx-tag">{{ formatContextSize(m.maxContextTokens) }}</span>
@@ -878,6 +878,7 @@ html.dark .mode-bypass { background: rgba(198,69,45,0.22); color: #e07373; }
 html.dark .ctx-tag { background: var(--el-fill-color); color: var(--el-text-color-secondary); }
 html.dark .think-tag { background: var(--el-color-primary-light-3); color: var(--el-color-primary); }
 .check-icon { font-size: 15px; color: var(--el-color-primary); flex-shrink: 0; }
+.check-icon-inline { font-size: 13px; color: var(--el-color-primary); flex-shrink: 0; margin-right: 2px; }
 .cmd-name { font-weight: 600; color: var(--el-color-primary); min-width: 60px; font-size: 12px; }
 .cmd-desc { color: var(--el-text-color-secondary); font-size: 12px; }
 
