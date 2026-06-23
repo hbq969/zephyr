@@ -384,6 +384,38 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             }
         }
         // 图谱检索增强 — 结果作为独立上下文区块（不参与 RRF 混排）
+        // --- 上下文窗口扩展 ---
+        final int WINDOW_SIZE = 2;
+        final int MAX_TOTAL_CHARS = 8000;
+
+        Set<String> expandedIds = new LinkedHashSet<>();
+        for (String chunkId : mergedIds) {
+            List<String> window = keywordIndex.expandWindow(chunkId, WINDOW_SIZE);
+            expandedIds.addAll(window);
+        }
+
+        List<String> sortedExpanded = new ArrayList<>(expandedIds);
+        sortedExpanded.sort(Comparator.comparing(id -> {
+            int i = id.lastIndexOf('_');
+            if (i < 0) return id;
+            return id.substring(0, i) + String.format("%010d", Integer.parseInt(id.substring(i + 1)));
+        }));
+
+        StringBuilder expandedText = new StringBuilder();
+        for (String id : sortedExpanded) {
+            String chunkText = keywordIndex.getChunkText(id);
+            if (chunkText == null) continue;
+            if (expandedText.length() + chunkText.length() + 1 > MAX_TOTAL_CHARS) break;
+            if (expandedText.length() > 0) expandedText.append("\n\n");
+            expandedText.append(chunkText);
+        }
+
+        if (!results.isEmpty() && expandedText.length() > 0) {
+            SearchResult first = results.get(0);
+            results.add(0, new SearchResult(expandedText.toString(),
+                    first.getSourceFile() + "（上下文窗口）", first.getScore()));
+        }
+
         for (String kbId : kbIds) {
             KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
             if (kb == null || !Integer.valueOf(1).equals(kb.getGraphEnabled())) continue;
