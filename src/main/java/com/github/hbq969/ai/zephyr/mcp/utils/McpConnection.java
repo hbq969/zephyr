@@ -359,8 +359,12 @@ public class McpConnection {
             List<ProcessHandle> children = ph.descendants().toList();
             log.info("MCP 进程树: server={}, parentPid={}, childrenPids={}",
                     server.getName(), pid, children.stream().map(c -> String.valueOf(c.pid())).toList());
-            children.forEach(ProcessHandle::destroyForcibly);
-            ph.destroyForcibly();
+            for (ProcessHandle child : children) {
+                boolean ok = child.destroyForcibly();
+                log.info("MCP kill 子进程: pid={}, 结果={}", child.pid(), ok);
+            }
+            boolean ok = ph.destroyForcibly();
+            log.info("MCP kill 父进程: pid={}, 结果={}", pid, ok);
         });
     }
 
