@@ -597,7 +597,8 @@ mvn test -Dtest=KeywordIndexTest -Dsurefire.useFile=false 2>&1 | tail -20
         }
 
         // 4. 用扩展后的文本替换第一个 SearchResult 的内容
-        //    后续单个 chunk 的结果仍然保留，但主要上下文已在第一个结果中
+        //    SearchResult 构造签名：(String text, String fileName, double score)
+        //    实现前请确认实际构造函数匹配
         if (!results.isEmpty() && expandedText.length() > 0) {
             SearchResult first = results.get(0);
             results.add(0, new SearchResult(expandedText.toString(),
@@ -859,21 +860,24 @@ EOF
 {
   "kbName": "recall-test-kb",
   "queries": [
-    {
-      "query": "如何配置超时时间",
-      "category": "配置问题",
-      "expectedChunkIds": []
-    },
-    {
-      "query": "MCP服务器支持哪些协议",
-      "category": "接口查找",
-      "expectedChunkIds": []
-    },
-    {
-      "query": "什么是embedding",
-      "category": "概念解释",
-      "expectedChunkIds": []
-    }
+    // === 配置问题 (5条) ===
+    { "query": "如何配置超时时间", "category": "配置问题", "expectedChunkIds": [] },
+    { "query": "怎么修改端口号", "category": "配置问题", "expectedChunkIds": [] },
+    { "query": "日志级别怎么设置", "category": "配置问题", "expectedChunkIds": [] },
+    { "query": "线程池大小配置参数", "category": "配置问题", "expectedChunkIds": [] },
+    { "query": "数据源连接池配置", "category": "配置问题", "expectedChunkIds": [] },
+    // === 接口查找 (5条) ===
+    { "query": "MCP服务器支持哪些协议", "category": "接口查找", "expectedChunkIds": [] },
+    { "query": "如何调用知识库搜索接口", "category": "接口查找", "expectedChunkIds": [] },
+    { "query": "模型配置有哪些API", "category": "接口查找", "expectedChunkIds": [] },
+    { "query": "文档上传接口参数说明", "category": "接口查找", "expectedChunkIds": [] },
+    { "query": "对话SSE接口怎么用", "category": "接口查找", "expectedChunkIds": [] },
+    // === 概念解释 (5条) ===
+    { "query": "什么是embedding向量化", "category": "概念解释", "expectedChunkIds": [] },
+    { "query": "RRF融合算法原理", "category": "概念解释", "expectedChunkIds": [] },
+    { "query": "LightRAG和传统RAG的区别", "category": "概念解释", "expectedChunkIds": [] },
+    { "query": "ChromaDB是什么", "category": "概念解释", "expectedChunkIds": [] },
+    { "query": "BM25打分怎么算的", "category": "概念解释", "expectedChunkIds": [] }
   ]
 }
 ```
@@ -968,11 +972,68 @@ class RecallTest {
     }
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: 添加 baseline 捕获步骤**
+
+```java
+// 在 RecallTest.java 中添加
+    @Test
+    void captureBaseline() {
+        var gson = new Gson();
+        var is = getClass().getClassLoader().getResourceAsStream("knowledge-recall-testset.json");
+        Map<String, Object> testset = gson.fromJson(
+                new InputStreamReader(is, StandardCharsets.UTF_8),
+                new TypeToken<Map<String, Object>>() {}.getType());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> queries = (List<Map<String, Object>>) testset.get("queries");
+
+        Map<String, Object> baseline = new LinkedHashMap<>();
+        baseline.put("timestamp", System.currentTimeMillis());
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        for (Map<String, Object> q : queries) {
+            String query = (String) q.get("query");
+            long start = System.nanoTime();
+            var sr = knowledgeService.search(query, List.of("test-kb-id"), 3);
+            long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("query", query);
+            entry.put("latencyMs", elapsedMs);
+            entry.put("top3ChunkIds", sr.stream().map(r -> r.getFileName()).toList());
+            entry.put("top3Scores", sr.stream().map(r -> r.getVecScore()).toList());
+            results.add(entry);
+        }
+        baseline.put("results", results);
+
+        // 写入 target/recall-baseline.json
+        Path outPath = Paths.get("target/recall-baseline.json");
+        Files.createDirectories(outPath.getParent());
+        Files.writeString(outPath, gson.toJson(baseline));
+        System.out.println("Baseline saved to " + outPath.toAbsolutePath());
+    }
+```
+
+运行：
+```bash
+mvn test -Dtest=RecallTest#captureBaseline -Dsurefire.useFile=false 2>&1 | tail -5
+```
+
+预期：输出 "Baseline saved to .../target/recall-baseline.json"
+
+- [ ] **Step 5: 部署迁移说明**
+
+KeywordIndex 是内存索引，服务重启后自动从 ChromaDB 中已存储的 chunk 数据重建。部署新代码后需：
+
+1. 重启服务（内存索引自动清空）
+2. 对现有知识库的每个文档调用 `reParseDoc()` 重新解析（会自动将新 `tokenizeForBm25()` 产生的 bigram 分词结果写入内存索引）
+
+> 或者：如果服务重启后所有 `processDocContentAsync` 不重新执行，则需手动对每个知识库重新上传文档，或提供一次性脚本遍历已有文档重新索引。
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/test/ && git commit -m "$(cat <<'EOF'
-test: 知识库召回率量化测试框架 — Recall@3跑分+测试数据集
+test: 知识库召回率量化测试框架 — Recall@3跑分+baseline+测试数据集
 
 Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
 EOF
