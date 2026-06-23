@@ -530,6 +530,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
             if (doc == null) { log.warn("文档已被删除，取消处理: docId={}", docId); return; }
 
+            log.info("开始处理文档: docId={}, kbId={}, textLen={}", docId, kbId, text != null ? text.length() : 0);
             text = jsonPreprocessor.preprocess(text);
             text = textCleaner.clean(text);
 

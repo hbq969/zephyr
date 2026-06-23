@@ -39,12 +39,13 @@ public class JsonPreprocessor {
         try {
             root = JsonParser.parseString(raw.trim());
         } catch (Exception e) {
+            log.warn("JSON 解析失败，按原文处理: {}", e.getMessage());
             return raw;
         }
 
         List<JsonObject> records = extractRecords(root);
         if (records.isEmpty()) {
-            // 没有可展开的对象记录，原样返回
+            log.info("JSON 未提取到对象记录，按原文处理");
             return raw;
         }
 
