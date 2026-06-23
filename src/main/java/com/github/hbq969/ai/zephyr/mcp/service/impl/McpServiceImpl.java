@@ -157,14 +157,19 @@ public class McpServiceImpl implements McpService {
 
     @Override
     public void connect(String id, String userName) {
+        connect0(id, userName, true);
+    }
+
+    private void connect0(String id, String userName, boolean checkPermission) {
         McpServerEntity server = mcpDao.queryServerById(id);
         if (server == null) {
             log.warn("MCP 连接失败，服务器不存在: id={}", id);
             return;
         }
 
-        boolean isShared = SCOPE_SHARED.equals(server.getScope());
-        if (isShared) checkSharedManage();
+        if (checkPermission && SCOPE_SHARED.equals(server.getScope())) {
+            checkSharedManage();
+        }
 
         log.info("MCP 开始连接: name={}, transport={}, command={}, user={}",
                 server.getName(), server.getTransport(), server.getCommand(), userName);
@@ -347,7 +352,7 @@ public class McpServiceImpl implements McpService {
         int ok = 0;
         for (McpServerEntity s : servers) {
             try {
-                connect(s.getId(), s.getUserName());
+                connect0(s.getId(), s.getUserName(), false);
                 ok++;
                 log.info("MCP 启动重连成功: server={}, user={}", s.getName(), s.getUserName());
             } catch (Exception e) {
