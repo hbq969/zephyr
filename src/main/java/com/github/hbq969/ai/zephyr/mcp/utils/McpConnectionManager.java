@@ -47,11 +47,14 @@ public class McpConnectionManager {
         }
         for (File f : files) {
             try {
-                long pid = Long.parseLong(Files.readString(f.toPath()).trim());
-                ProcessHandle.of(pid).ifPresent(ph -> {
-                    ph.destroyForcibly();
-                    log.info("已清理孤儿 MCP 进程: pid={}, file={}", pid, f.getName());
-                });
+                String content = Files.readString(f.toPath()).trim();
+                for (String pidStr : content.split(",")) {
+                    long pid = Long.parseLong(pidStr.trim());
+                    ProcessHandle.of(pid).ifPresent(ph -> {
+                        ph.destroyForcibly();
+                        log.info("已清理孤儿 MCP 进程: pid={}, file={}", pid, f.getName());
+                    });
+                }
                 Files.deleteIfExists(f.toPath());
             } catch (Exception e) {
                 log.warn("清理孤儿进程失败: {}", f.getName(), e);

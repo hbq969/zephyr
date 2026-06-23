@@ -92,11 +92,14 @@ public class McpConnection {
             }
         }
         process = pb.start();
+        // 用逗号分隔记录所有 PID（父 + 子孙），确保孤儿清理能覆盖到 npx 等包装器内的真实进程
+    String pids = process.pid() + process.descendants().map(ph -> "," + ph.pid())
+            .collect(java.util.stream.Collectors.joining());
         Path pidFile = pidFilePath();
         try {
             Files.createDirectories(pidFile.getParent());
-            Files.writeString(pidFile, String.valueOf(process.pid()));
-            log.info("MCP PID 已记录: server={}, pid={}", server.getName(), process.pid());
+            Files.writeString(pidFile, pids);
+            log.info("MCP PID 已记录: server={}, pids={}", server.getName(), pids);
         } catch (Exception e) {
             log.warn("写入 MCP PID 文件失败: {}", pidFile, e);
         }
@@ -298,6 +301,7 @@ public class McpConnection {
                     toolTimeoutSeconds, server.getName(), process != null ? process.pid() : -1);
             future.cancel(true);
             if (process != null) {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
                 try { Files.deleteIfExists(pidFilePath()); } catch (Exception ignored) {}
             }
@@ -357,6 +361,7 @@ public class McpConnection {
         try {
             if (type == Type.STDIO && process != null) {
                 long pid = process.pid();
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
                 try { Files.deleteIfExists(pidFilePath()); } catch (Exception ignored) {}
                 log.info("MCP 进程已终止: server={}, pid={}", server.getName(), pid);
