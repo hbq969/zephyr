@@ -992,8 +992,6 @@ class RecallTest {
         baseline.put("timestamp", System.currentTimeMillis());
         List<Map<String, Object>> results = new ArrayList<>();
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> queries = (List<Map<String, Object>>) testset.get("queries");
         String kbId = (String) testset.get("kbId");
 
         for (Map<String, Object> q : queries) {
