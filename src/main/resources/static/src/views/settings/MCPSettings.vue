@@ -21,7 +21,7 @@ const serverUrl = ref('')
 const serverHeaders = ref('')
 const serverScope = ref<'user' | 'shared'>('user')
 
-const activeTab = ref('shared')
+const activeTab = ref('user')
 const sharedServers = computed(() => store.mcpServers.filter((s: any) => s.scope === 'shared'))
 const userServers = computed(() => store.mcpServers.filter((s: any) => s.scope !== 'shared'))
 
@@ -198,6 +198,80 @@ function toolsCount(count: number): string {
     </div>
 
     <el-tabs v-if="store.mcpServers.length > 0" v-model="activeTab" class="mcp-tabs">
+      <el-tab-pane :label="(langData.mcpMgmt_userTab || '我的 MCP') + ' (' + userServers.length + ')'" name="user">
+        <div v-if="userServers.length > 0" class="server-list">
+          <div v-for="s in userServers" :key="s.id" class="server-card" :class="{ expanded: expandedServerId === s.id }">
+        <div class="card-main" @click="toggleServerTools(s.id!)">
+          <div class="server-icon" :class="s.transport">
+            <Icon :icon="s.transport === 'http' ? 'lucide:globe' : 'lucide:terminal'" width="18" />
+          </div>
+          <div class="server-info">
+            <div class="server-name">{{ s.name }}</div>
+            <div class="server-meta">
+              <span class="badge badge-transport">{{ s.transport }}</span>
+              <span class="badge badge-status" :class="'badge-' + s.status">
+                <span class="status-dot" :class="s.status"></span>
+                {{ s.status === 'connected' ? langData.mcpMgmt_connected : s.status === 'error' ? langData.mcpMgmt_connectFailed : langData.mcpMgmt_disconnected }}
+              </span>
+            </div>
+            <div class="server-detail">
+              <template v-if="s.transport === 'http'">{{ s.url }}</template>
+              <template v-else>$ {{ s.command }} {{ s.args?.split('\n')[0] || '' }}</template>
+            </div>
+          </div>
+          <div class="server-actions" @click.stop>
+            <button v-if="s.canManage" class="btn-icon" @click="toggleScope(s.id!, 'shared')" :title="langData.mcpMgmt_shareToAll">
+              <Icon icon="lucide:share-2" width="15" />
+            </button>
+            <button class="btn-icon" @click="openEditServer(s)" :title="langData.btnEdit">
+              <Icon icon="lucide:pencil" width="15" />
+            </button>
+            <button v-if="s.status === 'connected'" class="btn-icon" @click="disconnectServer(s.id!)" :title="langData.mcpMgmt_disconnectTooltip">
+              <Icon icon="lucide:unplug" width="15" />
+            </button>
+            <button v-else class="btn-icon" @click="connectServer(s.id!)" :title="langData.mcpMgmt_connectTooltip">
+              <Icon icon="lucide:plug" width="15" />
+            </button>
+            <button class="btn-icon" @click="confirmDeleteServer(s.id!, s.name)" :title="langData.btnDelete" style="color:var(--el-color-danger)">
+              <Icon icon="lucide:trash-2" width="15" />
+            </button>
+            <Icon icon="lucide:chevron-down" class="expand-chevron" width="20" />
+          </div>
+        </div>
+        <div class="tools-panel">
+          <div v-if="loadingTools[s.id!]" class="tools-loading">{{ langData.inputArea_loading }}</div>
+          <template v-else-if="serverTools[s.id!]?.length">
+            <div class="tools-header"><span>{{ toolsCount(serverTools[s.id!].length) }}</span></div>
+            <div v-for="t in serverTools[s.id!]" :key="t.id" class="tool-row">
+              <div class="tool-dot" :class="t.source"></div>
+              <div class="tool-info">
+                <span class="tool-name">{{ t.toolName }}</span>
+                <span v-if="t.description" class="tool-desc">{{ t.description }}</span>
+              </div>
+              <span class="tool-source" :class="t.source">{{ t.source === 'discovered' ? langData.mcpMgmt_autoDiscovered : langData.mcpMgmt_manualAdd }}</span>
+              <label class="toggle-switch">
+                <input type="checkbox" :checked="t.enabled" @change="toggleTool(t.id!, ($event.target as HTMLInputElement).checked, s.id!)" />
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn-icon-sm" @click="confirmDeleteTool(t.id!, s.id!, t.toolName)" :title="langData.btnDelete"><Icon icon="lucide:x" width="13" /></button>
+            </div>
+          </template>
+          <div v-else class="tools-empty">{{ s.status === 'connected' ? langData.mcpMgmt_noToolsConnected : langData.mcpMgmt_noToolsDisconnected }}</div>
+          <div v-if="addingToolFor === s.id" class="add-tool-row">
+            <input v-model="newToolName" :placeholder="langData.mcpMgmt_toolName" />
+            <input v-model="newToolDesc" :placeholder="langData.mcpMgmt_toolDesc" />
+            <button class="btn-primary btn-sm" @click="addTool(s.id!)">{{ langData.btnAdd }}</button>
+            <button class="btn-secondary btn-sm" @click="addingToolFor = null">{{ langData.btnCancel }}</button>
+          </div>
+          <button v-else class="add-tool-btn" @click.stop="addingToolFor = s.id!; newToolName = ''; newToolDesc = ''"><Icon icon="lucide:plus" width="14" /> {{ langData.mcpMgmt_addToolManually }}</button>
+        </div>
+          </div>
+        </div>
+        <div v-else class="empty-result">
+          <Icon icon="lucide:inbox" class="empty-icon" />
+          <p class="empty-desc">{{ langData.mcpMgmt_noUser || '暂无个人 MCP 服务器' }}</p>
+        </div>
+      </el-tab-pane>
       <el-tab-pane :label="(langData.mcpMgmt_sharedTab || '共享 MCP') + ' (' + sharedServers.length + ')'" name="shared">
         <div v-if="sharedServers.length > 0" class="server-list">
           <div v-for="s in sharedServers" :key="s.id" class="server-card" :class="{ expanded: expandedServerId === s.id }">
@@ -271,80 +345,6 @@ function toolsCount(count: number): string {
         <div v-else class="empty-result">
           <Icon icon="lucide:inbox" class="empty-icon" />
           <p class="empty-desc">{{ langData.mcpMgmt_noShared || '暂无共享 MCP 服务器' }}</p>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane :label="(langData.mcpMgmt_userTab || '我的 MCP') + ' (' + userServers.length + ')'" name="user">
-        <div v-if="userServers.length > 0" class="server-list">
-          <div v-for="s in userServers" :key="s.id" class="server-card" :class="{ expanded: expandedServerId === s.id }">
-        <div class="card-main" @click="toggleServerTools(s.id!)">
-          <div class="server-icon" :class="s.transport">
-            <Icon :icon="s.transport === 'http' ? 'lucide:globe' : 'lucide:terminal'" width="18" />
-          </div>
-          <div class="server-info">
-            <div class="server-name">{{ s.name }}</div>
-            <div class="server-meta">
-              <span class="badge badge-transport">{{ s.transport }}</span>
-              <span class="badge badge-status" :class="'badge-' + s.status">
-                <span class="status-dot" :class="s.status"></span>
-                {{ s.status === 'connected' ? langData.mcpMgmt_connected : s.status === 'error' ? langData.mcpMgmt_connectFailed : langData.mcpMgmt_disconnected }}
-              </span>
-            </div>
-            <div class="server-detail">
-              <template v-if="s.transport === 'http'">{{ s.url }}</template>
-              <template v-else>$ {{ s.command }} {{ s.args?.split('\n')[0] || '' }}</template>
-            </div>
-          </div>
-          <div class="server-actions" @click.stop>
-            <button v-if="s.canManage" class="btn-icon" @click="toggleScope(s.id!, 'shared')" :title="langData.mcpMgmt_shareToAll">
-              <Icon icon="lucide:share-2" width="15" />
-            </button>
-            <button class="btn-icon" @click="openEditServer(s)" :title="langData.btnEdit">
-              <Icon icon="lucide:pencil" width="15" />
-            </button>
-            <button v-if="s.status === 'connected'" class="btn-icon" @click="disconnectServer(s.id!)" :title="langData.mcpMgmt_disconnectTooltip">
-              <Icon icon="lucide:unplug" width="15" />
-            </button>
-            <button v-else class="btn-icon" @click="connectServer(s.id!)" :title="langData.mcpMgmt_connectTooltip">
-              <Icon icon="lucide:plug" width="15" />
-            </button>
-            <button class="btn-icon" @click="confirmDeleteServer(s.id!, s.name)" :title="langData.btnDelete" style="color:var(--el-color-danger)">
-              <Icon icon="lucide:trash-2" width="15" />
-            </button>
-            <Icon icon="lucide:chevron-down" class="expand-chevron" width="20" />
-          </div>
-        </div>
-        <div class="tools-panel">
-          <div v-if="loadingTools[s.id!]" class="tools-loading">{{ langData.inputArea_loading }}</div>
-          <template v-else-if="serverTools[s.id!]?.length">
-            <div class="tools-header"><span>{{ toolsCount(serverTools[s.id!].length) }}</span></div>
-            <div v-for="t in serverTools[s.id!]" :key="t.id" class="tool-row">
-              <div class="tool-dot" :class="t.source"></div>
-              <div class="tool-info">
-                <span class="tool-name">{{ t.toolName }}</span>
-                <span v-if="t.description" class="tool-desc">{{ t.description }}</span>
-              </div>
-              <span class="tool-source" :class="t.source">{{ t.source === 'discovered' ? langData.mcpMgmt_autoDiscovered : langData.mcpMgmt_manualAdd }}</span>
-              <label class="toggle-switch">
-                <input type="checkbox" :checked="t.enabled" @change="toggleTool(t.id!, ($event.target as HTMLInputElement).checked, s.id!)" />
-                <span class="toggle-slider"></span>
-              </label>
-              <button class="btn-icon-sm" @click="confirmDeleteTool(t.id!, s.id!, t.toolName)" :title="langData.btnDelete"><Icon icon="lucide:x" width="13" /></button>
-            </div>
-          </template>
-          <div v-else class="tools-empty">{{ s.status === 'connected' ? langData.mcpMgmt_noToolsConnected : langData.mcpMgmt_noToolsDisconnected }}</div>
-          <div v-if="addingToolFor === s.id" class="add-tool-row">
-            <input v-model="newToolName" :placeholder="langData.mcpMgmt_toolName" />
-            <input v-model="newToolDesc" :placeholder="langData.mcpMgmt_toolDesc" />
-            <button class="btn-primary btn-sm" @click="addTool(s.id!)">{{ langData.btnAdd }}</button>
-            <button class="btn-secondary btn-sm" @click="addingToolFor = null">{{ langData.btnCancel }}</button>
-          </div>
-          <button v-else class="add-tool-btn" @click.stop="addingToolFor = s.id!; newToolName = ''; newToolDesc = ''"><Icon icon="lucide:plus" width="14" /> {{ langData.mcpMgmt_addToolManually }}</button>
-        </div>
-          </div>
-        </div>
-        <div v-else class="empty-result">
-          <Icon icon="lucide:inbox" class="empty-icon" />
-          <p class="empty-desc">{{ langData.mcpMgmt_noUser || '暂无个人 MCP 服务器' }}</p>
         </div>
       </el-tab-pane>
     </el-tabs>

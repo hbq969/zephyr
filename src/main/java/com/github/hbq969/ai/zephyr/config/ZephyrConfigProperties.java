@@ -183,6 +183,8 @@ public class ZephyrConfigProperties {
 
     @Data
     public static class Knowledge {
+        /** 检索返回结果数量默认值，LLM 可通过 top_k 参数覆盖，默认 5 */
+        private int topK = 5;
         /** BM25 关键词检索参数 */
         private Bm25 bm25 = new Bm25();
         /** Chroma 向量数据库 */

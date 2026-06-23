@@ -503,7 +503,7 @@ public class ChatServiceImpl implements ChatService {
         }
         try {
             String query = args.get("query").toString();
-            int topK = 5;
+            int topK = cfg.getKnowledge().getTopK();
             if (args.containsKey("top_k")) {
                 topK = ((Number) args.get("top_k")).intValue();
             }

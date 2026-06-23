@@ -43,6 +43,10 @@
         update zephyr_mcp_servers set status = #{status} where id = #{id} and user_name = #{userName}
     </update>
 
+    <update id="resetAllServerStatus">
+        update zephyr_mcp_servers set status = #{status}
+    </update>
+
     <select id="queryToolById" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
         select id, user_name as userName, server_id as serverId,
                tool_name as toolName, description, parameters_json as parametersJson,

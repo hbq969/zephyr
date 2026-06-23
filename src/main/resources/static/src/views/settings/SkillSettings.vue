@@ -33,7 +33,7 @@ const detailSkill = ref<SkillConfig | null>(null)
 const showDetail = ref(false)
 
 const selectedIds = ref<Set<string>>(new Set())
-const activeTab = ref('shared')
+const activeTab = ref('user')
 const batchDeleting = ref(false)
 
 function toggleSelect(id: string) {
@@ -277,6 +277,53 @@ function goBack() { window.history.back() }
     </div>
 
     <el-tabs v-if="filteredSkills.length > 0" v-model="activeTab" class="skill-tabs">
+      <el-tab-pane :label="(langData.skillMgmt_userSection || '我的 Skill') + ' (' + userSkills.length + ')'" name="user">
+        <div v-if="userSkills.length > 0" class="batch-bar">
+          <label class="batch-check" @click.stop>
+            <input type="checkbox" :checked="selectedIds.size > 0 && userSkills.every(s => s.id && selectedIds.has(s.id))" @change="toggleBatchSelectAll(userSkills)" />
+            <span class="batch-label">{{ langData.skillMgmt_selectAll }} ({{ userSkills.filter(s => s.id && selectedIds.has(s.id)).length }})</span>
+          </label>
+          <button
+            v-if="selectedIds.size > 0"
+            class="btn-danger btn-sm"
+            :disabled="batchDeleting"
+            @click="doBatchUninstall"
+          >
+            <Icon icon="lucide:trash-2" width="14" /> {{ langData.skillMgmt_batchUninstall }}
+          </button>
+        </div>
+        <div v-if="userSkills.length > 0" class="skill-list">
+          <div v-for="s in userSkills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
+            <label class="card-check" @click.stop>
+              <input type="checkbox" :checked="s.id ? selectedIds.has(s.id) : false" @change="s.id && toggleSelect(s.id)" />
+            </label>
+            <div class="skill-icon" :class="s.source">
+              <Icon :icon="s.source === 'builtin' ? 'lucide:star' : s.source === 'git' ? 'lucide:git-branch' : s.source === 'sync' ? 'lucide:refresh-cw' : s.source === 'upload' ? 'lucide:package' : 'lucide:puzzle'" width="18" />
+            </div>
+            <div class="skill-info">
+              <div class="skill-name">{{ s.skillName || s.displayName }}</div>
+              <div v-if="s.description" class="skill-desc">{{ s.description }}</div>
+              <div class="skill-meta">
+                <span class="badge badge-source" :class="'src-' + s.source">{{ sourceTag[s.source] ?? s.source }}</span>
+                <span v-if="s.version" class="badge badge-version">{{ 'v' + s.version }}</span>
+              </div>
+            </div>
+            <div class="skill-actions" @click.stop>
+              <label class="toggle-switch" :title="s.enabled ? langData.skillMgmt_disabled : langData.skillMgmt_enabled">
+                <input type="checkbox" :checked="s.enabled" @change="doToggle(s)" />
+                <span class="toggle-slider"></span>
+              </label>
+              <button class="btn-icon" @click="confirmUninstall(s)" :title="langData.skillMgmt_uninstall">
+                <Icon icon="lucide:trash-2" width="15" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-result">
+          <Icon icon="lucide:inbox" class="empty-icon" />
+          <p class="empty-desc">{{ langData.skillMgmt_noUser || '暂无个人 Skill' }}</p>
+        </div>
+      </el-tab-pane>
       <el-tab-pane :label="(langData.skillMgmt_sharedSection || '共享 Skill') + ' (' + sharedSkills.length + ')'" name="shared">
         <div v-if="sharedSkills.length > 0" class="batch-bar">
           <label class="batch-check" @click.stop>
@@ -323,53 +370,6 @@ function goBack() { window.history.back() }
         <div v-else class="empty-result">
           <Icon icon="lucide:inbox" class="empty-icon" />
           <p class="empty-desc">{{ langData.skillMgmt_noShared || '暂无共享 Skill' }}</p>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane :label="(langData.skillMgmt_userSection || '我的 Skill') + ' (' + userSkills.length + ')'" name="user">
-        <div v-if="userSkills.length > 0" class="batch-bar">
-          <label class="batch-check" @click.stop>
-            <input type="checkbox" :checked="selectedIds.size > 0 && userSkills.every(s => s.id && selectedIds.has(s.id))" @change="toggleBatchSelectAll(userSkills)" />
-            <span class="batch-label">{{ langData.skillMgmt_selectAll }} ({{ userSkills.filter(s => s.id && selectedIds.has(s.id)).length }})</span>
-          </label>
-          <button
-            v-if="selectedIds.size > 0"
-            class="btn-danger btn-sm"
-            :disabled="batchDeleting"
-            @click="doBatchUninstall"
-          >
-            <Icon icon="lucide:trash-2" width="14" /> {{ langData.skillMgmt_batchUninstall }}
-          </button>
-        </div>
-        <div v-if="userSkills.length > 0" class="skill-list">
-          <div v-for="s in userSkills" :key="s.id ?? s.skillName" class="skill-card" @click="showSkillDetail(s)">
-            <label class="card-check" @click.stop>
-              <input type="checkbox" :checked="s.id ? selectedIds.has(s.id) : false" @change="s.id && toggleSelect(s.id)" />
-            </label>
-            <div class="skill-icon" :class="s.source">
-              <Icon :icon="s.source === 'builtin' ? 'lucide:star' : s.source === 'git' ? 'lucide:git-branch' : s.source === 'sync' ? 'lucide:refresh-cw' : s.source === 'upload' ? 'lucide:package' : 'lucide:puzzle'" width="18" />
-            </div>
-            <div class="skill-info">
-              <div class="skill-name">{{ s.skillName || s.displayName }}</div>
-              <div v-if="s.description" class="skill-desc">{{ s.description }}</div>
-              <div class="skill-meta">
-                <span class="badge badge-source" :class="'src-' + s.source">{{ sourceTag[s.source] ?? s.source }}</span>
-                <span v-if="s.version" class="badge badge-version">{{ 'v' + s.version }}</span>
-              </div>
-            </div>
-            <div class="skill-actions" @click.stop>
-              <label class="toggle-switch" :title="s.enabled ? langData.skillMgmt_disabled : langData.skillMgmt_enabled">
-                <input type="checkbox" :checked="s.enabled" @change="doToggle(s)" />
-                <span class="toggle-slider"></span>
-              </label>
-              <button class="btn-icon" @click="confirmUninstall(s)" :title="langData.skillMgmt_uninstall">
-                <Icon icon="lucide:trash-2" width="15" />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-result">
-          <Icon icon="lucide:inbox" class="empty-icon" />
-          <p class="empty-desc">{{ langData.skillMgmt_noUser || '暂无个人 Skill' }}</p>
         </div>
       </el-tab-pane>
     </el-tabs>

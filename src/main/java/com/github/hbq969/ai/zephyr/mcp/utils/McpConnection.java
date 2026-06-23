@@ -1,6 +1,7 @@
 package com.github.hbq969.ai.zephyr.mcp.utils;
 
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity;
+import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -11,6 +12,9 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -88,6 +92,14 @@ public class McpConnection {
             }
         }
         process = pb.start();
+        Path pidFile = pidFilePath();
+        try {
+            Files.createDirectories(pidFile.getParent());
+            Files.writeString(pidFile, String.valueOf(process.pid()));
+            log.info("MCP PID 已记录: server={}, pid={}", server.getName(), process.pid());
+        } catch (Exception e) {
+            log.warn("写入 MCP PID 文件失败: {}", pidFile, e);
+        }
         reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
         writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
 
@@ -173,6 +185,64 @@ public class McpConnection {
         return extractContent(resp);
     }
 
+    public List<McpToolEntity> listTools() {
+        List<McpToolEntity> tools = new java.util.ArrayList<>();
+        try {
+            String resp;
+            if (type == Type.STDIO) {
+                JsonObject req = new JsonObject();
+                req.addProperty("jsonrpc", "2.0");
+                req.addProperty("id", requestId.incrementAndGet());
+                req.addProperty("method", "tools/list");
+                req.add("params", new JsonObject());
+                resp = sendAndRead(gson.toJson(req));
+            } else {
+                JsonObject req = new JsonObject();
+                req.addProperty("jsonrpc", "2.0");
+                req.addProperty("id", requestId.incrementAndGet());
+                req.addProperty("method", "tools/list");
+                req.add("params", new JsonObject());
+                resp = _httpPost(gson.toJson(req));
+            }
+            if (resp != null) {
+                tools = parseTools(resp);
+            }
+        } catch (Exception e) {
+            log.warn("MCP listTools 失败: server={}, error={}", server.getName(), e.getMessage());
+            throw new RuntimeException("获取工具列表失败: " + e.getMessage(), e);
+        }
+        return tools;
+    }
+
+    private List<McpToolEntity> parseTools(String raw) {
+        List<McpToolEntity> tools = new java.util.ArrayList<>();
+        try {
+            if (raw == null) return tools;
+            JsonObject resp = gson.fromJson(raw, JsonObject.class);
+            if (resp.has("result")) {
+                JsonObject result = resp.getAsJsonObject("result");
+                if (result.has("tools")) {
+                    JsonArray arr = result.getAsJsonArray("tools");
+                    for (int i = 0; i < arr.size(); i++) {
+                        JsonObject t = arr.get(i).getAsJsonObject();
+                        McpToolEntity entity = new McpToolEntity();
+                        entity.setToolName(t.has("name") ? t.get("name").getAsString() : "");
+                        entity.setDescription(t.has("description") ? t.get("description").getAsString() : "");
+                        if (t.has("inputSchema")) {
+                            entity.setParametersJson(gson.toJson(t.get("inputSchema")));
+                        }
+                        entity.setSource("discovered");
+                        entity.setEnabled(1);
+                        tools.add(entity);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("解析 tools/list 响应失败: {}", e.getMessage());
+        }
+        return tools;
+    }
+
     private String extractContent(String resp) {
         if (resp == null) return "工具返回空结果";
         try {
@@ -224,9 +294,13 @@ public class McpConnection {
         try {
             return future.get(toolTimeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            log.warn("STDIO MCP 工具执行超时（{}秒），取消等待并强制关闭进程", toolTimeoutSeconds);
+            log.warn("STDIO MCP 工具执行超时({}s)，强制关闭进程: server={}, pid={}",
+                    toolTimeoutSeconds, server.getName(), process != null ? process.pid() : -1);
             future.cancel(true);
-            if (process != null) process.destroyForcibly();
+            if (process != null) {
+                process.destroyForcibly();
+                try { Files.deleteIfExists(pidFilePath()); } catch (Exception ignored) {}
+            }
             return null;
         }
     }
@@ -270,6 +344,11 @@ public class McpConnection {
         return null;
     }
 
+    private Path pidFilePath() {
+        return Paths.get(System.getProperty("user.home"), ".zephyr/mcp-pids",
+                server.getUserName() + "-" + server.getId() + ".pid");
+    }
+
     private void touch() {
         this.lastUsedAt = System.currentTimeMillis();
     }
@@ -277,7 +356,10 @@ public class McpConnection {
     public void close() {
         try {
             if (type == Type.STDIO && process != null) {
+                long pid = process.pid();
                 process.destroyForcibly();
+                try { Files.deleteIfExists(pidFilePath()); } catch (Exception ignored) {}
+                log.info("MCP 进程已终止: server={}, pid={}", server.getName(), pid);
             }
         } catch (Exception ignored) {}
     }

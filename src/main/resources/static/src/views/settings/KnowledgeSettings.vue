@@ -12,7 +12,7 @@ const router = useRouter()
 const langData = getLangData()
 const store = useSettingsStore()
 const serverScope = ref<'user' | 'shared'>('user')
-const activeTab = ref('shared')
+const activeTab = ref('user')
 const sharedBases = computed(() => store.knowledgeBases.filter((kb: any) => kb.scope === 'shared'))
 const userBases = computed(() => store.knowledgeBases.filter((kb: any) => kb.scope !== 'shared'))
 const dialogVisible = ref(false)
@@ -98,6 +98,53 @@ onMounted(() => { store.loadKnowledgeBases() })
     <p class="subtitle">{{ langData.knowledgeMgmt_subtitle }}</p>
 
     <el-tabs v-if="store.knowledgeBases.length > 0" v-model="activeTab" class="kb-tabs">
+      <el-tab-pane :label="(langData.knowledgeMgmt_userTab || '我的知识库') + ' (' + userBases.length + ')'" name="user">
+        <div v-if="userBases.length > 0" class="card-list">
+          <div v-for="kb in userBases" :key="kb.id" class="kb-card" @click="goDocs(kb.id)">
+            <div class="card-inner">
+              <div class="card-header">
+                <Icon icon="lucide:library" class="card-icon" />
+                <div class="card-body">
+                  <div class="card-title">{{ kb.name }}</div>
+                  <div class="card-desc" v-if="kb.description">{{ kb.description }}</div>
+                  <div class="card-meta">
+                    <span class="kb-embed-badge">{{ kb.embedModelName || langData.knowledgeMgmt_embedModel }}</span>
+                    <span v-if="kb.graphEnabled" class="kb-graph-badge">图谱</span>
+                    <span>{{ langData.knowledgeMgmt_docCount.replace('{count}', kb.docCount || 0) }}</span>
+                    <span>{{ fmtTime(kb.updatedAt) }}</span>
+                  </div>
+                </div>
+                <div class="card-actions" @click.stop>
+                  <el-tooltip :content="langData.knowledgeMgmt_recallTest">
+                    <el-button circle size="small" @click="router.push('/settings/knowledge/' + kb.id + '/recall-test')">
+                      <Icon icon="lucide:search" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip v-if="kb.canManage" :content="langData.knowledgeMgmt_shareToAll">
+                    <el-button circle size="small" @click="toggleScope(kb.id!, 'shared')">
+                      <Icon icon="lucide:share-2" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip v-if="kb.canManage" :content="langData.btnEdit">
+                    <el-button circle size="small" @click="openEdit(kb)">
+                      <Icon icon="lucide:edit-3" />
+                    </el-button>
+                  </el-tooltip>
+                  <el-tooltip v-if="kb.canManage" :content="langData.btnDelete">
+                    <el-button circle size="small" @click="deleteKb(kb)">
+                      <Icon icon="lucide:trash-2" />
+                    </el-button>
+                  </el-tooltip>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-result">
+          <Icon icon="lucide:inbox" class="empty-icon" />
+          <p class="empty-desc">{{ langData.knowledgeMgmt_noUser || '暂无个人知识库' }}</p>
+        </div>
+      </el-tab-pane>
       <el-tab-pane :label="(langData.knowledgeMgmt_sharedTab || '共享知识库') + ' (' + sharedBases.length + ')'" name="shared">
         <div v-if="sharedBases.length > 0" class="card-list">
           <div v-for="kb in sharedBases" :key="kb.id" class="kb-card" @click="goDocs(kb.id)">
@@ -144,53 +191,6 @@ onMounted(() => { store.loadKnowledgeBases() })
         <div v-else class="empty-result">
           <Icon icon="lucide:inbox" class="empty-icon" />
           <p class="empty-desc">{{ langData.knowledgeMgmt_noShared || '暂无共享知识库' }}</p>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane :label="(langData.knowledgeMgmt_userTab || '我的知识库') + ' (' + userBases.length + ')'" name="user">
-        <div v-if="userBases.length > 0" class="card-list">
-          <div v-for="kb in userBases" :key="kb.id" class="kb-card" @click="goDocs(kb.id)">
-            <div class="card-inner">
-              <div class="card-header">
-                <Icon icon="lucide:library" class="card-icon" />
-                <div class="card-body">
-                  <div class="card-title">{{ kb.name }}</div>
-                  <div class="card-desc" v-if="kb.description">{{ kb.description }}</div>
-                  <div class="card-meta">
-                    <span class="kb-embed-badge">{{ kb.embedModelName || langData.knowledgeMgmt_embedModel }}</span>
-                    <span v-if="kb.graphEnabled" class="kb-graph-badge">图谱</span>
-                    <span>{{ langData.knowledgeMgmt_docCount.replace('{count}', kb.docCount || 0) }}</span>
-                    <span>{{ fmtTime(kb.updatedAt) }}</span>
-                  </div>
-                </div>
-                <div class="card-actions" @click.stop>
-                  <el-tooltip :content="langData.knowledgeMgmt_recallTest">
-                    <el-button circle size="small" @click="router.push('/settings/knowledge/' + kb.id + '/recall-test')">
-                      <Icon icon="lucide:search" />
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip v-if="kb.canManage" :content="langData.knowledgeMgmt_shareToAll">
-                    <el-button circle size="small" @click="toggleScope(kb.id!, 'shared')">
-                      <Icon icon="lucide:share-2" />
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip v-if="kb.canManage" :content="langData.btnEdit">
-                    <el-button circle size="small" @click="openEdit(kb)">
-                      <Icon icon="lucide:edit-3" />
-                    </el-button>
-                  </el-tooltip>
-                  <el-tooltip v-if="kb.canManage" :content="langData.btnDelete">
-                    <el-button circle size="small" @click="deleteKb(kb)">
-                      <Icon icon="lucide:trash-2" />
-                    </el-button>
-                  </el-tooltip>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div v-else class="empty-result">
-          <Icon icon="lucide:inbox" class="empty-icon" />
-          <p class="empty-desc">{{ langData.knowledgeMgmt_noUser || '暂无个人知识库' }}</p>
         </div>
       </el-tab-pane>
     </el-tabs>

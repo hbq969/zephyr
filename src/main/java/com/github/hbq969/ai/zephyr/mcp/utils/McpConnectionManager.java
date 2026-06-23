@@ -4,13 +4,18 @@ import com.github.hbq969.ai.zephyr.mcp.dao.McpDao;
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity;
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity;
 import com.github.hbq969.code.common.encrypt.ext.utils.AESUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,9 +26,40 @@ public class McpConnectionManager {
 
 
 
+    private static final Path PIDS_DIR = Paths.get(System.getProperty("user.home"), ".zephyr/mcp-pids");
+
     private final Map<String, McpConnection> connections = new ConcurrentHashMap<>();
 
     @Resource private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+
+    @PostConstruct
+    void cleanupOrphanProcesses() {
+        try {
+            Files.createDirectories(PIDS_DIR);
+        } catch (Exception e) {
+            log.warn("创建 MCP PID 目录失败: {}", PIDS_DIR, e);
+            return;
+        }
+        File[] files = PIDS_DIR.toFile().listFiles((d, n) -> n.endsWith(".pid"));
+        if (files == null || files.length == 0) {
+            log.info("无孤儿 MCP 进程需要清理");
+            return;
+        }
+        for (File f : files) {
+            try {
+                long pid = Long.parseLong(Files.readString(f.toPath()).trim());
+                ProcessHandle.of(pid).ifPresent(ph -> {
+                    ph.destroyForcibly();
+                    log.info("已清理孤儿 MCP 进程: pid={}, file={}", pid, f.getName());
+                });
+                Files.deleteIfExists(f.toPath());
+            } catch (Exception e) {
+                log.warn("清理孤儿进程失败: {}", f.getName(), e);
+            }
+        }
+        mcpDao.resetAllServerStatus("disconnected");
+        log.info("MCP 服务器状态已重置: 所有服务器设为 disconnected");
+    }
 
 
 
@@ -34,7 +70,8 @@ public class McpConnectionManager {
         String key = userName + ":" + serverId;
         McpConnection conn = connections.get(key);
         if (conn != null) {
-            return conn; // touch 在 callTool 中更新
+            log.debug("MCP 连接复用: user={}, serverId={}", userName, serverId);
+            return conn;
         }
         return createConnection(key, userName, serverId);
     }
@@ -59,7 +96,8 @@ public class McpConnectionManager {
 
         McpConnection conn = McpConnection.create(server, cfg.getMcp().getTool().getTimeoutSeconds());
         connections.put(key, conn);
-        log.info("MCP 连接已建立: {} (当前 {} 个连接)", key, connections.size());
+        log.info("MCP 连接已建立: user={}, serverId={}, serverName={}, transport={}, 当前连接数={}",
+                userName, serverId, server.getName(), server.getTransport(), connections.size());
         return conn;
     }
 
@@ -68,7 +106,26 @@ public class McpConnectionManager {
         McpConnection conn = connections.remove(key);
         if (conn != null) {
             conn.close();
-            log.info("MCP 连接已关闭: {}", key);
+            log.info("MCP 连接已关闭: user={}, serverId={}, 剩余连接数={}",
+                    userName, serverId, connections.size());
+        }
+    }
+
+    /** 删除服务器时关闭所有关联连接（共享服务器可能被多人使用） */
+    public void removeAllConnectionsForServer(String serverId) {
+        List<String> toRemove = new java.util.ArrayList<>();
+        for (String key : connections.keySet()) {
+            if (key.endsWith(":" + serverId)) {
+                toRemove.add(key);
+            }
+        }
+        for (String key : toRemove) {
+            McpConnection conn = connections.remove(key);
+            if (conn != null) conn.close();
+        }
+        if (!toRemove.isEmpty()) {
+            log.info("MCP 服务器删除，已关闭 {} 个关联连接: serverId={}, 剩余连接数={}",
+                    toRemove.size(), serverId, connections.size());
         }
     }
 
@@ -95,7 +152,7 @@ public class McpConnectionManager {
         if (oldest != null) {
             McpConnection conn = connections.remove(oldest);
             if (conn != null) conn.close();
-            log.info("LRU 淘汰连接: {}", oldest);
+            log.info("LRU 淘汰 MCP 连接: {}, 当前连接数={}", oldest, connections.size());
         }
     }
 
@@ -103,9 +160,11 @@ public class McpConnectionManager {
     public void cleanupIdle() {
         long now = System.currentTimeMillis();
         connections.entrySet().removeIf(entry -> {
-            if (now - entry.getValue().getLastUsedAt() > cfg.getMcp().getConnection().getIdleTimeoutMillis()) {
+            long idleDuration = now - entry.getValue().getLastUsedAt();
+            if (idleDuration > cfg.getMcp().getConnection().getIdleTimeoutMillis()) {
                 entry.getValue().close();
-                log.info("空闲连接回收: {}", entry.getKey());
+                log.info("空闲 MCP 连接已回收: userServer={}, 空闲时间={}ms, 剩余连接数={}",
+                        entry.getKey(), idleDuration, connections.size() - 1);
                 return true;
             }
             return false;

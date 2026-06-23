@@ -14,6 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -33,6 +36,7 @@ public class McpClient {
 
     private static List<McpToolEntity> discoverStdio(McpServerEntity server) {
         List<McpToolEntity> tools = new ArrayList<>();
+        Process process = null;
         try {
             List<String> cmd = new ArrayList<>();
             cmd.add(server.getCommand());
@@ -52,23 +56,34 @@ public class McpClient {
                     }
                 }
             }
-            Process process = pb.start();
+            process = pb.start();
+            final Process proc = process;
+            log.info("stdio MCP 进程已启动: server={}, pid={}, cmd={}",
+                    server.getName(), proc.pid(), String.join(" ", cmd));
 
-            // 消费 stderr，避免缓冲区满导致进程阻塞
             StringBuilder stderrBuf = new StringBuilder();
             Thread stderrThread = new Thread(() -> {
-                try (BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = errReader.readLine()) != null) {
-                        stderrBuf.append(line).append("\n");
+                try {
+                    log.debug("stdio MCP stderr 消费线程启动: server={}, pid={}", server.getName(), proc.pid());
+                    try (BufferedReader errReader = new BufferedReader(new InputStreamReader(proc.getErrorStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        int lineCount = 0;
+                        while ((line = errReader.readLine()) != null) {
+                            stderrBuf.append(line).append("\n");
+                            lineCount++;
+                        }
+                        log.debug("stdio MCP stderr 线程退出: server={}, pid={}, lines={}, alive={}",
+                                server.getName(), proc.pid(), lineCount, proc.isAlive());
                     }
                 } catch (Exception ignored) {}
-            });
+            }, "mcp-stderr-" + server.getName());
             stderrThread.setDaemon(true);
             stderrThread.start();
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+
+            int timeoutSec = 30;
 
             // 1. send initialize
             JsonObject initReq = new JsonObject();
@@ -85,12 +100,22 @@ public class McpClient {
             initParams.add("clientInfo", clientInfo);
             initReq.add("params", initParams);
 
-            String resp = sendAndReadJson(reader, writer, gson.toJson(initReq));
-            if (resp == null || !resp.contains("\"id\":1")) {
-                process.destroyForcibly();
-                String errInfo = stderrBuf.toString().trim();
-                if (!errInfo.isEmpty()) {
-                    log.warn("stdio MCP initialize 失败，stderr: {}", errInfo.substring(0, Math.min(500, errInfo.length())));
+            String resp = sendAndReadJsonWithTimeout(reader, writer, gson.toJson(initReq), timeoutSec);
+            String stderrInfo = stderrBuf.toString().trim();
+            if (resp == null) {
+                log.warn("stdio MCP initialize 超时({}s): server={}, pid={}, alive={}, stderrLen={}, stderr={}",
+                        timeoutSec, server.getName(), proc.pid(), proc.isAlive(), stderrInfo.length(),
+                        stderrInfo.isEmpty() ? "(空)" : stderrInfo.substring(0, Math.min(500, stderrInfo.length())));
+                return tools;
+            }
+            if (!resp.contains("\"id\":1")) {
+                if (!stderrInfo.isEmpty()) {
+                    log.warn("stdio MCP initialize 响应异常: server={}, resp={}, stderr={}", server.getName(),
+                            resp.substring(0, Math.min(200, resp.length())),
+                            stderrInfo.substring(0, Math.min(300, stderrInfo.length())));
+                } else {
+                    log.warn("stdio MCP initialize 响应异常: server={}, resp={}", server.getName(),
+                            resp.substring(0, Math.min(200, resp.length())));
                 }
                 return tools;
             }
@@ -108,14 +133,16 @@ public class McpClient {
             listReq.addProperty("method", "tools/list");
             listReq.add("params", new JsonObject());
 
-            resp = sendAndReadJson(reader, writer, gson.toJson(listReq));
-            if (resp != null) {
-                tools = parseTools(resp);
+            resp = sendAndReadJsonWithTimeout(reader, writer, gson.toJson(listReq), timeoutSec);
+            if (resp == null) {
+                log.warn("stdio MCP tools/list 超时({}s): server={}", timeoutSec, server.getName());
+                return tools;
             }
-
-            process.destroyForcibly();
+            tools = parseTools(resp);
         } catch (Exception e) {
             log.warn("stdio MCP 连接失败: {} - {}", server.getName(), e.getMessage());
+        } finally {
+            if (process != null) process.destroyForcibly();
         }
         return tools;
     }
@@ -165,9 +192,21 @@ public class McpClient {
         return tools;
     }
 
-    private static String sendAndReadJson(BufferedReader reader, BufferedWriter writer, String json) throws Exception {
+    private static String sendAndReadJsonWithTimeout(BufferedReader reader, BufferedWriter writer, String json, int timeoutSeconds) throws Exception {
         writeMsg(writer, json);
-        return readMsgJson(reader);
+        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+            try {
+                return readMsgJson(reader);
+            } catch (Exception e) {
+                return null;
+            }
+        });
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            return null;
+        }
     }
 
     private static void writeMsg(BufferedWriter writer, String json) throws Exception {
@@ -176,13 +215,20 @@ public class McpClient {
         writer.flush();
     }
 
-    /** 读取一行 JSON-RPC 响应，自动跳过非 JSON 行（如 MCP 服务器误打到 stdout 的日志） */
     private static String readMsgJson(BufferedReader reader) throws Exception {
+        StringBuilder skipped = new StringBuilder();
         for (int i = 0; i < 200; i++) {
             String line = reader.readLine();
             if (line == null) return null;
             String trimmed = line.trim();
             if (trimmed.startsWith("{")) return trimmed;
+            if (!trimmed.isEmpty() && skipped.length() < 500) {
+                if (!skipped.isEmpty()) skipped.append(" | ");
+                skipped.append(trimmed);
+            }
+        }
+        if (!skipped.isEmpty()) {
+            log.warn("stdio MCP stdout 非 JSON 行: {}", skipped.toString());
         }
         return null;
     }

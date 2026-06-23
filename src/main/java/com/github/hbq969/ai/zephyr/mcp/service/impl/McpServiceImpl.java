@@ -5,7 +5,7 @@ import com.github.hbq969.ai.zephyr.mcp.dao.McpDao;
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity;
 import com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity;
 import com.github.hbq969.ai.zephyr.mcp.service.McpService;
-import com.github.hbq969.ai.zephyr.mcp.utils.McpClient;
+import com.github.hbq969.ai.zephyr.mcp.utils.McpConnection;
 import com.github.hbq969.ai.zephyr.mcp.utils.McpConnectionManager;
 import com.github.hbq969.code.common.encrypt.ext.utils.AESUtil;
 import com.github.hbq969.code.sm.login.model.UserInfo;
@@ -90,6 +90,8 @@ public class McpServiceImpl implements McpService {
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         mcpDao.insertServer(entity);
+        log.info("MCP 服务器已创建: name={}, transport={}, scope={}, user={}",
+                name, entity.getTransport(), scope, userName);
         entity.setHeaders(headers.isEmpty() ? "" : maskHeaders(entity.getHeaders()));
         return entity;
     }
@@ -97,8 +99,11 @@ public class McpServiceImpl implements McpService {
     @Override
     @Transactional
     public void updateServer(Map<String, String> body, String userName) {
+        String id = body.get("id");
+        McpServerEntity oldServer = mcpDao.queryServerById(id);
+
         McpServerEntity entity = new McpServerEntity();
-        entity.setId(body.get("id"));
+        entity.setId(id);
         entity.setUserName(userName);
         entity.setName(body.get("name"));
         entity.setTransport(body.getOrDefault("transport", "stdio"));
@@ -112,6 +117,30 @@ public class McpServiceImpl implements McpService {
         }
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         mcpDao.updateServer(entity);
+        log.info("MCP 服务器配置已更新: id={}, name={}, user={}", id, body.get("name"), userName);
+
+        // 如果启动配置有变化，关闭所有旧连接，下次工具调用时懒重建
+        if (oldServer != null && hasConnectionConfigChanged(oldServer, body)) {
+            connectionManager.removeAllConnectionsForServer(id);
+            log.info("MCP 更新导致连接参数变化，已关闭旧连接: id={}", id);
+        }
+    }
+
+    private boolean hasConnectionConfigChanged(McpServerEntity old, Map<String, String> body) {
+        String newCmd = body.getOrDefault("command", "");
+        String newArgs = body.getOrDefault("args", "");
+        String newEnv = body.getOrDefault("envVars", "");
+        String newUrl = body.getOrDefault("url", "");
+        String newHeaders = body.getOrDefault("headers", "");
+        return !old.getCommand().equals(newCmd)
+                || !nullToEmpty(old.getArgs()).equals(newArgs)
+                || !nullToEmpty(old.getEnvVars()).equals(newEnv)
+                || !nullToEmpty(old.getUrl()).equals(newUrl)
+                || !newHeaders.isEmpty(); // headers 重新提交了就认为可能有变化
+    }
+
+    private String nullToEmpty(String s) {
+        return s == null ? "" : s;
     }
 
     @Override
@@ -119,57 +148,94 @@ public class McpServiceImpl implements McpService {
     public void deleteServer(String id, String userName) {
         McpServerEntity server = mcpDao.queryServerById(id);
         if (server != null && SCOPE_SHARED.equals(server.getScope())) checkSharedManage();
+        log.info("MCP 服务器已删除: id={}, name={}, user={}", id,
+                server != null ? server.getName() : id, userName);
+        connectionManager.removeAllConnectionsForServer(id);
         mcpDao.deleteToolsByServerId(id, server != null ? server.getUserName() : userName);
         mcpDao.deleteServer(id, userName);
     }
 
     @Override
-    @Transactional
     public void connect(String id, String userName) {
         McpServerEntity server = mcpDao.queryServerById(id);
-        if (server == null) return;
+        if (server == null) {
+            log.warn("MCP 连接失败，服务器不存在: id={}", id);
+            return;
+        }
 
         boolean isShared = SCOPE_SHARED.equals(server.getScope());
         if (isShared) checkSharedManage();
+
+        log.info("MCP 开始连接: name={}, transport={}, command={}, user={}",
+                server.getName(), server.getTransport(), server.getCommand(), userName);
+
+        // 先关闭已有的连接
+        connectionManager.removeAllConnectionsForServer(id);
 
         String encryptedHeaders = server.getHeaders();
         if (encryptedHeaders != null && !encryptedHeaders.isEmpty()) {
             server.setHeaders(AESUtil.decrypt(encryptedHeaders, cfg.getEncrypt().getRestful().getAes().getKey(), cfg.getEncrypt().getRestful().getAes().getIv(), StandardCharsets.UTF_8));
         }
 
-        List<McpToolEntity> discovered = McpClient.discoverTools(server);
-        mcpDao.deleteToolsByServerId(id, server.getUserName());
+        McpConnection conn = null;
+        try {
+            // 创建持久连接（启动 STDIO 进程 + MCP 握手）
+            conn = connectionManager.getConnection(userName, id);
 
-        // 检查发现的工具是否与共享工具或当前用户已有工具重名
-        for (McpToolEntity t : discovered) {
-            McpToolEntity dup = mcpDao.queryToolByNameAndUser(t.getToolName(), server.getUserName());
-            if (dup != null) {
-                throw new RuntimeException("工具名 \"" + t.getToolName() + "\" 已存在，连接失败");
+            // 从持久连接发现工具
+            List<McpToolEntity> discovered = conn.listTools();
+
+            mcpDao.deleteToolsByServerId(id, server.getUserName());
+
+            // 检查工具名冲突
+            for (McpToolEntity t : discovered) {
+                McpToolEntity dup = mcpDao.queryToolByNameAndUser(t.getToolName(), server.getUserName());
+                if (dup != null) {
+                    log.warn("MCP 连接失败，工具名冲突: server={}, tool={}", server.getName(), t.getToolName());
+                    throw new RuntimeException("工具名 \"" + t.getToolName() + "\" 已存在，连接失败");
+                }
             }
-        }
 
-        if (discovered.isEmpty()) {
+            if (discovered.isEmpty()) {
+                log.warn("MCP 连接失败，未发现工具: server={}", server.getName());
+                mcpDao.updateServerStatus(id, "error", userName);
+                connectionManager.removeConnection(userName, id);
+                return;
+            }
+
+            long now = System.currentTimeMillis() / 1000;
+            for (McpToolEntity t : discovered) {
+                t.setId(UUID.fastUUID().toString(true).substring(0, 12));
+                t.setUserName(server.getUserName());
+                t.setServerId(id);
+                t.setCreatedAt(now);
+                mcpDao.insertTool(t);
+            }
+
+            mcpDao.updateServerStatus(id, "connected", userName);
+            log.info("MCP 连接成功: name={}, 发现 {} 个工具, user={}",
+                    server.getName(), discovered.size(), userName);
+        } catch (RuntimeException e) {
+            log.warn("MCP 连接失败: name={}, error={}", server.getName(), e.getMessage());
             mcpDao.updateServerStatus(id, "error", userName);
-            return;
+            if (conn != null) {
+                connectionManager.removeConnection(userName, id);
+            }
+            throw e;
         }
-
-        long now = System.currentTimeMillis() / 1000;
-        for (McpToolEntity t : discovered) {
-            t.setId(UUID.fastUUID().toString(true).substring(0, 12));
-            t.setUserName(server.getUserName());
-            t.setServerId(id);
-            t.setCreatedAt(now);
-            mcpDao.insertTool(t);
-        }
-
-        mcpDao.updateServerStatus(id, "connected", userName);
     }
 
     @Override
     @Transactional
     public void disconnect(String id, String userName) {
         McpServerEntity server = mcpDao.queryServerById(id);
-        connectionManager.removeConnection(userName, id);
+        log.info("MCP 断开连接: id={}, name={}, user={}", id,
+                server != null ? server.getName() : id, userName);
+        if (server != null && SCOPE_SHARED.equals(server.getScope())) {
+            connectionManager.removeAllConnectionsForServer(id);
+        } else {
+            connectionManager.removeConnection(userName, id);
+        }
         mcpDao.updateServerStatus(id, "disconnected", userName);
     }
 
@@ -200,6 +266,8 @@ public class McpServiceImpl implements McpService {
         entity.setSource("manual");
         entity.setCreatedAt(System.currentTimeMillis() / 1000);
         mcpDao.insertTool(entity);
+        log.info("MCP 工具已手动添加: toolName={}, serverId={}, user={}",
+                body.get("toolName"), serverId, toolUser);
         return entity;
     }
 
@@ -225,6 +293,8 @@ public class McpServiceImpl implements McpService {
         if (tool == null) return;
         McpServerEntity server = mcpDao.queryServerById(tool.getServerId());
         if (server != null && SCOPE_SHARED.equals(server.getScope())) checkSharedManage();
+        log.info("MCP 工具已删除: toolName={}, serverId={}, user={}",
+                tool.getToolName(), tool.getServerId(), userName);
         mcpDao.deleteTool(id, tool.getUserName());
     }
 
@@ -235,6 +305,8 @@ public class McpServiceImpl implements McpService {
         if (tool == null) return;
         McpServerEntity server = mcpDao.queryServerById(tool.getServerId());
         if (server != null && SCOPE_SHARED.equals(server.getScope())) checkSharedManage();
+        log.info("MCP 工具{}: toolName={}, serverId={}, user={}",
+                enabled == 1 ? "已启用" : "已禁用", tool.getToolName(), tool.getServerId(), userName);
         mcpDao.toggleTool(id, enabled, tool.getUserName());
     }
 
@@ -249,6 +321,14 @@ public class McpServiceImpl implements McpService {
     @Transactional
     public void toggleServerScope(String id, String scope) {
         checkSharedManage();
+        McpServerEntity server = mcpDao.queryServerById(id);
+        log.info("MCP 范围已变更: id={}, name={}, scope={}",
+                id, server != null ? server.getName() : id, scope);
+        // 取消共享时，关闭其他用户持有的连接
+        if (server != null && SCOPE_SHARED.equals(server.getScope()) && SCOPE_USER.equals(scope)) {
+            connectionManager.removeAllConnectionsForServer(id);
+            log.info("MCP 取消共享，已关闭所有关联连接: id={}", id);
+        }
         mcpDao.updateServerScope(id, scope);
     }
 

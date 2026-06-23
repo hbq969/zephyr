@@ -272,6 +272,7 @@ zephyr:
   memory:
     home: ${user.home}/.zephyr/memory  # 记忆存储目录
   knowledge:
+    top-k: 5  # 知识库检索默认返回结果数量，LLM 可通过 top_k 参数覆盖
     data-dir: ${user.home}/.zephyr/knowledge
     chroma:
       mode: embedded

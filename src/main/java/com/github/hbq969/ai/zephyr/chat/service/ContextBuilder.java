@@ -441,7 +441,7 @@ public class ContextBuilder {
     private ToolDef buildSearchKnowledgeTool() {
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("query", Map.of("type", "string", "description", "检索关键词或问题"));
-        props.put("top_k", Map.of("type", "integer", "description", "返回结果数量，默认 5"));
+        props.put("top_k", Map.of("type", "integer", "description", "返回结果数量，默认 " + cfg.getKnowledge().getTopK()));
 
         return ToolDef.builder()
                 .type("function")
