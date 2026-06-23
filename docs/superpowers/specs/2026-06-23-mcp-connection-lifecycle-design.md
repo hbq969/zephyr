@@ -59,6 +59,8 @@ void cleanupOrphanProcesses() {
 - catch 异常后将 DB 状态设为 `error`
 - 同时关闭已创建的连接（如有），清理 PID 文件
 
+**关键决策：移除 `@Transactional`。** 如果保留 `@Transactional`，catch 块中 `updateServerStatus("error")` 在 `throw e` 后会被回滚。移除后每条 SQL 自动提交，error 状态能持久化。
+
 ### 4. 全生命周期日志
 
 | 类 | 事件 | 日志 |
@@ -81,7 +83,7 @@ void cleanupOrphanProcesses() {
 ## connect() 新流程
 
 ```
-connect(serverId, userName):
+connect(serverId, userName):              ← 注意：无 @Transactional
   1. 查 DB 获取 server 配置
   2. 权限检查（共享服务器需 admin）
   3. 关闭已有连接 removeAllConnectionsForServer(id)

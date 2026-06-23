@@ -145,9 +145,9 @@ public List<McpToolEntity> listTools() {
 private List<McpToolEntity> parseTools(String raw) {
     List<McpToolEntity> tools = new ArrayList<>();
     try {
-        String json = (type == Type.HTTP) ? McpClient.extractSSEData(raw) : raw;
-        if (json == null) return tools;
-        JsonObject resp = gson.fromJson(json, JsonObject.class);
+        // _httpPost() 和 readMsg() 都已返回纯 JSON，无需 SSE 提取
+        if (raw == null) return tools;
+        JsonObject resp = gson.fromJson(raw, JsonObject.class);
         if (resp.has("result")) {
             JsonObject result = resp.getAsJsonObject("result");
             if (result.has("tools")) {
@@ -201,7 +201,6 @@ mvn clean compile -q
 
 ```java
 @Override
-@Transactional
 public void connect(String id, String userName) {
     McpServerEntity server = mcpDao.queryServerById(id);
     if (server == null) {
@@ -311,7 +310,7 @@ mvn clean compile -q
 grep -r "McpClient" src/main/java/ --include="*.java" | grep -v "McpClient.java"
 ```
 
-预期：仅 `McpConnection.java` 中对 `McpClient.extractSSEData()` 的引用
+预期：无输出（`McpServiceImpl.connect()` 不再使用 `McpClient`，`McpConnection.listTools()` 也不再引用 `McpClient`）
 
 - [ ] **Step 3: 提交**
 
