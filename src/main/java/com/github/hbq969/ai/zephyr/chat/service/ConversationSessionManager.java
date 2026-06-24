@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -112,6 +113,31 @@ public class ConversationSessionManager {
             return lastActivityTime;
         }
 
+        private final List<ProcessSlot> trackedProcesses = new CopyOnWriteArrayList<>();
+
+        public ProcessSlot reserveProcessSlot(String command) {
+            ProcessSlot slot = new ProcessSlot(command);
+            trackedProcesses.add(slot);
+            return slot;
+        }
+
+        public void killTrackedProcesses() {
+            for (ProcessSlot s : trackedProcesses) {
+                if (s.state == ProcessSlot.State.BOUND) {
+                    try {
+                        ProcessHandle.of(s.pid).ifPresent(ph -> {
+                            ph.descendants().forEach(ProcessHandle::destroyForcibly);
+                            ph.destroyForcibly();
+                        });
+                        log.info("[会话] 清理进程 cid={}, pid={}, cmd={}", conversationId, s.pid, s.command);
+                    } catch (Exception e) {
+                        log.warn("[会话] 清理进程失败 cid={}, pid={}", conversationId, s.pid, e);
+                    }
+                }
+            }
+            trackedProcesses.clear();
+        }
+
         public void cancel() {
             if (!this.cancelled) {
                 this.cancelled = true;
@@ -128,6 +154,27 @@ public class ConversationSessionManager {
             if (cancelled) {
                 throw new CancelSessionException(conversationId);
             }
+        }
+    }
+
+    public static class ProcessSlot {
+        enum State { RESERVED, BOUND, FAILED }
+
+        final String command;
+        volatile State state = State.RESERVED;
+        volatile long pid;
+
+        ProcessSlot(String command) {
+            this.command = command;
+        }
+
+        void bind(long pid) {
+            this.pid = pid;
+            this.state = State.BOUND;
+        }
+
+        void markFailed() {
+            this.state = State.FAILED;
         }
     }
 
