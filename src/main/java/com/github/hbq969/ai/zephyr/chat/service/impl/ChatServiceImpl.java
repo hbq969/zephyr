@@ -77,10 +77,11 @@ public class ChatServiceImpl implements ChatService {
         SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());
 
         emitter.onTimeout(() -> {
+            log.info("[会话] SSE 超时 cid={}", cid);
             handle.cancel();
         });
         emitter.onError(th -> {
-            log.warn("SSE client disconnected: {}", th.getMessage());
+            log.warn("[会话] SSE 客户端断开 cid={}: {}", cid, th.getMessage());
             handle.cancel();
         });
 
@@ -116,6 +117,7 @@ public class ChatServiceImpl implements ChatService {
                     conv.setCreatedAt(now);
                     conv.setUpdatedAt(now);
                     chatDao.insertConversation(conv);
+                    log.info("[会话] 新建对话 cid={}, user={}, title={}", cid, userName, conv.getTitle());
                     emitter.send(SseEmitter.event().name("message")
                             .data(ChatEvent.builder().type("meta").content(cid).build()));
                 }
@@ -246,15 +248,15 @@ public class ChatServiceImpl implements ChatService {
                     }
                 }
             } catch (ConversationSessionManager.CancelSessionException e) {
-                log.debug("会话已被取消: {}", e.getMessage());
+                log.info("[会话] 已取消 cid={}", cid);
                 llmClient.cancelCall(cid);
             } catch (Exception e) {
                 boolean disconnected = e instanceof IOException
                         && e.getMessage() != null && e.getMessage().contains("CANCEL");
                 if (disconnected) {
-                    log.debug("SSE 客户端已断开，终止对话");
+                    log.info("[会话] SSE 客户端断开，终止对话 cid={}", cid);
                 } else {
-                    log.error("Chat error", e);
+                    log.error("[会话] 异常 cid={}", cid, e);
                     try {
                         emitter.send(SseEmitter.event().name("message")
                                 .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
@@ -264,6 +266,7 @@ public class ChatServiceImpl implements ChatService {
                 if (!completed) {
                     try { emitter.complete(); } catch (Exception ignored) {}
                 }
+                log.info("[会话] 异步任务结束 cid={}, completed={}", cid, completed);
                 sessionManager.remove(cid);
             }
         });
@@ -316,6 +319,7 @@ public class ChatServiceImpl implements ChatService {
             case "clear" -> {
                 chatDao.deleteMessagesByConvId(cid);
                 chatDao.deleteConversation(cid, userName);
+                log.info("[会话] /clear 清空对话 cid={}, user={}", cid, userName);
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("clear").build()));
                 emitter.send(SseEmitter.event().name("message")
@@ -550,7 +554,9 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public void cancel(String userName) {
-        for (ConversationSessionManager.SessionHandle h : sessionManager.getByUser(userName)) {
+        List<ConversationSessionManager.SessionHandle> handles = sessionManager.getByUser(userName);
+        log.info("[会话] 批量取消 user={}, 数量={}", userName, handles.size());
+        for (ConversationSessionManager.SessionHandle h : handles) {
             h.cancel();
             llmClient.cancelCall(h.getConversationId());
         }
@@ -560,6 +566,7 @@ public class ChatServiceImpl implements ChatService {
     public void cancelByConversationId(String conversationId) {
         ConversationSessionManager.SessionHandle h = sessionManager.get(conversationId);
         if (h != null) {
+            log.info("[会话] 按 cid 取消 cid={}", conversationId);
             h.cancel();
             llmClient.cancelCall(conversationId);
         }

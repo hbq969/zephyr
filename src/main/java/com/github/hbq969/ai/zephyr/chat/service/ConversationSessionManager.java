@@ -31,7 +31,7 @@ public class ConversationSessionManager {
     public SessionHandle register(String conversationId, String userName) {
         SessionHandle handle = new SessionHandle(conversationId, userName);
         sessions.put(conversationId, handle);
-        log.debug("会话注册: conversationId={}, userName={}", conversationId, userName);
+        log.info("[会话] 注册 cid={}, user={}, 当前活跃: {}", conversationId, userName, sessions.size());
         return handle;
     }
 
@@ -47,7 +47,7 @@ public class ConversationSessionManager {
 
     public void remove(String conversationId) {
         sessions.remove(conversationId);
-        log.debug("会话注销: conversationId={}", conversationId);
+        log.info("[会话] 注销 cid={}, 剩余活跃: {}", conversationId, sessions.size());
     }
 
     public ExecutorService getExecutor() {
@@ -113,7 +113,11 @@ public class ConversationSessionManager {
         }
 
         public void cancel() {
-            this.cancelled = true;
+            if (!this.cancelled) {
+                this.cancelled = true;
+                log.info("[会话] 标记取消 cid={}, idle={}s",
+                        conversationId, System.currentTimeMillis() / 1000 - lastActivityTime);
+            }
         }
 
         public boolean isCancelled() {

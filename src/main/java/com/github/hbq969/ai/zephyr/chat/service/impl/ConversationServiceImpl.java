@@ -10,6 +10,7 @@ import com.github.hbq969.ai.zephyr.chat.service.ConversationSessionManager;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class ConversationServiceImpl implements ConversationService {
 
@@ -84,6 +86,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
         ConversationSessionManager.SessionHandle handle = sessionManager.get(id);
         if (handle != null) {
+            log.info("[会话] 删除对话触发取消 cid={}, user={}", id, userName);
             handle.cancel();
         }
         chatDao.deleteMessagesByConvId(id);
