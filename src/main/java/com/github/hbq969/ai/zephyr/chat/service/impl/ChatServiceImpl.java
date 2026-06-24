@@ -709,9 +709,9 @@ public class ChatServiceImpl implements ChatService {
                 return "创建日志目录失败: " + e.getMessage();
             }
             try {
-                // 用单引号包裹路径防止空格问题；$$ 展开为 shell pid = Process.pid()
+                // 双引号包裹路径防空格，且允许 $$ 展开（单引号会阻止 shell 变量展开）
                 Process p = new ProcessBuilder("sh", "-c",
-                        "exec >'" + workspacePath + "/.zephyr-logs/$$.log' 2>&1; " + command)
+                        "exec >\"" + workspacePath + "/.zephyr-logs/$$.log\" 2>&1; " + command)
                         .directory(new java.io.File(workspacePath))
                         .redirectErrorStream(false)
                         .start();
