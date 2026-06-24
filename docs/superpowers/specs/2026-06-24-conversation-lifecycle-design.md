@@ -58,7 +58,16 @@ public class ConversationSessionManager {
 ### 生命周期流程
 
 ```
-会话创建（send/首次消息） → handle = sessionManager.register(conversationId, userName)
+// send() 方法内，同步阶段（在 HTTP 线程上）：
+conversationId = resolveOrCreateCid(request)  // 若为空则预生成
+handle = new SessionHandle(conversationId, userName)
+sessionManager.register(handle)
+emitter = new SseEmitter(timeout)             // 创建 SSE
+emitter.onTimeout(() -> {                     // 回调中可通过 sessionManager.get(cid) 取到 handle
+    handle = sessionManager.get(cid); handle.cancel();
+})
+// 启动异步任务
+executor.execute(() -> {
     ↓
 异步任务执行：
     try {
