@@ -179,7 +179,7 @@ public class ChatServiceImpl implements ChatService {
                 int totalInputTokens = 0, totalOutputTokens = 0, rounds = 0;
                 while (true) {
                     handle.checkCancel();
-                    result = llmClient.chat(ctx.getModel(), messages, ctx.getTools(), emitter, cid);
+                    result = llmClient.chat(ctx.getModel(), messages, ctx.getTools(), emitter, cid, handle);
                     rounds++;
                     if (result.getUsage() != null) {
                         totalInputTokens += result.getUsage().getOrDefault("inputTokens", 0);
@@ -206,6 +206,7 @@ public class ChatServiceImpl implements ChatService {
 
                         List<String> enabledKbIds = cid != null ? knowledgeDao.queryKbIdsByConversation(cid) : List.of();
                         List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName, enabledKbIds, cid);
+                        handle.touch();
 
                         for (int i = 0; i < result.getToolCalls().size(); i++) {
                             LlmResult.ToolCall tc = result.getToolCalls().get(i);
