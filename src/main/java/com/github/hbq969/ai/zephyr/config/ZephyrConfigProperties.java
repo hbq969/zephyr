@@ -309,7 +309,7 @@ public class ZephyrConfigProperties {
             "javac", "java", "mvn", "gradle", "make", "cmake", "gcc", "g++", "clang", "clang++", "rustc", "dotnet",
             // 文件操作
             "ls", "cat", "head", "tail", "wc", "find", "grep", "egrep", "awk", "sed",
-            "mkdir", "touch", "cp", "mv", "rm", "rmdir", "ln", "stat", "file", "du",
+            "mkdir", "touch", "cp", "mv", "ln", "stat", "file", "du",
             "df", "tree", "realpath", "basename", "dirname",
             // 文本处理
             "sort", "uniq", "cut", "tr", "tee", "diff", "patch", "echo", "printf",

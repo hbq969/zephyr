@@ -151,7 +151,8 @@ public class ChatServiceImpl implements ChatService {
                             case ".xlsx", ".xls" -> " → 调用 use_skill(\"xlsx\")";
                             case ".docx", ".doc" -> " → 调用 use_skill(\"docx\")";
                             case ".pptx", ".ppt" -> " → 调用 use_skill(\"pptx\")";
-                            case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp" -> " → 调用 use_skill(\"image-analysis\")";
+                            case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp" ->
+                                    " → 调用 use_skill(\"image-analysis\")";
                             default -> "";
                         };
                         sb.append("- ").append(name).append(skillHint).append("\n");
@@ -263,11 +264,15 @@ public class ChatServiceImpl implements ChatService {
                     try {
                         emitter.send(SseEmitter.event().name("message")
                                 .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 }
             } finally {
                 if (!completed) {
-                    try { emitter.complete(); } catch (Exception ignored) {}
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {
+                    }
                 }
                 handle.killTrackedProcesses();
                 log.info("[会话] 异步任务结束 cid={}, completed={}", cid, completed);
@@ -311,8 +316,8 @@ public class ChatServiceImpl implements ChatService {
      * 返回非 null 字符串表示改写后的消息（继续走 LLM 流程）。
      */
     private String handleSlashCommand(String message, String userName, String cid,
-                                       SseEmitter emitter, long now,
-                                       ConversationSessionManager.SessionHandle handle) throws IOException {
+                                      SseEmitter emitter, long now,
+                                      ConversationSessionManager.SessionHandle handle) throws IOException {
         String cmd = message.trim();
         int spaceIdx = cmd.indexOf(' ');
         String cmdName = spaceIdx > 0 ? cmd.substring(1, spaceIdx) : cmd.substring(1);
@@ -333,16 +338,16 @@ public class ChatServiceImpl implements ChatService {
             case "help" -> {
                 String help = """
                         ## zephyr 可用命令
-
+                        
                         ### MCP 工具
                         输入 `/工具名` 直接调用 MCP 工具，如 `/browser_navigate`
-
+                        
                         ### 技能
                         输入 `/技能名` 加载并使用技能，如 `/frontend-design`
-
+                        
                         ### 会话
                         - `/context` — 查看上下文占比
-
+                        
                         ### 操作
                         - `/clear` — 清空当前对话
                         - `/help` — 查看此帮助
@@ -406,7 +411,9 @@ public class ChatServiceImpl implements ChatService {
     }
 
 
-    /** 清除 NULL byte 并检测/截断二进制内容 */
+    /**
+     * 清除 NULL byte 并检测/截断二进制内容
+     */
     private String sanitizeToolOutput(String raw) {
         if (raw == null || raw.isEmpty()) return "";
         // 清除 NULL byte
@@ -498,7 +505,8 @@ public class ChatServiceImpl implements ChatService {
                         }
                     }
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }
         return null;
     }
@@ -544,8 +552,8 @@ public class ChatServiceImpl implements ChatService {
                 KnowledgeService.SearchResult r = results.get(i);
                 if (i > 0) sb.append(",");
                 sb.append("{\"content\": \"").append(escapeJson(r.getContent())).append("\",")
-                  .append("\"source\": \"").append(escapeJson(r.getSourceFile())).append("\",")
-                  .append("\"score\": ").append(String.format("%.4f", r.getScore())).append("}");
+                        .append("\"source\": \"").append(escapeJson(r.getSourceFile())).append("\",")
+                        .append("\"score\": ").append(String.format("%.4f", r.getScore())).append("}");
             }
             sb.append("]}");
             return sb.toString();
@@ -679,7 +687,9 @@ public class ChatServiceImpl implements ChatService {
                 cmdName = cmdName.substring(lastSlash + 1);
             }
             if (!cfg.getShell().getAllowedCommands().contains(cmdName)) {
-                return "命令 '" + cmdName + "' 不在白名单中，拒绝执行";
+                String msg = "命令 '" + cmdName + "' 不在白名单中，拒绝执行";
+                log.info(msg);
+                return msg;
             }
         }
 
@@ -766,9 +776,9 @@ public class ChatServiceImpl implements ChatService {
         StringBuilder sb = new StringBuilder("后台进程列表:\n");
         for (BackgroundProcessManager.TrackedProcess tp : list) {
             sb.append("PID: ").append(tp.getPid())
-              .append(", 命令: ").append(tp.getCommand())
-              .append(", 启动时间: ").append(tp.getStartedAt())
-              .append("\n");
+                    .append(", 命令: ").append(tp.getCommand())
+                    .append(", 启动时间: ").append(tp.getStartedAt())
+                    .append("\n");
         }
         return sb.toString();
     }
