@@ -569,6 +569,8 @@ public class ChatServiceImpl implements ChatService {
             log.info("[会话] 按 cid 取消 cid={}", conversationId);
             h.cancel();
             llmClient.cancelCall(conversationId);
+        } else {
+            log.info("[会话] 按 cid 取消（无活跃会话） cid={}", conversationId);
         }
     }
 

@@ -88,6 +88,8 @@ public class ConversationServiceImpl implements ConversationService {
         if (handle != null) {
             log.info("[会话] 删除对话触发取消 cid={}, user={}", id, userName);
             handle.cancel();
+        } else {
+            log.info("[会话] 删除对话（无活跃会话） cid={}, user={}", id, userName);
         }
         chatDao.deleteMessagesByConvId(id);
         chatDao.deleteConversation(id, userName);
