@@ -217,6 +217,9 @@ public class ContextBuilder {
         toolDefs.add(buildUseSkillTool());
         toolDefs.add(buildUseMemoryTool());
         toolDefs.add(buildSearchKnowledgeTool());
+        toolDefs.add(buildExecuteShellTool());
+        toolDefs.add(buildListProcessesTool());
+        toolDefs.add(buildKillProcessTool());
 
         // 7. 加载历史消息（最近 20 轮）
         List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt.toString());
@@ -449,6 +452,46 @@ public class ContextBuilder {
                         .name("search_knowledge")
                         .description("从已勾选的知识库中检索相关文档片段")
                         .parameters(Map.of("type", "object", "properties", props, "required", List.of("query")))
+                        .build())
+                .build();
+    }
+
+    private ToolDef buildExecuteShellTool() {
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("command", Map.of("type", "string", "description", "要执行的完整命令字符串"));
+        props.put("background", Map.of("type", "boolean", "description", "是否后台运行，默认 false"));
+
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("execute_shell")
+                        .description("在工作空间目录执行 shell 命令。前台命令（默认）阻塞等待结果返回；后台命令（background=true）立即返回，进程跨会话存活。")
+                        .parameters(Map.of("type", "object", "properties", props, "required", List.of("command")))
+                        .build())
+                .build();
+    }
+
+    private ToolDef buildListProcessesTool() {
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("list_processes")
+                        .description("列出当前用户的所有后台进程")
+                        .parameters(Map.of("type", "object", "properties", new LinkedHashMap<>()))
+                        .build())
+                .build();
+    }
+
+    private ToolDef buildKillProcessTool() {
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("pid", Map.of("type", "integer", "description", "进程 PID"));
+
+        return ToolDef.builder()
+                .type("function")
+                .function(ToolDef.FunctionDef.builder()
+                        .name("kill_process")
+                        .description("终止指定后台进程")
+                        .parameters(Map.of("type", "object", "properties", props, "required", List.of("pid")))
                         .build())
                 .build();
     }
