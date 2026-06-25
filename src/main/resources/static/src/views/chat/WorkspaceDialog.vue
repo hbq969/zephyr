@@ -127,10 +127,8 @@ function onToggle(node: DirNode) {
 
 function onSelect(node: DirNode) {
   path.value = node.path
-  if (!name.value.trim()) {
-    const parts = node.path.replace(/\/+$/, '').split('/')
-    name.value = parts[parts.length - 1] || node.path
-  }
+  const parts = node.path.replace(/\/+$/, '').split('/')
+  name.value = parts[parts.length - 1] || node.path
 }
 
 function onStartCreate(node: DirNode) {
