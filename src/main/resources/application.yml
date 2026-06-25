@@ -313,6 +313,68 @@ zephyr:
     max-bypass-attempts: 1  # 连续绕过 HARD BLOCK 最大次数
     # default 模式下无需确认的只读 shell 命令，逗号分隔（仅命令名，不含参数）
     default-allow-commands: ls,cat,head,tail,less,more,file,stat,tree,od,hexdump,find,grep,egrep,fgrep,locate,which,whereis,type,wc,sort,uniq,cut,tr,diff,cmp,comm,join,paste,expand,unexpand,fmt,fold,iconv,nl,rev,tac,pwd,whoami,id,groups,users,who,w,last,lastlog,date,uname,hostname,hostid,arch,nproc,df,du,free,uptime,dmesg,ps,pgrep,top,env,printenv,ulimit,umask,getconf,basename,dirname,realpath,readlink,echo,printf,man,whatis,apropos,info,cal,clear,reset,tty,sleep,test,expr,true,false,yes,command,builtin,hash,tsort
+    # === HARD BLOCK 规则（命中即禁止执行） ===
+    hard-block:
+      # 合并模式：EXTEND=与代码默认规则合并（推荐），REPLACE=完全覆盖默认规则
+      merge-mode: EXTEND
+      path-merge-mode: EXTEND
+      # shell 命令 HARD BLOCK 正则，大小写不敏感，使用 find() 部分匹配
+      shell-patterns:
+        # --- 系统/数据毁灭 ---
+        - "rm\\s+(-[a-zA-Z]*[rf][a-zA-Z]*\\s+)+/(\\*|$|\\s)"                         # rm -rf / 或 rm -rf /*
+        - "rm\\s+(-[a-zA-Z]*[rf][a-zA-Z]*\\s+)+/[^\\s]"                               # rm -rf 任何绝对路径
+        - "dd\\s+.*of=/dev/(sd|hd|nvme|xvd|vd|mmcblk|dm-|loop)"                       # dd 覆写磁盘
+        - "mkfs\\.\\S*\\s+/dev/"                                                       # mkfs 格式化设备
+        - ":\\\\(\\\\)\\s*\\{.*:\\|&\\s*\\}|fork\\s+bomb"                               # fork 炸弹
+        - "shred\\s+.*/(dev|etc|boot|bin|sbin|lib|usr|var|home|root|opt|sys|proc)/"    # shred 安全擦除系统路径
+        - "mv\\s+.*/dev/null"                                                           # mv 到 /dev/null 销毁数据
+        # --- 权限提升 ---
+        - "(?:/etc/sudoers|/etc/sudoers\\.d/)"                                         # 修改 sudoers 文件
+        - "(?:usermod|gpasswd|adduser|useradd)\\s+.*\\b(?:sudo|wheel|admin|root)\\b"   # 添加用户到特权组
+        - "chmod\\s+(?:.*[ug]\\+s|[4-7]\\d{2})"                                         # 设置 SUID/SGID 位
+        # --- 安全控制绕过 ---
+        - "(?:iptables\\s+-(?:F|X)\\b|nft\\s+flush\\s+ruleset|ufw\\s+disable)"         # 清空/禁用防火墙
+        - "iptables\\s+--flush"                                                         # iptables 长格式清空
+        - "systemctl\\s+(?:stop|disable|mask)\\s+(?:selinux|apparmor|auditd|firewalld|iptables|ufw|fail2ban|clamav|crowdstrike)"  # 停止安全服务
+        - "setenforce\\s+0"                                                             # 关闭 SELinux
+        - "/etc/pam\\.d/"                                                               # 修改 PAM 配置
+        - "/etc/ssh/(?:sshd_config|ssh_config)"                                         # 修改 SSH 服务配置
+        # --- 后门/持久化 ---
+        - "(?:>|>>|tee\\s+(?:-a\\s+)?)\\S*authorized_keys"                             # 写入 SSH 公钥
+        - "(?:>|>>|tee\\s+(?:-a\\s+)?)\\S*(?:\\.bashrc|\\.zshrc|\\.profile|\\.bash_profile|/etc/profile)"  # 写入 shell RC 文件
+        - "(?:>|>>|cp|mv)\\s+.*/(?:usr/)?(?:s?bin|lib(?:64)?)/"                        # 写入系统二进制目录
+        - "crontab\\s+-(?:[^l]|e|r)"                                                   # 修改 crontab（排除 -l 列出）
+        # --- 基础设施破坏 ---
+        - "kubectl\\s+delete\\s+(?:namespace|ns\\b|pods?|deployment|deploy\\b|statefulset|daemonset|secret|configmap|service\\b|svc\\b|ingress|ing\\b|pvc|pv\\b)"  # kubectl 删除关键资源
+        - "docker\\s+(?:run|create).*--privileged.*(?:-v|--volume)\\s+/:"              # docker 特权容器挂载宿主机根目录
+        - "docker\\s+system\\s+prune"                                                   # docker 清理所有未使用资源
+        # --- 数据外泄 + 反弹 shell ---
+        - "(?:cat|head|tail|read|strings|xxd|od|hexdump).*(?:\\.env|credentials|private.?key|secret|token|password|id_rsa|id_ed25519|id_ecdsa).*(?:\\||>|curl|http|nc\\s|socat\\s|ssh\\s|scp\\s|rsync\\s)"  # 敏感文件经网络外传
+        - "nc\\s+.*-[ec]\\s+(?:/bin/|/usr/bin/)?(?:bash|sh|zsh|dash|python|perl|ruby)" # nc 反弹 shell
+        - "bash\\s+.*-i.*>&.*/(?:dev|tmp)/tcp/"                                         # bash TCP 反弹 shell
+        - "socat\\s+.*EXEC:(?:bash|sh|zsh|python)"                                      # socat 反弹 shell
+      path-prefixes:
+        - "prompts/security/"
+        - "prompts/modes/"
+        - "prompts/tools/"
+    # === SOFT BLOCK 规则（命中即需用户确认） ===
+    soft-block:
+      merge-mode: EXTEND
+      shell-patterns:
+        - "\\brm\\s+(-[a-zA-Z]*[rf][a-zA-Z]*\\s+)+"                                    # rm -rf 变体
+        - "git\\s+push\\s+.*(?:--force|--force-with-lease)"                             # git force push
+        - "git\\s+(?:reset\\s+--hard|clean\\s+-fdx)"                                    # git hard reset / clean
+        - "git\\s+branch\\s+-D"                                                         # git 强制删除分支
+        - "(?:curl|wget).*(?:\\||>|bash|sh|python|eval|exec)"                           # curl/wget 远程执行
+        - "(?:DROP\\s+(?:TABLE|DATABASE)|TRUNCATE|DELETE\\s+FROM)"                      # 数据库删除
+        - "kubectl\\s+delete"                                                           # kubectl 通用删除
+        - "docker\\s+(?:rm|stop|kill)"                                                  # docker rm/stop/kill
+        - "docker-compose\\s+down.*-v"                                                  # docker-compose 删除卷
+        - "docker\\s+volume\\s+(?:rm|prune)"                                            # docker 删除卷
+        - "helm\\s+(?:delete|uninstall)"                                                # helm 删除 release
+        - "(?:kill\\s+-9|pkill)"                                                        # 强制杀进程
+        - "chmod\\s+777"                                                                # chmod 777
+        - ">\\s*\\S+"                                                                   # 重定向覆写文件
     audit:
       enabled: true  # 是否启用审计日志
       log-path: ${user.home}/.zephyr/audit.log  # 审计日志路径

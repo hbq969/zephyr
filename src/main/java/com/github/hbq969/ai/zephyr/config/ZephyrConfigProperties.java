@@ -4,6 +4,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * zephyr 统一配置，对应 application.yml 中 {@code zephyr} 前缀下所有属性。
  * <p>
@@ -348,12 +351,55 @@ public class ZephyrConfigProperties {
         /** 审计日志 */
         private Audit audit = new Audit();
 
+        /** HARD BLOCK 规则配置 */
+        private HardBlock hardBlock = new HardBlock();
+
+        /** SOFT BLOCK 规则配置 */
+        private SoftBlock softBlock = new SoftBlock();
+
+        /** 规则合并模式 */
+        public enum MergeMode {
+            /** 用户配置与代码默认规则合并（追加），默认 */
+            EXTEND,
+            /** 用户配置完全替代代码默认规则 */
+            REPLACE
+        }
+
         @Data
         public static class Audit {
             /** 是否启用审计日志，默认 true */
             private boolean enabled = true;
             /** 审计日志路径，默认 ~/.zephyr/audit.log */
             private String logPath = System.getProperty("user.home") + "/.zephyr/audit.log";
+        }
+
+        @Data
+        public static class HardBlock {
+            /**
+             * shell 命令 HARD BLOCK 正则列表，命中任一即禁止执行。
+             * 正则大小写不敏感（代码中已强制 CASE_INSENSITIVE），使用 {@code find()} 部分匹配。
+             */
+            private List<String> shellPatterns = new ArrayList<>();
+            /**
+             * 文件写入 HARD BLOCK 路径子串列表，命中任一即禁止写入。
+             * 匹配使用 {@code String.contains()} 语义（子串包含，非前缀匹配）。
+             */
+            private List<String> pathPrefixes = new ArrayList<>();
+            /** 规则合并模式，默认 EXTEND（与代码默认规则合并） */
+            private MergeMode mergeMode = MergeMode.EXTEND;
+            /** pathPrefixes 的合并模式，默认 EXTEND */
+            private MergeMode pathMergeMode = MergeMode.EXTEND;
+        }
+
+        @Data
+        public static class SoftBlock {
+            /**
+             * shell 命令 SOFT BLOCK 正则列表，命中任一即需要用户确认。
+             * 正则大小写不敏感（代码中已强制 CASE_INSENSITIVE），使用 {@code find()} 部分匹配。
+             */
+            private List<String> shellPatterns = new ArrayList<>();
+            /** 规则合并模式，默认 EXTEND（与代码默认规则合并） */
+            private MergeMode mergeMode = MergeMode.EXTEND;
         }
     }
 }
