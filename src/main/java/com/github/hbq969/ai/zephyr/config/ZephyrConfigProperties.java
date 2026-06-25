@@ -51,6 +51,9 @@ public class ZephyrConfigProperties {
     /** 工作空间相关配置 */
     private Workspace workspace = new Workspace();
 
+    /** 安全相关配置 */
+    private Security security = new Security();
+
     // ================================================================
     //  对话配置
     // ================================================================
@@ -344,5 +347,29 @@ public class ZephyrConfigProperties {
     public static class Workspace {
         /** browse 接口默认根目录，相对路径相对于 user.home，默认 .zephyr/workspace */
         private String browseRoot = ".zephyr/workspace";
+    }
+
+    // ================================================================
+    //  安全配置
+    // ================================================================
+
+    @Data
+    public static class Security {
+        /** 是否启用安全评估，默认 true */
+        private boolean enabled = true;
+        /** 用户确认超时秒数，超时自动拒绝，默认 300 */
+        private int confirmTimeoutSeconds = 300;
+        /** 连续绕过 HARD BLOCK 最大次数，超出强制终止，默认 3 */
+        private int maxBypassAttempts = 3;
+        /** 审计日志 */
+        private Audit audit = new Audit();
+
+        @Data
+        public static class Audit {
+            /** 是否启用审计日志，默认 true */
+            private boolean enabled = true;
+            /** 审计日志路径，默认 ~/.zephyr/audit.log */
+            private String logPath = System.getProperty("user.home") + "/.zephyr/audit.log";
+        }
     }
 }
