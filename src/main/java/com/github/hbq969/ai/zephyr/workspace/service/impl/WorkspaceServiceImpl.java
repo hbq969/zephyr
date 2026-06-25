@@ -20,6 +20,9 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Resource
     private WorkspaceDao workspaceDao;
 
+    @Resource
+    private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+
     @Override
     public List<WorkspaceEntity> list(String userName) {
         return workspaceDao.queryByUserName(userName);
@@ -61,7 +64,16 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     public List<Map<String, Object>> browse(String parent) {
         List<Map<String, Object>> result = new ArrayList<>();
-        String root = parent != null && !parent.isBlank() ? parent : System.getProperty("user.home");
+        String root;
+        if (parent != null && !parent.isBlank()) {
+            root = parent;
+        } else {
+            root = java.nio.file.Path.of(System.getProperty("user.home"), cfg.getWorkspace().getBrowseRoot()).toString();
+            java.io.File defaultDir = new java.io.File(root);
+            if (!defaultDir.exists()) {
+                defaultDir.mkdirs();
+            }
+        }
         File dir = new File(root);
         if (!dir.exists() || !dir.isDirectory()) return result;
 
