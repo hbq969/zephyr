@@ -12,6 +12,8 @@ import CommandPalette from './CommandPalette.vue'
 import SettingsPanel from './SettingsPanel.vue'
 import { Icon } from '@iconify/vue'
 import { getLangData } from '@/i18n/locale'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import type { ConfirmActionEvent } from '@/types/chat'
 import axios from '@/network'
 
 const convStore = useConversationsStore()
@@ -19,6 +21,8 @@ const chatStore = useChatStore()
 const settingsStore = useSettingsStore()
 const workspaceStore = useWorkspaceStore()
 const showSettings = ref(false)
+const confirmVisible = ref(false)
+const confirmEvent = ref<ConfirmActionEvent | null>(null)
 const langData = getLangData()
 
 // 搜索弹窗
@@ -153,6 +157,12 @@ function onSend(text: string, filePaths?: string[]) {
               status: isError ? 'error' : 'success',
               output: event.toolOutput,
             })
+          } else if (event.type === 'confirm_action' && event.content) {
+            try {
+              const parsed: ConfirmActionEvent = JSON.parse(event.content)
+              confirmEvent.value = parsed
+              confirmVisible.value = true
+            } catch { /* skip */ }
           } else if (event.type === 'meta') {
             convStore.currentId = event.content
             refreshConversationList()
@@ -336,6 +346,11 @@ onMounted(() => {
       <StatusBar />
     </div>
     <SettingsPanel :visible="showSettings" @close="showSettings = false" />
+    <ConfirmDialog
+      :visible="confirmVisible"
+      :event="confirmEvent"
+      @close="confirmVisible = false"
+    />
   </div>
 </template>
 

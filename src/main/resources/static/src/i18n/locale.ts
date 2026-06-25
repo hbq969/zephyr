@@ -65,6 +65,16 @@ const locale: any = {
         "chatArea_filesUploaded": "[上传了 {n} 个文件]",
         "chatArea_toolExecutionError": "工具执行错误",
 
+        // 确认弹窗
+        "confirmTitle": "操作确认",
+        "confirmRiskHard": "安全红线",
+        "confirmRiskSoft": "需确认",
+        "confirmTool": "工具",
+        "confirmParams": "参数",
+        "confirmRiskDesc": "风险说明",
+        "confirmDeny": "拒绝",
+        "confirmAllow": "允许本次",
+
         // 输入区域
         "inputArea_placeholder": "Ctrl+Enter 发送 · Shift+Enter 换行",
         "inputArea_noModel": "无",
@@ -484,6 +494,16 @@ const locale: any = {
         "chatArea_timeDaysAgo": "{n} days ago",
         "chatArea_filesUploaded": "[Uploaded {n} file(s)]",
         "chatArea_toolExecutionError": "Tool execution error",
+
+        // Confirm dialog
+        "confirmTitle": "Confirm Action",
+        "confirmRiskHard": "SECURITY RED LINE",
+        "confirmRiskSoft": "Confirmation Required",
+        "confirmTool": "Tool",
+        "confirmParams": "Parameters",
+        "confirmRiskDesc": "Risk",
+        "confirmDeny": "Deny",
+        "confirmAllow": "Allow",
 
         // Input area
         "inputArea_placeholder": "Ctrl+Enter to send · Shift+Enter for new line",

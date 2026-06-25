@@ -152,3 +152,12 @@ export interface FileAttachment {
   size: number       // 字节
   status: 'uploading' | 'done' | 'error'
 }
+
+// === Confirm Action Event ===
+export interface ConfirmActionEvent {
+  confirmId: string
+  toolName: string
+  toolInput: Record<string, unknown>
+  rule: string
+  ruleDetail: string
+}
