@@ -5,6 +5,8 @@ import { Icon } from '@iconify/vue'
 import axios from '@/network'
 import { msg } from '@/utils/Utils'
 import { getLangData } from '@/i18n/locale'
+import TreeNode from './TreeNode.vue'
+import type { DirNode } from './TreeNode.vue'
 
 const langData = getLangData()
 const emit = defineEmits<{ close: [] }>()
@@ -14,43 +16,124 @@ const path = ref('')
 const saving = ref(false)
 
 const showBrowser = ref(false)
-const browserPath = ref('')
-const dirs = ref<{ name: string; path: string }[]>([])
+const treeRoot = ref<{ name: string; path: string; children: DirNode[]; expanded: boolean; loaded: boolean } | null>(null)
 const browserLoading = ref(false)
 
 function openBrowser() {
   showBrowser.value = true
-  loadDirs(browserPath.value || '/')
+  loadRoot()
 }
 
-function loadDirs(parent: string) {
+function loadRoot() {
   browserLoading.value = true
-  axios({ url: '/workspace/browse', method: 'get', params: { parent } })
+  axios({ url: '/workspace/browse', method: 'get' })
     .then(res => {
       if (res.data.state === 'OK') {
-        dirs.value = res.data.body || []
-        browserPath.value = parent
+        const items = (res.data.body || [])
+          .filter((d: any) => d.name !== '..')
+          .map((d: any) => ({
+            name: d.name,
+            path: d.path,
+            children: [],
+            expanded: false,
+            loaded: false,
+            creating: false,
+            newDirName: '',
+            creatingError: ''
+          } as DirNode))
+        const rootPath = items.length > 0
+          ? items[0].path.substring(0, items[0].path.lastIndexOf('/')) || '/'
+          : '/'
+        treeRoot.value = { name: rootPath, path: rootPath, children: items, expanded: true, loaded: true }
       }
     })
     .catch(() => {})
     .finally(() => { browserLoading.value = false })
 }
 
-function onDirClick(item: { name: string; path: string }) {
-  if (item.name === '..') {
-    loadDirs(item.path)
+function loadChildren(node: DirNode) {
+  axios({ url: '/workspace/browse', method: 'get', params: { parent: node.path } })
+    .then(res => {
+      if (res.data.state === 'OK') {
+        node.children = (res.data.body || [])
+          .filter((d: any) => d.name !== '..')
+          .map((d: any) => ({
+            name: d.name,
+            path: d.path,
+            children: [],
+            expanded: false,
+            loaded: false,
+            creating: false,
+            newDirName: '',
+            creatingError: ''
+          } as DirNode))
+        node.loaded = true
+      }
+    })
+    .catch(() => {})
+}
+
+function onToggle(node: DirNode) {
+  if (node.expanded) {
+    node.expanded = false
   } else {
-    loadDirs(item.path)
+    if (!node.loaded) {
+      loadChildren(node)
+    }
+    node.expanded = true
   }
 }
 
-function selectCurrentDir() {
-  path.value = browserPath.value
+function onSelect(node: DirNode) {
+  path.value = node.path
   if (!name.value.trim()) {
-    const parts = browserPath.value.replace(/\/+$/, '').split('/')
-    name.value = parts[parts.length - 1] || browserPath.value
+    const parts = node.path.replace(/\/+$/, '').split('/')
+    name.value = parts[parts.length - 1] || node.path
   }
-  showBrowser.value = false
+}
+
+function onStartCreate(node: DirNode) {
+  if (!node.expanded) {
+    if (!node.loaded) {
+      loadChildren(node)
+    }
+    node.expanded = true
+  }
+  node.creating = true
+  node.newDirName = ''
+  node.creatingError = ''
+}
+
+function onCancelCreate(node: DirNode) {
+  node.creating = false
+  node.newDirName = ''
+  node.creatingError = ''
+}
+
+function onConfirmCreate(node: DirNode) {
+  const dirName = node.newDirName.trim()
+  if (!dirName) {
+    node.creatingError = '目录名不能为空'
+    return
+  }
+  axios({
+    url: '/workspace/mkdir',
+    method: 'post',
+    data: { parent: node.path, name: dirName }
+  })
+    .then(res => {
+      if (res.data.state === 'OK') {
+        node.creating = false
+        node.newDirName = ''
+        node.creatingError = ''
+        loadChildren(node)
+      } else {
+        node.creatingError = res.data.errorMessage || '创建失败'
+      }
+    })
+    .catch(err => {
+      node.creatingError = err?.response?.data?.errorMessage || '创建失败'
+    })
 }
 
 function onSubmit() {
@@ -92,24 +175,30 @@ function onSubmit() {
         <label class="ws-field">
           <span>{{ langData.workspaceDialog_directory }}</span>
           <div class="ws-dir-row">
-            <input v-model="path" class="ws-input ws-dir-input" placeholder="/Users/hbq/my-project" @keydown.enter="onSubmit" />
+            <input v-model="path" class="ws-input ws-dir-input" :placeholder="langData.workspaceDialog_dirPlaceholder" readonly @click="openBrowser" />
             <button class="ws-btn ws-btn-browse" @click="openBrowser">{{ langData.workspaceDialog_browse }}</button>
           </div>
         </label>
 
-        <!-- 目录浏览器 -->
+        <!-- 目录树 -->
         <div v-if="showBrowser" class="ws-browser">
           <div class="ws-browser-head">
             <Icon icon="lucide:folder-open" class="ws-browser-icon" />
-            <span class="ws-browser-path">{{ browserPath }}</span>
-            <button class="ws-btn ws-btn-select" @click="selectCurrentDir">{{ langData.workspaceDialog_selectDir }}</button>
+            <span class="ws-browser-path">{{ treeRoot?.path || '' }}</span>
           </div>
           <div v-if="browserLoading" class="ws-browser-loading">{{ langData.inputArea_loading }}</div>
-          <div v-else class="ws-browser-list">
-            <div v-for="d in dirs" :key="d.path" class="ws-browser-item" @click="onDirClick(d)">
-              <Icon :icon="d.name === '..' ? 'lucide:corner-up-left' : 'lucide:folder'" class="ws-browser-item-icon" />
-              <span>{{ d.name }}</span>
-            </div>
+          <div v-else class="ws-browser-tree">
+            <TreeNode
+              v-for="node in treeRoot?.children || []"
+              :key="node.path"
+              :node="node"
+              :depth="0"
+              @toggle="onToggle"
+              @select="onSelect"
+              @start-create="onStartCreate"
+              @cancel-create="onCancelCreate"
+              @confirm-create="onConfirmCreate"
+            />
           </div>
         </div>
       </div>
@@ -125,7 +214,7 @@ function onSubmit() {
 
 <style scoped>
 .ws-dialog-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.2); backdrop-filter: blur(2px); }
-.ws-dialog { position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); width: 420px; max-width: 90vw; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); z-index: 1001; }
+.ws-dialog { position: fixed; top: 30%; left: 50%; transform: translate(-50%, -50%); width: 480px; max-width: 90vw; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,0.12); z-index: 1001; }
 .ws-dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 0; font-size: 16px; font-weight: 600; color: var(--el-text-color-primary); }
 .ws-dialog-close { width: 30px; height: 30px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
 .ws-dialog-close:hover { background: var(--el-fill-color-light); }
@@ -135,20 +224,18 @@ function onSubmit() {
 .ws-input { width: 100%; padding: 8px 12px; border: 1px solid var(--el-border-color); border-radius: 8px; background: var(--el-bg-color); color: var(--el-text-color-primary); font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box; }
 .ws-input:focus { border-color: var(--el-color-primary); }
 .ws-input::placeholder { color: var(--el-text-color-placeholder); }
+.ws-input[readonly] { cursor: pointer; background: var(--el-fill-color-light); color: var(--el-text-color-secondary); }
 .ws-dir-row { display: flex; gap: 8px; }
 .ws-dir-input { flex: 1; }
 
-.ws-browser { border: 1px solid var(--el-border-color); border-radius: 8px; overflow: hidden; max-height: 220px; display: flex; flex-direction: column; }
+.ws-browser { border: 1px solid var(--el-border-color); border-radius: 8px; overflow: hidden; max-height: 320px; display: flex; flex-direction: column; }
 .ws-browser-head { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--el-border-color); background: var(--el-fill-color-light); font-size: 12px; color: var(--el-text-color-secondary); }
 .ws-browser-icon { font-size: 14px; color: var(--el-color-primary); flex-shrink: 0; }
 .ws-browser-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .ws-browser-loading { padding: 20px; text-align: center; font-size: 12px; color: var(--el-text-color-placeholder); }
-.ws-browser-list { flex: 1; overflow-y: auto; padding: 4px; }
-.ws-browser-list::-webkit-scrollbar { width: 2px; }
-.ws-browser-list::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 1px; }
-.ws-browser-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--el-text-color-primary); transition: background 0.1s; }
-.ws-browser-item:hover { background: var(--el-fill-color-light); }
-.ws-browser-item-icon { font-size: 15px; color: var(--el-text-color-secondary); flex-shrink: 0; }
+.ws-browser-tree { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.ws-browser-tree::-webkit-scrollbar { width: 4px; }
+.ws-browser-tree::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 2px; }
 
 .ws-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; }
 .ws-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid var(--el-border-color); font-size: 13px; cursor: pointer; transition: background 0.15s; }
@@ -156,8 +243,6 @@ function onSubmit() {
 .ws-btn-cancel:hover { background: var(--el-fill-color-light); }
 .ws-btn-browse { background: var(--el-bg-color); color: var(--el-text-color-regular); padding: 8px 12px; white-space: nowrap; }
 .ws-btn-browse:hover { background: var(--el-fill-color-light); }
-.ws-btn-select { padding: 3px 10px; font-size: 12px; white-space: nowrap; background: var(--el-color-primary); color: #fff; border-color: var(--el-color-primary); }
-.ws-btn-select:hover { background: var(--el-color-primary-dark-2); }
 .ws-btn-confirm { background: var(--el-color-primary); color: #fff; border-color: var(--el-color-primary); }
 .ws-btn-confirm:hover { background: var(--el-color-primary-dark-2); }
 .ws-btn-confirm:disabled { opacity: 0.6; cursor: default; }
