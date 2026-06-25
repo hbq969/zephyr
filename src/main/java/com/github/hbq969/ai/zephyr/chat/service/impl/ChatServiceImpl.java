@@ -407,7 +407,8 @@ public class ChatServiceImpl implements ChatService {
 
             // === 安全评估（新增） ===
             SecurityEvaluator.Result secResult = securityEvaluator.evaluate(
-                    tc.getName(), tc.getArguments(), userName, mode);
+                    tc.getName(), tc.getArguments(), userName, mode,
+                    SecurityEvaluator.WorkspaceBoundary.NONE);
 
             if (secResult.decision() == SecurityEvaluator.Decision.BLOCK) {
                 // HARD BLOCK → 拒绝

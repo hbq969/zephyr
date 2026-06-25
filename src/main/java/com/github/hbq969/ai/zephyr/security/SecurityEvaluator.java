@@ -5,6 +5,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -70,19 +72,34 @@ public class SecurityEvaluator {
     }
 
     /**
+     * workspace 边界信息，用于文件写入路径检查。
+     * 纯值对象，零依赖。
+     */
+    public record WorkspaceBoundary(Path path) {
+        public static final WorkspaceBoundary NONE = new WorkspaceBoundary(null);
+
+        public boolean isPresent() { return path != null; }
+
+        public boolean contains(Path target) {
+            return isPresent() && target.startsWith(path);
+        }
+    }
+
+    /**
      * 评估工具调用。仅对 execute_shell 和文件写入类工具做模式匹配，
      * 其余工具调用返回 ALLOW（由 LLM 自评估负责）。
      *
      * @param mode 权限模式：default | acceptEdits | bypass
      */
-    public Result evaluate(String toolName, Map<String, Object> arguments, String userName, String mode) {
+    public Result evaluate(String toolName, Map<String, Object> arguments, String userName, String mode,
+                           WorkspaceBoundary boundary) {
         if (!cfg.getSecurity().isEnabled()) {
             return Result.allow();
         }
 
         Result result = switch (toolName) {
             case "execute_shell" -> evaluateShell(arguments, mode);
-            case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode);
+            case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode, boundary);
             default -> Result.allow();
         };
 
@@ -157,7 +174,7 @@ public class SecurityEvaluator {
         return Result.allow();
     }
 
-    private Result evaluateFileWrite(Map<String, Object> arguments, String mode) {
+    private Result evaluateFileWrite(Map<String, Object> arguments, String mode, WorkspaceBoundary boundary) {
         String filePath = arguments.getOrDefault("file_path", "").toString();
         if (filePath.isEmpty()) {
             filePath = arguments.getOrDefault("filePath", "").toString();
@@ -182,12 +199,31 @@ public class SecurityEvaluator {
             return Result.allow();
         }
 
+        // workspace 边界检查
+        if (boundary.isPresent()) {
+            Path targetPath = Path.of(filePath);
+            if (!targetPath.isAbsolute()) {
+                targetPath = boundary.path().resolve(targetPath);
+            }
+            targetPath = targetPath.normalize();
+            try {
+                targetPath = targetPath.toRealPath();
+            } catch (IOException ignored) {
+                // symlink 解析失败，用 normalize 结果
+            }
+
+            if (!boundary.contains(targetPath)) {
+                return Result.confirm("WORKSPACE_BOUNDARY",
+                        "目标路径 " + filePath + " 不在工作空间 " + boundary.path() + " 内");
+            }
+        }
+
         // default 模式：所有文件编辑需确认
         if (!"acceptEdits".equalsIgnoreCase(mode)) {
             return Result.confirm("MODE_DEFAULT", "Default 模式下文件写入需要用户确认");
         }
 
-        // acceptEdits 模式：文件编辑自动放行
+        // acceptEdits 模式：workspace 内文件编辑自动放行
         return Result.allow();
     }
 }
