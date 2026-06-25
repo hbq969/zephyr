@@ -45,7 +45,7 @@
     }
 ```
 
-需要新增 import：`import java.nio.file.Path;`
+需要新增 import：`import java.nio.file.Path;` 和 `import java.io.IOException;`
 
 - [ ] **Step 2: 修改 evaluate() 签名**
 
