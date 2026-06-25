@@ -36,6 +36,8 @@ public class McpConnectionManager {
 
     @PostConstruct
     void cleanupOrphanProcesses() {
+        log.info("开始启动清理 MCP 服务器...");
+
         // 1. 记录重启前处于 connected 状态的服务器
         try {
             startupReconnectList = mcpDao.queryConnectedServers();
@@ -55,19 +57,33 @@ public class McpConnectionManager {
         if (files == null || files.length == 0) {
             log.info("无孤儿 MCP 进程需要清理");
         } else {
+            // 先收集所有 PID 信息
+            java.util.Map<String, Long> pidMap = new java.util.LinkedHashMap<>();
             for (File f : files) {
                 try {
                     long pid = Long.parseLong(Files.readString(f.toPath()).trim());
-                    ProcessHandle.of(pid).ifPresent(ph -> {
-                        List<ProcessHandle> children = ph.descendants().toList();
-                        log.info("清理孤儿 MCP 进程树: parentPid={}, childrenPids={}, file={}",
-                                pid, children.stream().map(c -> String.valueOf(c.pid())).toList(), f.getName());
-                        children.forEach(ProcessHandle::destroyForcibly);
-                        ph.destroyForcibly();
-                    });
-                    Files.deleteIfExists(f.toPath());
+                    pidMap.put(f.getName(), pid);
                 } catch (Exception e) {
-                    log.warn("清理孤儿进程失败: {}", f.getName(), e);
+                    log.warn("读取 PID 文件失败: {}", f.getName(), e);
+                }
+            }
+            log.info("发现 {} 个孤儿 MCP 进程待清理, PIDs: {}",
+                    pidMap.size(), pidMap.values());
+
+            // 逐个清理
+            for (java.util.Map.Entry<String, Long> entry : pidMap.entrySet()) {
+                long pid = entry.getValue();
+                ProcessHandle.of(pid).ifPresent(ph -> {
+                    List<ProcessHandle> children = ph.descendants().toList();
+                    log.info("清理孤儿 MCP 进程树: parentPid={}, childrenPids={}, file={}",
+                            pid, children.stream().map(c -> String.valueOf(c.pid())).toList(), entry.getKey());
+                    children.forEach(ProcessHandle::destroyForcibly);
+                    ph.destroyForcibly();
+                });
+                try {
+                    Files.deleteIfExists(PIDS_DIR.resolve(entry.getKey()));
+                } catch (Exception e) {
+                    log.warn("删除 PID 文件失败: {}", entry.getKey(), e);
                 }
             }
         }
@@ -79,6 +95,8 @@ public class McpConnectionManager {
         } catch (Exception e) {
             log.warn("重置 MCP 服务器状态失败（表可能尚未创建）", e);
         }
+
+        log.info("启动清理 MCP 服务器完成");
     }
 
     /** 获取启动时需要重连的服务器列表 */
@@ -167,6 +185,7 @@ public class McpConnectionManager {
 
     @PreDestroy
     public void destroy() {
+        log.info("开始销毁 MCP 连接管理器, 当前连接数={}", connections.size());
         int count = connections.size();
         for (Map.Entry<String, McpConnection> entry : connections.entrySet()) {
             entry.getValue().close();

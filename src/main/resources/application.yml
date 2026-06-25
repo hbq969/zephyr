@@ -412,7 +412,6 @@ zephyr:
     cleanup-interval-seconds: 60  # 后台进程超时扫描间隔（秒）
     command-timeout-seconds: 120  # 同步命令超时（秒）
     max-output-bytes: 1048576  # 前台命令输出最大读取字节数（1MB）
-
   workspace:
     browse-root: .zephyr/workspace  # browse 接口默认根目录，相对于 user.home
 
