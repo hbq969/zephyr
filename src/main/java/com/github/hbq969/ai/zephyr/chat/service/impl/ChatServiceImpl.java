@@ -521,6 +521,19 @@ public class ChatServiceImpl implements ChatService {
             if (attempts >= cfg.getSecurity().getMaxBypassAttempts()) {
                 log.warn("[安全] 连续 {} 次被拒绝，强制终止 cid={}", attempts, cid);
                 bypassAttempts.remove(cid);
+                // 发送已收集的 tool_result 事件，让前端停止计时器
+                for (int i = 0; i < results.size(); i++) {
+                    try {
+                        emitter.send(SseEmitter.event().name("message")
+                                .data(ChatEvent.builder()
+                                        .type("tool_result")
+                                        .toolName(toolCalls.get(i).getName())
+                                        .toolOutput(results.get(i).get("content").toString())
+                                        .build()));
+                    } catch (IOException e) {
+                        log.warn("推送终止前的 tool_result 事件失败: {}", e.getMessage());
+                    }
+                }
                 throw new ConversationSessionManager.CancelSessionException(cid);
             }
         } else {
