@@ -7,6 +7,7 @@ export interface DirNode {
   children: DirNode[]
   expanded: boolean
   loaded: boolean
+  loading: boolean
   creating: boolean
   newDirName: string
   creatingError: string
@@ -47,7 +48,6 @@ function hasChildren(node: DirNode): boolean {
       </button>
     </div>
 
-    <!-- 新建目录输入框 -->
     <div v-if="node.creating" class="tn-create" :style="{ paddingLeft: (depth + 1) * 16 + 'px' }">
       <input
         v-model="node.newDirName"
@@ -65,8 +65,7 @@ function hasChildren(node: DirNode): boolean {
       <span v-if="node.creatingError" class="tn-create-error">{{ node.creatingError }}</span>
     </div>
 
-    <!-- 递归子节点 -->
-    <div v-if="node.expanded">
+    <template v-if="node.expanded">
       <TreeNode
         v-for="child in node.children"
         :key="child.path"
@@ -78,7 +77,7 @@ function hasChildren(node: DirNode): boolean {
         @cancel-create="(n: DirNode) => emit('cancelCreate', n)"
         @confirm-create="(n: DirNode) => emit('confirmCreate', n)"
       />
-    </div>
+    </template>
   </div>
 </template>
 

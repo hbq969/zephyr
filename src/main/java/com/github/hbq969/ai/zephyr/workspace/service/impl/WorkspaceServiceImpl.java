@@ -1,6 +1,7 @@
 package com.github.hbq969.ai.zephyr.workspace.service.impl;
 
 import cn.hutool.core.lang.UUID;
+import com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties;
 import com.github.hbq969.ai.zephyr.workspace.dao.WorkspaceDao;
 import com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity;
 import com.github.hbq969.ai.zephyr.workspace.service.WorkspaceService;
@@ -21,7 +22,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     private WorkspaceDao workspaceDao;
 
     @Resource
-    private com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties cfg;
+    private ZephyrConfigProperties cfg;
 
     @Override
     public List<WorkspaceEntity> list(String userName) {

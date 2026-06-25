@@ -19,6 +19,20 @@ const showBrowser = ref(false)
 const treeRoot = ref<{ name: string; path: string; children: DirNode[]; expanded: boolean; loaded: boolean } | null>(null)
 const browserLoading = ref(false)
 
+function toDirNode(d: any): DirNode {
+  return {
+    name: d.name,
+    path: d.path,
+    children: [],
+    expanded: false,
+    loaded: false,
+    loading: false,
+    creating: false,
+    newDirName: '',
+    creatingError: ''
+  } as DirNode
+}
+
 function openBrowser() {
   showBrowser.value = true
   loadRoot()
@@ -29,58 +43,43 @@ function loadRoot() {
   axios({ url: '/workspace/browse', method: 'get' })
     .then(res => {
       if (res.data.state === 'OK') {
-        const items = (res.data.body || [])
-          .filter((d: any) => d.name !== '..')
-          .map((d: any) => ({
-            name: d.name,
-            path: d.path,
-            children: [],
-            expanded: false,
-            loaded: false,
-            creating: false,
-            newDirName: '',
-            creatingError: ''
-          } as DirNode))
+        const items = (res.data.body || []).filter((d: any) => d.name !== '..').map(toDirNode)
         const rootPath = items.length > 0
           ? items[0].path.substring(0, items[0].path.lastIndexOf('/')) || '/'
           : '/'
         treeRoot.value = { name: rootPath, path: rootPath, children: items, expanded: true, loaded: true }
       }
     })
-    .catch(() => {})
+    .catch(() => msg('加载目录失败', 'error'))
     .finally(() => { browserLoading.value = false })
 }
 
 function loadChildren(node: DirNode) {
+  if (node.loading) return
+  node.loading = true
   axios({ url: '/workspace/browse', method: 'get', params: { parent: node.path } })
     .then(res => {
       if (res.data.state === 'OK') {
-        node.children = (res.data.body || [])
-          .filter((d: any) => d.name !== '..')
-          .map((d: any) => ({
-            name: d.name,
-            path: d.path,
-            children: [],
-            expanded: false,
-            loaded: false,
-            creating: false,
-            newDirName: '',
-            creatingError: ''
-          } as DirNode))
+        node.children = (res.data.body || []).filter((d: any) => d.name !== '..').map(toDirNode)
         node.loaded = true
       }
     })
-    .catch(() => {})
+    .catch(() => msg('加载目录失败', 'error'))
+    .finally(() => { node.loading = false })
+}
+
+function ensureExpanded(node: DirNode) {
+  if (!node.loaded && !node.loading) {
+    loadChildren(node)
+  }
+  node.expanded = true
 }
 
 function onToggle(node: DirNode) {
   if (node.expanded) {
     node.expanded = false
   } else {
-    if (!node.loaded) {
-      loadChildren(node)
-    }
-    node.expanded = true
+    ensureExpanded(node)
   }
 }
 
@@ -94,10 +93,7 @@ function onSelect(node: DirNode) {
 
 function onStartCreate(node: DirNode) {
   if (!node.expanded) {
-    if (!node.loaded) {
-      loadChildren(node)
-    }
-    node.expanded = true
+    ensureExpanded(node)
   }
   node.creating = true
   node.newDirName = ''
@@ -180,7 +176,6 @@ function onSubmit() {
           </div>
         </label>
 
-        <!-- 目录树 -->
         <div v-if="showBrowser" class="ws-browser">
           <div class="ws-browser-head">
             <Icon icon="lucide:folder-open" class="ws-browser-icon" />
