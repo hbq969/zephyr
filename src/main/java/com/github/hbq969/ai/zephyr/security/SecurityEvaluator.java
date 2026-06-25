@@ -161,7 +161,7 @@ public class SecurityEvaluator {
         return merged;
     }
 
-    private static Set<String> parseCommandList(String raw) {
+    public static Set<String> parseCommandList(String raw) {
         if (raw == null || raw.isBlank()) return Set.of();
         return Arrays.stream(raw.split(","))
                 .map(String::trim)

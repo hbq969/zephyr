@@ -90,7 +90,18 @@ public class ChatServiceImpl implements ChatService {
                 ? conversationId
                 : UUID.fastUUID().toString(true).substring(0, 12);
 
-        ConversationSessionManager.SessionHandle handle = sessionManager.register(cid, userName);
+        // 解析 workspace 路径
+        String workspacePath;
+        if (workspaceId != null && !workspaceId.isEmpty()) {
+            WorkspaceEntity ws = workspaceDao.queryById(workspaceId);
+            workspacePath = (ws != null && ws.getPath() != null && !ws.getPath().isBlank())
+                    ? ws.getPath()
+                    : System.getProperty("user.home");
+        } else {
+            workspacePath = System.getProperty("user.home");
+        }
+
+        ConversationSessionManager.SessionHandle handle = sessionManager.register(cid, userName, workspacePath);
 
         SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());
 
@@ -401,17 +412,13 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * 根据 conversationId 解析对应 workspace 的文件系统边界。
+     * 根据 workspacePath 解析文件系统边界。
      * 返回 NONE 表示无有效边界（所有文件操作需确认）。
      */
-    private WorkspaceBoundary resolveWorkspaceBoundary(String conversationId) {
-        if (conversationId == null) return WorkspaceBoundary.NONE;
+    private WorkspaceBoundary resolveWorkspaceBoundary(String workspacePath) {
+        if (workspacePath == null) return WorkspaceBoundary.NONE;
         try {
-            ConversationEntity conv = chatDao.queryConversationById(conversationId);
-            if (conv == null || conv.getWorkspaceId() == null) return WorkspaceBoundary.NONE;
-            WorkspaceEntity ws = workspaceDao.queryById(conv.getWorkspaceId());
-            if (ws == null || ws.getPath() == null) return WorkspaceBoundary.NONE;
-            Path wsPath = Path.of(ws.getPath());
+            Path wsPath = Path.of(workspacePath);
             try {
                 return new WorkspaceBoundary(wsPath.toRealPath());
             } catch (IOException e) {
@@ -420,7 +427,8 @@ public class ChatServiceImpl implements ChatService {
                 return new WorkspaceBoundary(wsPath.normalize().toAbsolutePath());
             }
         } catch (Exception e) {
-            log.warn("[安全] 解析 workspace 路径失败 conv={}: {}", conversationId, e.getMessage());
+            log.warn("[安全] 解析 workspace 路径失败: {} ({})",
+                    workspacePath, e.getMessage());
             return WorkspaceBoundary.NONE;
         }
     }
@@ -432,7 +440,7 @@ public class ChatServiceImpl implements ChatService {
         boolean rejected = false;
 
         // === 一次性解析 workspace 边界（循环外，避免 N 次 DB 查询） ===
-        WorkspaceBoundary boundary = resolveWorkspaceBoundary(conversationId);
+        WorkspaceBoundary boundary = resolveWorkspaceBoundary(handle.getWorkspacePath());
 
         for (LlmResult.ToolCall tc : toolCalls) {
 
@@ -831,15 +839,7 @@ public class ChatServiceImpl implements ChatService {
 
     @jakarta.annotation.PostConstruct
     void initShellWhitelist() {
-        String raw = cfg.getShell().getAllowedCommands();
-        if (raw == null || raw.isBlank()) {
-            shellWhitelist = Set.of();
-        } else {
-            shellWhitelist = Arrays.stream(raw.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .collect(java.util.stream.Collectors.toSet());
-        }
+        shellWhitelist = SecurityEvaluator.parseCommandList(cfg.getShell().getAllowedCommands());
     }
 
     private boolean isNotBlank(String s) {
@@ -873,21 +873,11 @@ public class ChatServiceImpl implements ChatService {
             }
         }
 
-        // 获取工作空间路径
-        String workspacePath = System.getProperty("user.home");
-        ConversationEntity conv = chatDao.queryConversationById(conversationId);
-        if (conv != null && conv.getWorkspaceId() != null) {
-            com.github.hbq969.ai.zephyr.workspace.dao.entity.WorkspaceEntity ws =
-                    workspaceDao.queryById(conv.getWorkspaceId());
-            if (ws != null) {
-                workspacePath = ws.getPath();
-            }
-        }
-
         ConversationSessionManager.SessionHandle handle = sessionManager.get(conversationId);
         if (handle == null) {
             return "会话不存在，无法执行命令";
         }
+        String workspacePath = handle.getWorkspacePath();
 
         if (background) {
             // 后台模式：检查配额 → 创建日志目录 → shell 层重定向到日志文件 → 启动 → 注册

@@ -29,8 +29,8 @@ public class ConversationSessionManager {
     @Resource
     private TaskScheduler taskScheduler;
 
-    public SessionHandle register(String conversationId, String userName) {
-        SessionHandle handle = new SessionHandle(conversationId, userName);
+    public SessionHandle register(String conversationId, String userName, String workspacePath) {
+        SessionHandle handle = new SessionHandle(conversationId, userName, workspacePath);
         sessions.put(conversationId, handle);
         log.info("[SSE] 注册连接 cid={}, user={}, 当前活跃连接: {}", conversationId, userName, sessions.size());
         return handle;
@@ -93,17 +93,20 @@ public class ConversationSessionManager {
     public static class SessionHandle {
         private final String conversationId;
         private final String userName;
+        private final String workspacePath;
         volatile long lastActivityTime;
         volatile boolean cancelled;
 
-        SessionHandle(String conversationId, String userName) {
+        SessionHandle(String conversationId, String userName, String workspacePath) {
             this.conversationId = conversationId;
             this.userName = userName;
+            this.workspacePath = workspacePath;
             this.lastActivityTime = System.currentTimeMillis() / 1000;
         }
 
         public String getConversationId() { return conversationId; }
         public String getUserName() { return userName; }
+        public String getWorkspacePath() { return workspacePath; }
 
         public void touch() {
             this.lastActivityTime = System.currentTimeMillis() / 1000;
