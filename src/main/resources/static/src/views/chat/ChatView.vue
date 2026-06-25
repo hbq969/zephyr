@@ -82,6 +82,8 @@ function refreshConversationList() {
 }
 
 function newChat() {
+  if (abortController) { abortController.abort(); abortController = null }
+  chatStore.streaming = false
   chatStore.clearMessages()
   convStore.currentId = null
   settingsStore.contextUsed = 0
@@ -107,6 +109,7 @@ function onSend(text: string, filePaths?: string[]) {
   chatStore.startSession()
   if (abortController) abortController.abort()
   abortController = new AbortController()
+  const currentController = abortController
 
   const displayText = filePaths && filePaths.length > 0
     ? langData.chatArea_filesUploaded.replace('{n}', String(filePaths.length)) + '\n' + text
@@ -120,7 +123,7 @@ function onSend(text: string, filePaths?: string[]) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversationId: convStore.currentId, message: text, workspaceId: workspaceStore.currentId, mode: chatStore.mode, filePaths: filePaths || [] }),
-    signal: abortController.signal
+    signal: currentController.signal
   }).then(async resp => {
     if (!resp.ok || !resp.body) {
       throw new Error(`HTTP ${resp.status}`)
@@ -175,6 +178,7 @@ function onSend(text: string, filePaths?: string[]) {
       chatStore.streaming = false
     }
   }).catch((err: any) => {
+    if (abortController !== currentController) return
     if (err?.name !== 'AbortError') {
       chatStore.appendToken('\n\n' + langData.context_requestFailed)
     }
@@ -192,8 +196,9 @@ function onStop() {
 function restoreConversation(id: string) {
   axios({ url: `/conversations/${id}/messages`, method: 'get' })
     .then(res => {
-      // 防止过期响应覆盖当前会话：当前选中的对话已变更时跳过
+      // 防止过期响应覆盖当前会话：当前选中的对话已变更或流式进行中时跳过
       if (convStore.currentId !== id) return
+      if (chatStore.streaming) return
       if (res.data.state === 'OK') {
         const body = res.data.body
         const msgs = (body.messages || body || []).map((m: any) => ({
