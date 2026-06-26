@@ -92,6 +92,10 @@ function newChat() {
   convStore.currentId = null
   settingsStore.contextUsed = 0
   chatStore.mode = 'default'
+
+  // 默认选中系统 workspace
+  const sysWs = workspaceStore.workspaces.find(w => w.isSystem === 1)
+  if (sysWs) workspaceStore.selectWorkspace(sysWs.id)
 }
 
 function onSend(text: string, filePaths?: string[]) {
