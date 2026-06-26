@@ -43,6 +43,7 @@ export interface Workspace {
   id: string
   name: string
   path: string
+  isSystem?: number
   createdAt: number
   updatedAt: number
 }

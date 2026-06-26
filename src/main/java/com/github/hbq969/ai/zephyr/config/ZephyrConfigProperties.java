@@ -329,6 +329,8 @@ public class ZephyrConfigProperties {
     public static class Workspace {
         /** browse 接口默认根目录，相对路径相对于 user.home，默认 .zephyr/workspace */
         private String browseRoot = ".zephyr/workspace";
+        /** 系统默认 tmp workspace 名称，默认 "tmp" */
+        private String tmpWorkspaceName = "tmp";
     }
 
     // ================================================================
