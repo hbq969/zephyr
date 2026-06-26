@@ -126,6 +126,12 @@ function onSend(text: string, filePaths?: string[]) {
   chatStore.addMessage({ id: nextMsgId(), role: 'assistant', content: '', timestamp: Date.now() / 1000 })
   chatStore.streaming = true
 
+  // 兜底：newChat 时 workspace 列表可能尚未加载完，发送前再检查一次
+  if (!workspaceStore.currentId) {
+    const sysWs = workspaceStore.workspaces.find(w => w.isSystem === 1)
+    if (sysWs) workspaceStore.selectWorkspace(sysWs.id)
+  }
+
   const baseUrl = import.meta.env.VITE_API_URL || ''
   fetch(`${baseUrl}/chat/send`, {
     method: 'POST',
