@@ -70,7 +70,7 @@ function openAdd() {
 
 function openEdit(rule: any) {
   editId.value = rule.id
-  dialogValue.value = rule.value || ''
+  dialogValue.value = rule.ruleValue || ''
   dialogDesc.value = rule.description || ''
   showDialog.value = true
 }
@@ -135,9 +135,9 @@ async function onToggle(rule: any, val: any) {
 
         <div v-else class="table-wrapper">
           <el-table :data="rules" style="width: 100%" :header-cell-style="headerCellStyle" stripe>
-            <el-table-column :label="valueLabel" prop="value" min-width="200">
+            <el-table-column :label="valueLabel" prop="ruleValue" min-width="200">
               <template #default="{ row }">
-                <span class="mono-text">{{ row.value }}</span>
+                <span class="mono-text">{{ row.ruleValue }}</span>
               </template>
             </el-table-column>
             <el-table-column :label="langData.tableHeaderDesc" prop="description" min-width="200">

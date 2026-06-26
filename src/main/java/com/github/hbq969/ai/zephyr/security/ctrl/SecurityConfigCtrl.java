@@ -53,6 +53,9 @@ public class SecurityConfigCtrl {
     }
 
     private void validateValue(String type, String value, String description) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("value 不能为空");
+        }
         if (RULE_TYPE_HARD_BLOCK.equals(type) || RULE_TYPE_SOFT_BLOCK.equals(type)) {
             try {
                 Pattern.compile(value, Pattern.CASE_INSENSITIVE);
