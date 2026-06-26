@@ -14,6 +14,10 @@ public final class ZephyrConstants {
 
     // === 用户默认值 ===
     public static final String DEFAULT_USERNAME = "admin";
+    /** 系统 workspace 所属内部用户名，不依赖请求上下文 */
+    public static final String SYSTEM_USERNAME = "system";
+    /** 系统 workspace 标记键 */
+    public static final String KEY_IS_SYSTEM = "isSystem";
     public static final String DEFAULT_AVATAR = "A";
 
     // === 通用响应 ===
