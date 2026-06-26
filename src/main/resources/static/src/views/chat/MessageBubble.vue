@@ -213,6 +213,8 @@ onUpdated(setupCodeBlocks)
 .markdown-body :deep(pre)::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.20); border-radius: 1px; }
 .markdown-body :deep(pre)::-webkit-scrollbar-track { background: transparent; }
 .markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
+html.dark .markdown-body :deep(pre) { background: #1e1d1a; color: #d4d3cf; }
+html.dark .markdown-body :deep(pre)::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
 
 </style>
 
@@ -227,5 +229,10 @@ onUpdated(setupCodeBlocks)
 .code-icon:hover { color: #141413; }
 .code-block-wrapper.collapsed pre { max-height: 0; overflow: hidden; }
 .code-block-wrapper:not(.collapsed) pre { max-height: none; }
+html.dark .code-block-wrapper { background: #252320; }
+html.dark .code-block-wrapper pre { background: #1e1d1a; color: #d4d3cf; }
+html.dark .code-block-wrapper pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+html.dark .code-icon { color: #6b6963; }
+html.dark .code-icon:hover { color: #d4d3cf; }
 
 </style>

@@ -16,9 +16,12 @@ const sizes = [12, 14, 16, 18, 20]
 
 const STORAGE_KEY = 'zephyr-font-size'
 
+const isDark = ref(false)
+
 onMounted(() => {
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved && sizes.includes(Number(saved))) fontSize.value = Number(saved)
+  isDark.value = document.documentElement.classList.contains('dark')
 })
 
 function changeFont(step: number) {
@@ -28,6 +31,12 @@ function changeFont(step: number) {
     fontSize.value = sizes[next]
     localStorage.setItem(STORAGE_KEY, String(fontSize.value))
   }
+}
+
+function toggleDark() {
+  document.documentElement.classList.toggle('dark')
+  isDark.value = document.documentElement.classList.contains('dark')
+  localStorage.setItem('zephyr-dark', isDark.value ? '1' : '0')
 }
 
 function scrollToBottom() {
@@ -49,13 +58,18 @@ watch(
 
 <template>
   <div ref="areaRef" class="chat-area" :style="{ '--chat-font-size': fontSize + 'px' }">
-    <div v-if="chatStore.messages.length > 0" class="font-ctrl">
-      <button class="fc-btn" @click="changeFont(-1)" :disabled="fontSize <= sizes[0]">
-        <Icon icon="lucide:minus" />
-      </button>
-      <span class="fc-val">{{ fontSize }}px</span>
-      <button class="fc-btn" @click="changeFont(1)" :disabled="fontSize >= sizes[sizes.length - 1]">
-        <Icon icon="lucide:plus" />
+    <div v-if="chatStore.messages.length > 0" class="top-tools">
+      <div class="font-ctrl">
+        <button class="fc-btn" @click="changeFont(-1)" :disabled="fontSize <= sizes[0]">
+          <Icon icon="lucide:minus" />
+        </button>
+        <span class="fc-val">{{ fontSize }}px</span>
+        <button class="fc-btn" @click="changeFont(1)" :disabled="fontSize >= sizes[sizes.length - 1]">
+          <Icon icon="lucide:plus" />
+        </button>
+      </div>
+      <button class="theme-toggle" @click="toggleDark()">
+        <Icon :icon="isDark ? 'lucide:moon' : 'lucide:sun'" />
       </button>
     </div>
     <div v-if="chatStore.messages.length === 0" class="empty-state">
@@ -71,11 +85,14 @@ watch(
 .chat-area { flex: 1; overflow-y: auto; padding: 20px 0; position: relative; }
 .chat-area::-webkit-scrollbar { width: 1px; }
 .chat-area::-webkit-scrollbar-thumb { background: var(--el-border-color); border-radius: 1px; }
-.font-ctrl { position: sticky; top: 0; float: right; display: inline-flex; align-items: center; gap: 4px; z-index: 10; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 2px 4px; margin-right: 16px; }
+.top-tools { position: sticky; top: 0; float: right; display: flex; align-items: center; gap: 6px; z-index: 10; margin-right: 16px; }
+.font-ctrl { display: inline-flex; align-items: center; gap: 4px; background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 8px; padding: 2px 4px; }
 .fc-btn { width: 24px; height: 24px; border-radius: 4px; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
 .fc-btn:hover:not(:disabled) { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 .fc-btn:disabled { opacity: 0.3; cursor: default; }
 .fc-val { font-size: 11px; color: var(--el-text-color-placeholder); min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; }
+.theme-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--el-border-color); background: var(--el-bg-color); color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.theme-toggle:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--el-text-color-secondary); }
 .empty-icon { width: 48px; height: 48px; border-radius: 12px; background: rgba(204,120,92,0.12); display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 24px; color: var(--el-color-primary); margin-bottom: 12px; }
 .empty-title { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; letter-spacing: -0.3px; color: var(--el-text-color-primary); margin-bottom: 4px; }

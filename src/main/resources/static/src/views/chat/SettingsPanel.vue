@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '@/store/settings'
 import { useWorkspaceStore } from '@/store/workspace'
@@ -23,18 +23,9 @@ watch(() => props.visible, (v) => {
   }
 })
 
-const isDark = ref(false)
-if (typeof document !== 'undefined') isDark.value = document.documentElement.classList.contains('dark')
-
 function goTo(path: string) {
   emit('close')
   router.push(path)
-}
-
-function toggleDark() {
-  document.documentElement.classList.toggle('dark')
-  isDark.value = document.documentElement.classList.contains('dark')
-  localStorage.setItem('zephyr-dark', isDark.value ? '1' : '0')
 }
 </script>
 
@@ -93,16 +84,6 @@ function toggleDark() {
           </span>
           <Icon icon="lucide:chevron-right" class="sp-arrow" />
         </div>
-        <div class="sp-divider"></div>
-        <div class="sp-item" @click="toggleDark()">
-          <Icon icon="lucide:moon" class="sp-item-icon" />
-          <span>{{ langData.settingsPanel_darkMode }}</span>
-          <span
-            class="sp-switch"
-            :class="{ on: isDark }"
-            @click.stop="toggleDark()"
-          ></span>
-        </div>
       </div>
       <div class="sp-footer">
         <button class="sp-btn" @click="emit('close')">{{ langData.settingsPanel_close }}</button>
@@ -127,11 +108,6 @@ html.dark .sp-body::-webkit-scrollbar-thumb { background: var(--el-text-color-pl
 .sp-item-icon { color: var(--el-text-color-secondary); font-size: 16px; flex-shrink: 0; }
 .sp-value { color: var(--el-text-color-secondary); font-size: 13px; flex: 1; text-align: right; }
 .sp-arrow { color: var(--el-text-color-placeholder); font-size: 14px; flex-shrink: 0; }
-.sp-divider { height: 8px; }
-.sp-switch { width: 44px; height: 24px; border-radius: 12px; background: var(--el-border-color); position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
-.sp-switch.on { background: var(--el-color-primary); }
-.sp-switch::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform 0.2s; }
-.sp-switch.on::after { transform: translateX(20px); }
 .sp-footer { padding: 12px 20px; border-top: 1px solid var(--el-border-color); display: flex; justify-content: flex-end; }
 .sp-btn { padding: 6px 18px; border-radius: 8px; border: none; background: var(--el-fill-color); color: var(--el-text-color-primary); cursor: pointer; font-size: 14px; font-family: inherit; }
 .sp-btn:hover { background: var(--el-border-color); }
