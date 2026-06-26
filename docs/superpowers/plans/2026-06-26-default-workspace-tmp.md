@@ -343,7 +343,7 @@ git commit -m "feat: WorkspaceService 增加 ensureSystemWorkspace 方法"
 在 `list()` 方法之后插入：
 
 ```java
-import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.*;
+// 注：import static ...ZephyrConstants.* 已在文件第 3 行存在，无需重复添加
 
 @Override
 public void ensureSystemWorkspace() {
@@ -405,17 +405,17 @@ git commit -m "feat: ensureSystemWorkspace 实现 + delete 拒绝系统 workspac
 
 在现有 `asyncScriptInitialDone`（MCP 重连回调）之后追加：
 
-```java
-import com.github.hbq969.ai.zephyr.workspace.service.WorkspaceService;
+在类中追加字段（与现有 `@Resource` 字段同级）：
 
-// 在类中追加 @Resource
+```java
 @Resource
 private WorkspaceService workspaceService;
 ```
 
+在 `tableCreate0()` 末尾，MCP 重连回调之后追加（使用全限定名 `java.util.concurrent.TimeUnit.SECONDS`，与现有代码风格一致；超时 5 秒，本地 DB 操作无需过长）：
+
 ```java
-// 在 tableCreate0() 末尾，MCP 重连回调之后追加：
-asyncScriptInitialDone(30, TimeUnit.SECONDS, () -> {
+asyncScriptInitialDone(5, java.util.concurrent.TimeUnit.SECONDS, () -> {
     workspaceService.ensureSystemWorkspace();
 });
 ```
