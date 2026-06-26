@@ -4,7 +4,6 @@ import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
 import { ElMessageBox } from 'element-plus'
 import { getLangData } from '@/i18n/locale'
-import { msg } from '@/utils/Utils'
 
 const settingsStore = useSettingsStore()
 const langData = getLangData()
@@ -53,7 +52,7 @@ function tabLabel(tab: { name: string; labelKey: string }): string {
 
 onMounted(() => loadRules())
 
-watch(activeTab, () => loadRules())
+watch(activeTab, () => { if (!settingsStore.securityRules[activeTab.value]) loadRules() })
 
 async function loadRules() {
   loading.value = true

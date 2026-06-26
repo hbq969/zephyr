@@ -19,7 +19,7 @@ import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.*;
 /**
  * Java 层安全评估器，在 LLM 自评估之外做模式匹配防御。
  * <p>
- * HARD/SOFT BLOCK 规则全部从 {@code application.yml} 的 {@code zephyr.security} 读取，规则变更后需重启生效。
+ * HARD/SOFT BLOCK 规则从 DB ({@code zephyr_security_rules}) 读取，通过 {@code SecurityConfigService.refresh()} 实时生效无需重启。
  */
 @Slf4j
 @Component

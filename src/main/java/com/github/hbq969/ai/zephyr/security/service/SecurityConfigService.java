@@ -7,6 +7,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import cn.hutool.core.lang.PatternPool;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -67,7 +68,7 @@ public class SecurityConfigService {
         List<Pattern> result = new ArrayList<>();
         for (String raw : patterns) {
             try {
-                result.add(Pattern.compile(raw, Pattern.CASE_INSENSITIVE));
+                result.add(PatternPool.get(raw, Pattern.CASE_INSENSITIVE));
             } catch (PatternSyntaxException e) {
                 log.warn("[SecurityConfig] 跳过非法正则: [{}], 错误: {}", raw, e.getMessage());
             }

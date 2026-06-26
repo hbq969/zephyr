@@ -13,7 +13,6 @@ public interface SecurityConfigDao {
 
     void createSecurityRulesTable();
 
-    List<SecurityRuleEntity> queryByType(@Param("ruleType") String ruleType);
     List<SecurityRuleEntity> queryAllByType(@Param("ruleType") String ruleType);
     List<SecurityRuleEntity> queryAll();
     void insert(SecurityRuleEntity entity);

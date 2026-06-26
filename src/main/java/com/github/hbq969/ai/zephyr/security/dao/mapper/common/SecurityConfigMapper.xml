@@ -3,15 +3,6 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.github.hbq969.ai.zephyr.security.dao.SecurityConfigDao">
 
-    <select id="queryByType" resultType="com.github.hbq969.ai.zephyr.security.dao.entity.SecurityRuleEntity">
-        select id, rule_type as ruleType, rule_value as ruleValue,
-               description, enabled,
-               created_at as createdAt, updated_at as updatedAt
-        from zephyr_security_rules
-        where rule_type = #{ruleType} and enabled = 1
-        order by created_at asc
-    </select>
-
     <select id="queryAll" resultType="com.github.hbq969.ai.zephyr.security.dao.entity.SecurityRuleEntity">
         select id, rule_type as ruleType, rule_value as ruleValue,
                description, enabled,
