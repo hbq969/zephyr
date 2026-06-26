@@ -16,6 +16,7 @@ import com.github.hbq969.ai.zephyr.chat.service.BackgroundProcessManager;
 import com.github.hbq969.ai.zephyr.security.AuditLogger;
 import com.github.hbq969.ai.zephyr.security.SecurityEvaluator;
 import com.github.hbq969.ai.zephyr.security.SecurityEvaluator.WorkspaceBoundary;
+import com.github.hbq969.ai.zephyr.security.service.SecurityConfigService;
 import com.github.hbq969.ai.zephyr.mcp.utils.McpConnectionManager;
 import com.github.hbq969.ai.zephyr.memory.service.MemoryService;
 import com.github.hbq969.ai.zephyr.skill.service.SkillService;
@@ -75,6 +76,8 @@ public class ChatServiceImpl implements ChatService {
     private SecurityEvaluator securityEvaluator;
     @Resource
     private AuditLogger auditLogger;
+    @Resource
+    private SecurityConfigService securityConfigService;
 
     // 绕过重试计数器（会话级）
     private final Map<String, Integer> bypassAttempts = new ConcurrentHashMap<>();
@@ -843,18 +846,13 @@ public class ChatServiceImpl implements ChatService {
         return (int) Math.ceil(text.length() * cfg.getChat().getContext().getTokenEstimationRatio());
     }
 
-    private Set<String> shellWhitelist = Set.of();
-
-    @jakarta.annotation.PostConstruct
-    void initShellWhitelist() {
-        shellWhitelist = SecurityEvaluator.parseCommandList(cfg.getShell().getAllowedCommands());
-    }
-
     private boolean isNotBlank(String s) {
         return s != null && !s.isBlank();
     }
 
     private String executeShell(Map<String, Object> args, String userName, String conversationId) {
+        SecurityConfigService.ConfigSnapshot snap = securityConfigService.getSnapshot();
+
         String mode = cfg.getShell().getMode();
         if (SHELL_MODE_DISABLED.equals(mode)) {
             return "Shell 命令执行已禁用";
@@ -874,7 +872,7 @@ public class ChatServiceImpl implements ChatService {
             if (lastSlash >= 0) {
                 cmdName = cmdName.substring(lastSlash + 1);
             }
-            if (!shellWhitelist.contains(cmdName)) {
+            if (!snap.shellAllowedCommands().contains(cmdName)) {
                 String msg = "命令 '" + cmdName + "' 不在白名单中，拒绝执行";
                 log.info(msg);
                 return msg;

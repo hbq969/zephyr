@@ -1,8 +1,8 @@
 package com.github.hbq969.ai.zephyr.security;
 
-import cn.hutool.core.lang.PatternPool;
 import cn.hutool.core.util.ReUtil;
 import com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties;
+import com.github.hbq969.ai.zephyr.security.service.SecurityConfigService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -10,13 +10,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-import java.util.stream.Collectors;
 
 import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.*;
 
@@ -35,11 +31,12 @@ public class SecurityEvaluator {
     @Resource
     private AuditLogger auditLogger;
 
-    // === 运行时编译后的 Pattern 缓存 ===
+    @Resource
+    private SecurityConfigService securityConfigService;
 
-    private List<Pattern> hardBlockShellPatterns;
+    // === 运行时编译后的 Path Prefix 缓存 ===
+
     private List<String> hardBlockPathPrefixes;
-    private List<Pattern> softBlockShellPatterns;
 
     // === 安全规则标识常量 ===
 
@@ -73,49 +70,12 @@ public class SecurityEvaluator {
         }
     }
 
-    private Set<String> readOnlyCommands;
-
     @jakarta.annotation.PostConstruct
     void init() {
-        initReadOnlyCommands();
-        initPatterns();
-    }
-
-    private void initReadOnlyCommands() {
-        readOnlyCommands = parseCommandList(cfg.getSecurity().getDefaultAllowCommands());
-    }
-
-    private void initPatterns() {
-        ZephyrConfigProperties.Security.HardBlock hb = cfg.getSecurity().getHardBlock();
-        ZephyrConfigProperties.Security.SoftBlock sb = cfg.getSecurity().getSoftBlock();
-
-        hardBlockShellPatterns = compileShellPatterns(hb.getShellPatterns(), "HARD_BLOCK");
-        hardBlockPathPrefixes = new ArrayList<>(hb.getPathPrefixes() != null ? hb.getPathPrefixes() : List.of());
-        softBlockShellPatterns = compileShellPatterns(sb.getShellPatterns(), "SOFT_BLOCK");
-
-        log.info("规则加载完成 — HARD_BLOCK shell: {} 条, path: {} 条; SOFT_BLOCK shell: {} 条",
-                hardBlockShellPatterns.size(), hardBlockPathPrefixes.size(), softBlockShellPatterns.size());
-    }
-
-    private List<Pattern> compileShellPatterns(List<String> patterns, String ruleType) {
-        if (patterns == null) return List.of();
-        List<Pattern> result = new ArrayList<>();
-        for (String raw : patterns) {
-            try {
-                result.add(PatternPool.get(raw, Pattern.CASE_INSENSITIVE));
-            } catch (PatternSyntaxException e) {
-                log.warn("{} 规则正则非法，已跳过: [{}], 错误: {}", ruleType, raw, e.getMessage());
-            }
-        }
-        return result;
-    }
-
-    public static Set<String> parseCommandList(String raw) {
-        if (raw == null || raw.isBlank()) return Set.of();
-        return Arrays.stream(raw.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
+        hardBlockPathPrefixes = new ArrayList<>(
+                cfg.getSecurity().getHardBlock().getPathPrefixes() != null
+                        ? cfg.getSecurity().getHardBlock().getPathPrefixes()
+                        : List.of());
     }
 
     /**
@@ -152,8 +112,10 @@ public class SecurityEvaluator {
         if (cmdObj == null) return Result.allow();
         String command = cmdObj.toString().trim();
 
+        SecurityConfigService.ConfigSnapshot snap = securityConfigService.getSnapshot();
+
         // 1. HARD BLOCK 检查（所有模式强制执行）
-        for (Pattern p : hardBlockShellPatterns) {
+        for (Pattern p : snap.hardBlockPatterns()) {
             if (ReUtil.contains(p, command)) {
                 log.info("[安全] HARD_BLOCK 触发拒绝 — 命令: {}, 命中规则: {}", command, p.pattern());
                 return Result.block("HARD_BLOCK", "命令匹配安全红线规则，禁止执行");
@@ -173,7 +135,7 @@ public class SecurityEvaluator {
         }
 
         // 4. SOFT BLOCK 检查
-        for (Pattern p : softBlockShellPatterns) {
+        for (Pattern p : snap.softBlockPatterns()) {
             if (!ReUtil.contains(p, command)) continue;
 
             // acceptEdits 模式：shell 重定向到 workspace 内文件应免批（文件编辑语义）
@@ -197,7 +159,7 @@ public class SecurityEvaluator {
             if (lastSlash >= 0) {
                 cmdName = cmdName.substring(lastSlash + 1);
             }
-            if (!readOnlyCommands.contains(cmdName)) {
+            if (!snap.defaultAllowCommands().contains(cmdName)) {
                 log.info("[安全] MODE_DEFAULT 触发确认 — 非只读命令: {} (主命令: {})", command, cmdName);
                 return Result.confirm("MODE_DEFAULT", "Default 模式下 shell 命令需要用户确认");
             }
