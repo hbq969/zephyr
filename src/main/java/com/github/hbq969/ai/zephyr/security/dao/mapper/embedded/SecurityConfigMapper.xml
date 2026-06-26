@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.github.hbq969.ai.zephyr.security.dao.SecurityConfigDao">
+
+  <update id="createSecurityRulesTable">
+    create table if not exists zephyr_security_rules (
+      id varchar(64) primary key,
+      rule_type varchar(32) not null,
+      rule_value varchar(512) not null,
+      description varchar(256),
+      enabled smallint default 1,
+      created_at bigint,
+      updated_at bigint
+    );
+    create unique index if not exists uk_zsr_type_value
+      on zephyr_security_rules(rule_type, rule_value);
+    create index if not exists idx_zsr_type on zephyr_security_rules(rule_type);
+  </update>
+
+</mapper>
