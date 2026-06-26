@@ -11,4 +11,7 @@ public interface WorkspaceService {
     void delete(String id, String userName);
     List<Map<String, Object>> browse(String parent);
     String mkdir(String parent, String name);
+
+    /** 确保系统 tmp workspace 存在（启动时调用），幂等，不依赖请求上下文 */
+    void ensureSystemWorkspace();
 }
