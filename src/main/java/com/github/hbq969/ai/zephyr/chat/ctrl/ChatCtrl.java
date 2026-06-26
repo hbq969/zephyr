@@ -29,7 +29,6 @@ public class ChatCtrl {
 
     private String userName() {
         UserInfo ui = UserContext.getNoCheck();
-        log.info("++++ 会话信息: {}", ui == null ? "无" : ui.getUserName());
         return ui != null ? ui.getUserName() : DEFAULT_USERNAME;
     }
 

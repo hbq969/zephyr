@@ -375,7 +375,7 @@ zephyr:
         - "helm\\s+(?:delete|uninstall)"                                                # helm 删除 release
         - "(?:kill\\s+-9|pkill)"                                                        # 强制杀进程
         - "chmod\\s+777"                                                                # chmod 777
-        - ">\\s*\\S+"                                                                   # 重定向覆写文件
+#        - ">\\s*\\S+"                                                                   # 重定向覆写文件
     audit:
       enabled: true  # 是否启用审计日志
       log-path: ${user.home}/.zephyr/audit.log  # 审计日志路径

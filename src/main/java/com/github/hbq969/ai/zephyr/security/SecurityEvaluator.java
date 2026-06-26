@@ -184,7 +184,7 @@ public class SecurityEvaluator {
         }
 
         Result result = switch (toolName) {
-            case "execute_shell" -> evaluateShell(arguments, mode);
+            case "execute_shell" -> evaluateShell(arguments, mode, boundary);
             case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode, boundary);
             default -> Result.allow();
         };
@@ -197,7 +197,7 @@ public class SecurityEvaluator {
         return result;
     }
 
-    private Result evaluateShell(Map<String, Object> arguments, String mode) {
+    private Result evaluateShell(Map<String, Object> arguments, String mode, WorkspaceBoundary boundary) {
         if (arguments == null || !arguments.containsKey("command")) {
             return Result.allow();
         }
@@ -217,11 +217,17 @@ public class SecurityEvaluator {
             return Result.allow();
         }
 
-        // 3. SOFT BLOCK 检查（default / acceptEdits 模式）
+        // 3. SOFT BLOCK 检查
         for (Pattern p : softBlockShellPatterns) {
-            if (ReUtil.contains(p, command)) {
-                return Result.confirm("SOFT_BLOCK", "该命令具有破坏性，需要用户确认");
+            if (!ReUtil.contains(p, command)) continue;
+
+            // acceptEdits 模式：shell 重定向到 workspace 内文件应免批（文件编辑语义）
+            if ("acceptEdits".equalsIgnoreCase(mode) && isRedirectPattern(p.pattern())
+                    && boundary.isPresent() && isRedirectTargetInsideWorkspace(command, boundary)) {
+                continue;
             }
+
+            return Result.confirm("SOFT_BLOCK", "该命令具有破坏性，需要用户确认");
         }
 
         // 4. default 模式：只读命令放行，其余需确认
@@ -241,6 +247,34 @@ public class SecurityEvaluator {
         }
 
         return Result.allow();
+    }
+
+    /** 判定 SOFT BLOCK 模式是否为输出重定向类型（在 acceptEdits 模式下应视为文件编辑免批） */
+    private boolean isRedirectPattern(String rawPattern) {
+        return rawPattern.contains(">") && (rawPattern.contains("\\s*\\\\S")
+                || rawPattern.contains("redirect") || rawPattern.contains("overwrite"));
+    }
+
+    /** 检查 shell 命令中重定向的目标路径是否全部在 workspace 内 */
+    private boolean isRedirectTargetInsideWorkspace(String command, WorkspaceBoundary boundary) {
+        // 匹配 > file 或 >> file（file 可能是带引号的路径）
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("[12]?>>?\\s*['\"]?([^'\"\\s;|&]+)")
+                .matcher(command);
+        boolean hasRedirect = false;
+        while (m.find()) {
+            hasRedirect = true;
+            String target = m.group(1);
+            try {
+                Path targetPath = boundary.resolveTarget(target);
+                if (!boundary.contains(targetPath)) {
+                    return false;
+                }
+            } catch (Exception ignored) {
+                return false;
+            }
+        }
+        return hasRedirect;
     }
 
     private Result evaluateFileWrite(Map<String, Object> arguments, String mode, WorkspaceBoundary boundary) {

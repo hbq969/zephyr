@@ -41,6 +41,11 @@ public class WorkspaceServiceImpl implements WorkspaceService {
             if (existing.getIsSystem() == null || existing.getIsSystem() != 1) {
                 workspaceDao.updateIsSystem(existing.getId(), 1);
             }
+            // 确保磁盘目录存在（DB 记录有但目录可能被误删）
+            File dir = new File(tmpPath);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
             return;
         }
         Map<String, String> body = new java.util.HashMap<>();
@@ -75,6 +80,13 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         workspaceDao.insert(entity);
+
+        // 确保磁盘目录存在，否则 shell 工具 cd 进去会报 No such file or directory
+        File dir = new File(path);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
         return entity;
     }
 

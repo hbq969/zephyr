@@ -53,7 +53,7 @@ const riskColor = (rule: string): string => {
     :title="langData?.confirmTitle || '操作确认'"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
-    width="480px"
+    width="680px"
     @close="emit('close')"
   >
     <div v-if="event" class="confirm-content">
@@ -121,7 +121,7 @@ const riskColor = (rule: string): string => {
   border-radius: 6px;
   font-size: 12px;
   overflow-x: auto;
-  max-height: 160px;
+  max-height: 360px;
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;

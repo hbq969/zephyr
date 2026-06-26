@@ -103,6 +103,12 @@ public class ChatServiceImpl implements ChatService {
             workspacePath = System.getProperty("user.home");
         }
 
+        // 确保工作目录存在（DB 记录有但磁盘目录可能被误删，ProcessBuilder 要求目录必须存在）
+        java.io.File wsDir = new java.io.File(workspacePath);
+        if (!wsDir.exists()) {
+            wsDir.mkdirs();
+        }
+
         ConversationSessionManager.SessionHandle handle = sessionManager.register(cid, userName, workspacePath);
 
         SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());

@@ -130,7 +130,7 @@ public class ContextBuilder {
         vars.put("knowledgeBaseIndex", buildKnowledgeBaseInfo(conversationId));
         vars.put("securityRules", securityRules.toString());
         String systemPrompt = promptLoader.render("role.md", vars);
-        log.info("系统提示词: \n{}",systemPrompt);
+//        log.info("系统提示词: \n{}",systemPrompt);
 
         // 6. 添加内置工具
         toolDefs.add(buildUseSkillTool());
