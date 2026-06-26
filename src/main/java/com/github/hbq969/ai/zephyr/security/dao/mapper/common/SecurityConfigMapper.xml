@@ -48,4 +48,10 @@
         where id = #{id}
     </update>
 
+    <update id="updateEnabled">
+        update zephyr_security_rules
+        set enabled = #{enabled}, updated_at = #{updatedAt}
+        where id = #{id}
+    </update>
+
 </mapper>

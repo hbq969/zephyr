@@ -19,4 +19,5 @@ public interface SecurityConfigDao {
     void insert(SecurityRuleEntity entity);
     void deleteById(@Param("id") String id);
     void updateById(SecurityRuleEntity entity);
+    void updateEnabled(SecurityRuleEntity entity);
 }

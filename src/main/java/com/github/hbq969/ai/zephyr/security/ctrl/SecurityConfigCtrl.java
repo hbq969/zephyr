@@ -163,7 +163,7 @@ public class SecurityConfigCtrl {
         e.setId(body.get("id"));
         e.setEnabled(Integer.parseInt(body.get("enabled")));
         e.setUpdatedAt(now);
-        dao.updateById(e);
+        dao.updateEnabled(e);
         securityConfigService.refresh();
         auditLogger.log("SECURITY_CONFIG", type, body.get("enabled").equals("1") ? "ENABLE" : "DISABLE",
                 "规则 id=" + body.get("id"), userName());

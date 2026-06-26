@@ -14,7 +14,7 @@
       updated_at bigint,
       UNIQUE(rule_type, rule_value)
     );
-    create index if not exists idx_zsr_type on zephyr_security_rules(rule_type);
+    create index idx_zsr_type on zephyr_security_rules(rule_type);
   </update>
 
 </mapper>
