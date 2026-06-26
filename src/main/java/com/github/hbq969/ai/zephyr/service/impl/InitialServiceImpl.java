@@ -44,6 +44,9 @@ public class InitialServiceImpl extends AbstractScriptInitialAware {
     private com.github.hbq969.ai.zephyr.workspace.dao.WorkspaceDao workspaceDao;
 
     @Resource
+    private com.github.hbq969.ai.zephyr.workspace.service.WorkspaceService workspaceService;
+
+    @Resource
     private com.github.hbq969.ai.zephyr.knowledge.dao.KnowledgeDao knowledgeDao;
 
     @Resource
@@ -80,6 +83,11 @@ public class InitialServiceImpl extends AbstractScriptInitialAware {
         // 建表完成后重连之前处于 connected 状态的 MCP 服务器
         asyncScriptInitialDone(MCP_DISCOVER_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS, () -> {
             mcpService.reconnectOnStartup();
+        });
+
+        // 确保系统 tmp workspace 存在（建表完成后异步执行）
+        asyncScriptInitialDone(5, java.util.concurrent.TimeUnit.SECONDS, () -> {
+            workspaceService.ensureSystemWorkspace();
         });
     }
 
