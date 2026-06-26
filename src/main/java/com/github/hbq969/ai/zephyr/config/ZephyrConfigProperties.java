@@ -304,11 +304,6 @@ public class ZephyrConfigProperties {
     public static class Shell {
         /** Shell 执行模式: disabled | whitelist | allowAll，默认 whitelist */
         private String mode = "whitelist";
-        /**
-         * whitelist 模式下允许的命令（仅命令名，不含参数），逗号分隔。
-         * 如 {@code ls,cat,find,git,mvn,npm}。
-         */
-        private String allowedCommands = "";
         /** 每个用户最大后台进程数，默认 5 */
         private int maxBackgroundProcesses = 5;
         /** 后台进程最大运行时间（秒），超时自动 kill，默认 3600 */
@@ -345,11 +340,6 @@ public class ZephyrConfigProperties {
         private int confirmTimeoutSeconds = 300;
         /** 连续绕过 HARD BLOCK 最大次数，超出强制终止，默认 3 */
         private int maxBypassAttempts = 3;
-        /**
-         * default 模式下无需确认的只读 shell 命令白名单，逗号分隔。
-         * 仅取命令名（路径和参数前的第一个词），如 {@code ls,cat,head,tail}。
-         */
-        private String defaultAllowCommands = "";
         /** 审计日志 */
         private Audit audit = new Audit();
 
@@ -370,11 +360,6 @@ public class ZephyrConfigProperties {
         @Data
         public static class HardBlock {
             /**
-             * shell 命令 HARD BLOCK 正则列表，命中任一即禁止执行。
-             * 正则大小写不敏感（代码中已强制 CASE_INSENSITIVE），使用 {@code find()} 部分匹配。
-             */
-            private List<String> shellPatterns = new ArrayList<>();
-            /**
              * 文件写入 HARD BLOCK 路径子串列表，命中任一即禁止写入。
              * 匹配使用 {@code String.contains()} 语义（子串包含，非前缀匹配）。
              */
@@ -383,11 +368,6 @@ public class ZephyrConfigProperties {
 
         @Data
         public static class SoftBlock {
-            /**
-             * shell 命令 SOFT BLOCK 正则列表，命中任一即需要用户确认。
-             * 正则大小写不敏感（代码中已强制 CASE_INSENSITIVE），使用 {@code find()} 部分匹配。
-             */
-            private List<String> shellPatterns = new ArrayList<>();
         }
     }
 }
