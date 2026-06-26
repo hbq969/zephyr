@@ -23,6 +23,7 @@ public class PromptLoader {
 
     private static final String USER_PROMPTS_DIR = System.getProperty("user.home") + "/.zephyr/prompts";
     private static final Pattern VAR_PATTERN = Pattern.compile("\\{(\\w+)}");
+    private static final Pattern FRONTMATTER_PATTERN = Pattern.compile("^---\\s*\\n.*?---\\s*\\n", Pattern.DOTALL);
 
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
@@ -31,8 +32,11 @@ public class PromptLoader {
      * 查找优先级：~/.zephyr/prompts/{name} > classpath:prompts/{name}
      */
     public String load(String name) {
+        return load(name, true);
+    }
+
+    public String loadRaw(String name) {
         return cache.computeIfAbsent(name, k -> {
-            // 1. 用户自定义覆盖
             Path userPath = Paths.get(USER_PROMPTS_DIR, k);
             if (Files.exists(userPath)) {
                 log.info("Prompt '{}' 使用用户自定义覆盖: {}", k, userPath);
@@ -42,7 +46,6 @@ public class PromptLoader {
                     log.warn("读取用户 prompt 失败: {}", userPath, e);
                 }
             }
-            // 2. classpath 默认
             try {
                 ClassPathResource res = new ClassPathResource("prompts/" + k);
                 return res.getContentAsString(StandardCharsets.UTF_8);
@@ -51,6 +54,11 @@ public class PromptLoader {
                 return "";
             }
         });
+    }
+
+    public String load(String name, boolean stripFrontmatter) {
+        String content = loadRaw(name);
+        return stripFrontmatter ? FRONTMATTER_PATTERN.matcher(content).replaceFirst("") : content;
     }
 
     /**

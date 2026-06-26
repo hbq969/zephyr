@@ -56,6 +56,45 @@ public class ContextBuilder {
     @Resource
     private com.github.hbq969.ai.zephyr.security.PromptLoader promptLoader;
 
+    private ModelConfigEntity resolveModel(String userName) {
+        // 合并共享 + 私有，私有优先
+        Map<String, ModelConfigEntity> modelMap = new LinkedHashMap<>();
+        List<ModelConfigEntity> ownModels = modelConfigDao.queryByUserName(userName);
+        for (ModelConfigEntity m : ownModels) {
+            modelMap.put(m.getName(), m);
+        }
+        for (ModelConfigEntity m : modelConfigDao.queryShared()) {
+            modelMap.putIfAbsent(m.getName(), m);
+        }
+        List<ModelConfigEntity> allModels = new ArrayList<>(modelMap.values());
+
+        // 优先级：用户偏好 > 私有默认 > 共享默认 > 第一个 llm
+        UserModelPreferenceEntity pref =
+                userModelPreferenceDao.queryByUserAndType(userName, MODEL_TYPE_LLM);
+        if (pref != null) {
+            String prefId = pref.getModelId();
+            ModelConfigEntity m = ownModels.stream().filter(o -> prefId.equals(o.getId())).findFirst()
+                    .orElseGet(() -> allModels.stream().filter(a -> prefId.equals(a.getId())).findFirst().orElse(null));
+            if (m != null) return m;
+        }
+
+        ModelConfigEntity model = ownModels.stream()
+                .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
+                .findFirst()
+                .orElseGet(() -> allModels.stream()
+                        .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
+                        .findFirst().orElse(null));
+        if (model != null) return model;
+
+        model = allModels.stream()
+                .filter(m -> MODEL_TYPE_LLM.equals(m.getModelType()) || m.getModelType() == null)
+                .findFirst()
+                .orElse(null);
+        if (model != null) return model;
+
+        throw new RuntimeException("请先配置模型");
+    }
+
     private String fileSystemSecurityPrompt(String mode) {
         if (MODE_BYPASS.equalsIgnoreCase(mode)) return promptLoader.load("modes/bypass.md");
         if (MODE_ACCEPT_EDITS.equalsIgnoreCase(mode)) return promptLoader.load("modes/accept-edits.md");
@@ -63,46 +102,7 @@ public class ContextBuilder {
     }
 
     public Context build(String userName, String conversationId, String mode) {
-        // 1. 加载模型配置（合并共享 + 私有）
-        List<ModelConfigEntity> ownModels = modelConfigDao.queryByUserName(userName);
-        List<ModelConfigEntity> sharedModels = modelConfigDao.queryShared();
-
-        // 私有优先，共享补充（同名时私有覆盖共享）
-        Map<String, ModelConfigEntity> modelMap = new LinkedHashMap<>();
-        for (ModelConfigEntity m : ownModels) {
-            modelMap.put(m.getName(), m);
-        }
-        for (ModelConfigEntity m : sharedModels) {
-            modelMap.putIfAbsent(m.getName(), m);
-        }
-        List<ModelConfigEntity> allModels = new ArrayList<>(modelMap.values());
-
-        // 1.1 优先读用户偏好表
-        ModelConfigEntity model = null;
-        String modelType = MODEL_TYPE_LLM;
-        UserModelPreferenceEntity pref =
-                userModelPreferenceDao.queryByUserAndType(userName, modelType);
-        if (pref != null) {
-            String prefId = pref.getModelId();
-            model = ownModels.stream().filter(m -> prefId.equals(m.getId())).findFirst()
-                    .orElseGet(() -> allModels.stream().filter(m -> prefId.equals(m.getId())).findFirst().orElse(null));
-        }
-        // 1.2 回退：用户私有默认 > 共享默认 > 第一个 llm
-        if (model == null) {
-            model = ownModels.stream()
-                    .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
-                    .findFirst()
-                    .orElseGet(() -> allModels.stream()
-                            .filter(m -> m.getIsDefault() != null && m.getIsDefault() == 1)
-                            .findFirst().orElse(null));
-        }
-        if (model == null) {
-            model = allModels.stream()
-                    .filter(m -> MODEL_TYPE_LLM.equals(m.getModelType()) || m.getModelType() == null)
-                    .findFirst()
-                    .orElse(null);
-        }
-        if (model == null) throw new RuntimeException("请先配置模型");
+        ModelConfigEntity model = resolveModel(userName);
 
         // 2. 加载 MCP 工具 → OpenAI tool definitions
         List<ToolDef> toolDefs = buildMcpToolDefs(userName);
@@ -123,52 +123,14 @@ public class ContextBuilder {
 
         // 6. 渲染角色 prompt
         Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("workspaceInfo", buildWorkspaceInfo(conversationId, mode));
         vars.put("fileSystemSecurity", fileSystemSecurityPrompt(mode));
         vars.put("skillIndex", skillIndex);
         vars.put("memoryIndex", memoryIndex);
-        vars.put("knowledgeBaseIndex", "");
-        vars.put("workspaceInfo", "");
+        vars.put("knowledgeBaseIndex", buildKnowledgeBaseInfo(conversationId));
         vars.put("securityRules", securityRules.toString());
-        String rendered = promptLoader.render("role.md", vars);
-        StringBuilder systemPrompt = new StringBuilder(rendered);
-
-        if (!skillIndex.isEmpty()) {
-            systemPrompt.append("\n\n## 可用技能\n").append(skillIndex)
-                    .append("\n（需要详细指导时使用 use_skill 工具加载）");
-        }
-        if (!memoryIndex.isEmpty()) {
-            systemPrompt.append("\n\n## 用户记忆\n").append(memoryIndex)
-                    .append("\n（需要完整内容时使用 use_memory 工具查看）");
-        }
-
-        // 工作空间
-        if (conversationId != null && !conversationId.isEmpty()) {
-            ConversationEntity conv = chatDao.queryConversationById(conversationId);
-            if (conv != null && conv.getWorkspaceId() != null && !conv.getWorkspaceId().isEmpty()) {
-                WorkspaceEntity ws = workspaceDao.queryById(conv.getWorkspaceId());
-                if (ws != null) {
-                    systemPrompt.append("\n\n## 工作空间\n")
-                        .append("当前工作目录: ").append(ws.getPath()).append("\n");
-                    if (!MODE_BYPASS.equalsIgnoreCase(mode)) {
-                        systemPrompt.append("此路径的父目录、兄弟目录均不属于工作空间，仅此目录及其子目录内的文件可以访问。\n");
-                    }
-                }
-            }
-        }
-
-        // 加载对话勾选的知识库
-        if (conversationId != null && !conversationId.isEmpty()) {
-            List<String> enabledKbIds = knowledgeDao.queryKbIdsByConversation(conversationId);
-            if (!enabledKbIds.isEmpty()) {
-                List<com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity> kbs = knowledgeDao.queryKbByIds(enabledKbIds);
-                systemPrompt.append("\n\n## 已启用知识库\n");
-                for (com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity kb : kbs) {
-                    systemPrompt.append("- ").append(kb.getName()).append(": ")
-                        .append(kb.getDescription() != null ? kb.getDescription() : "").append("\n");
-                }
-                systemPrompt.append("使用 search_knowledge 工具检索知识库内容");
-            }
-        }
+        String systemPrompt = promptLoader.render("role.md", vars);
+        log.info("系统提示词: \n{}",systemPrompt);
 
         // 6. 添加内置工具
         toolDefs.add(buildUseSkillTool());
@@ -179,11 +141,11 @@ public class ContextBuilder {
         toolDefs.add(buildKillProcessTool());
 
         // 7. 加载历史消息（最近 20 轮）
-        List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt.toString());
+        List<Map<String, Object>> messages = buildMessages(userName, conversationId, systemPrompt);
 
         Context ctx = new Context();
         ctx.setModel(model);
-        ctx.setSystemPrompt(systemPrompt.toString());
+        ctx.setSystemPrompt(systemPrompt);
         ctx.setTools(toolDefs);
         ctx.setMessages(messages);
         return ctx;
@@ -219,8 +181,6 @@ public class ContextBuilder {
     }
 
     private String buildSkillIndex(String userName) {
-        StringBuilder sb = new StringBuilder();
-
         // 用户私有 + 共享合并，用户私有覆盖同名共享
         Map<String, SkillConfigEntity> dedup = new LinkedHashMap<>();
         List<SkillConfigEntity> sharedSkills = skillDao.queryShared();
@@ -234,33 +194,69 @@ public class ContextBuilder {
             dedup.put(s.getSkillName(), s);
         }
 
-        Set<String> seen = new HashSet<>();
+        if (dedup.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
         for (SkillConfigEntity s : dedup.values()) {
             sb.append("- ").append(s.getSkillName()).append(": ").append(s.getDescription()).append("\n");
-            seen.add(s.getSkillName());
         }
-
         return sb.toString();
     }
 
     private String buildMemoryIndex(String userName) {
-        StringBuilder sb = new StringBuilder();
         List<MemoryVO> memories = memoryService.list(null, userName);
         List<String> included = new ArrayList<>();
         List<String> excluded = new ArrayList<>();
+
+        StringBuilder itemSb = new StringBuilder();
         for (MemoryVO m : memories) {
             if (!m.isEnabled()) {
                 excluded.add(m.getName());
                 continue;
             }
             included.add(m.getName());
-            sb.append("- ").append(m.getName()).append(" (").append(m.getType()).append("): ")
+            itemSb.append("- ").append(m.getName()).append(" (").append(m.getType()).append("): ")
                     .append(m.getDescription()).append("\n");
         }
         log.info("[记忆启停] 用户={} | 已启用({}): {} | 已停用({}): {}",
                 userName,
                 included.size(), included,
                 excluded.size(), excluded);
+
+        if (itemSb.isEmpty()) return "";
+
+        return itemSb.toString();
+    }
+
+    private String buildWorkspaceInfo(String conversationId, String mode) {
+        if (conversationId == null || conversationId.isEmpty()) return "";
+        ConversationEntity conv = chatDao.queryConversationById(conversationId);
+        if (conv == null || conv.getWorkspaceId() == null || conv.getWorkspaceId().isEmpty()) return "";
+        WorkspaceEntity ws = workspaceDao.queryById(conv.getWorkspaceId());
+        if (ws == null) return "";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("当前工作目录: ").append(ws.getPath()).append("\n");
+        if (!MODE_BYPASS.equalsIgnoreCase(mode)) {
+            sb.append("此路径的父目录、兄弟目录均不属于工作空间，仅此目录及其子目录内的文件可以访问。\n");
+        }
+        return sb.toString();
+    }
+
+    private String buildKnowledgeBaseInfo(String conversationId) {
+        if (conversationId == null || conversationId.isEmpty()) return "";
+        List<String> enabledKbIds = knowledgeDao.queryKbIdsByConversation(conversationId);
+        if (enabledKbIds.isEmpty()) return "";
+
+        List<com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity> kbs =
+                knowledgeDao.queryKbByIds(enabledKbIds);
+        if (kbs.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        for (com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity kb : kbs) {
+            sb.append("- ").append(kb.getName()).append(": ")
+                    .append(kb.getDescription() != null ? kb.getDescription() : "").append("\n");
+        }
         return sb.toString();
     }
 
