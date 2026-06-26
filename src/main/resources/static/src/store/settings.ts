@@ -20,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const contextUsed = ref(0)
   const contextLoaded = ref(false)
   const contextDetail = ref<Record<string, any> | null>(null)
+  const securityRules = ref<Record<string, any[]>>({})
 
   const contextTotal = computed(() => {
     const def = models.value.find(m => m.name === currentModel.value)
@@ -336,6 +337,37 @@ export const useSettingsStore = defineStore('settings', () => {
     await loadKnowledgeBases()
   }
 
+  // === Security Rules API 方法 ===
+
+  async function loadSecurityRules(type: string) {
+    try {
+      const res = await axios({ url: `/security/${type}/list`, method: 'get' })
+      if (res.data.state === 'OK') {
+        securityRules.value[type] = res.data.body
+      }
+    } catch (_) { /* handled by axios interceptor */ }
+  }
+
+  async function addSecurityRule(type: string, value: string, description: string) {
+    await axios({ url: `/security/${type}/add`, method: 'post', data: { value, description } })
+    await loadSecurityRules(type)
+  }
+
+  async function deleteSecurityRule(type: string, id: string) {
+    await axios({ url: `/security/${type}/delete`, method: 'post', data: { id } })
+    await loadSecurityRules(type)
+  }
+
+  async function updateSecurityRule(type: string, id: string, value: string, description: string, enabled?: number) {
+    await axios({ url: `/security/${type}/update`, method: 'post', data: { id, value, description, enabled } })
+    await loadSecurityRules(type)
+  }
+
+  async function toggleSecurityRule(type: string, id: string, enabled: number) {
+    await axios({ url: `/security/${type}/toggle`, method: 'post', data: { id, enabled } })
+    await loadSecurityRules(type)
+  }
+
   async function loadUserInfo() {
     try {
       const res = await axios({ url: '/chat/whoami', method: 'get' })
@@ -363,6 +395,8 @@ export const useSettingsStore = defineStore('settings', () => {
     syncScanSkills, syncInstallSkills,
     loadMemories, loadMemoryDetail, createMemory, updateMemory, deleteMemories, toggleMemory,
     loadKnowledgeBases,
-    toggleKbScope
+    toggleKbScope,
+    securityRules,
+    loadSecurityRules, addSecurityRule, deleteSecurityRule, updateSecurityRule, toggleSecurityRule
   }
 })

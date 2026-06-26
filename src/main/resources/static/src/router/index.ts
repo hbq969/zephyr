@@ -52,6 +52,11 @@ const router = createRouter({
       name: 'KnowledgeRecallTest',
       component: () => import('../views/settings/KnowledgeRecallTest.vue'),
     },
+    {
+      path: '/settings/security',
+      name: 'SecuritySettings',
+      component: () => import('../views/settings/SecuritySettings.vue'),
+    },
   ],
 })
 
