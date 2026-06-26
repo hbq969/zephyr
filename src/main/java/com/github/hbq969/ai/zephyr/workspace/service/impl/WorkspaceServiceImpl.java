@@ -32,6 +32,20 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     }
 
     @Override
+    public void ensureSystemWorkspace() {
+        String tmpName = cfg.getWorkspace().getTmpWorkspaceName();
+        String tmpPath = java.nio.file.Path.of(System.getProperty("user.home"),
+            cfg.getWorkspace().getBrowseRoot(), tmpName).toString();
+        WorkspaceEntity existing = workspaceDao.queryByPath(tmpPath, SYSTEM_USERNAME);
+        if (existing != null) return;
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("name", tmpName);
+        body.put("path", tmpPath);
+        body.put(KEY_IS_SYSTEM, "true");
+        create(body, SYSTEM_USERNAME);
+    }
+
+    @Override
     @Transactional
     public WorkspaceEntity create(Map<String, String> body, String userName) {
         String name = body.get("name");
@@ -52,6 +66,7 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         entity.setName(name);
         entity.setPath(path);
         entity.setUserName(userName);
+        entity.setIsSystem("true".equals(body.get(KEY_IS_SYSTEM)) ? 1 : 0);
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         workspaceDao.insert(entity);
@@ -61,6 +76,11 @@ public class WorkspaceServiceImpl implements WorkspaceService {
     @Override
     @Transactional
     public void delete(String id, String userName) {
+        WorkspaceEntity ws = workspaceDao.queryById(id);
+        if (ws == null) throw new RuntimeException("工作空间不存在");
+        if (ws.getIsSystem() != null && ws.getIsSystem() == 1) {
+            throw new RuntimeException("系统工作空间不可删除");
+        }
         workspaceDao.delete(id, userName);
     }
 
