@@ -425,6 +425,26 @@ const locale: any = {
         "context_requestFailed": "[请求失败]",
         "context_requestErr": "请求失败",
 
+        // 安全规则配置
+        "securityMgmt_title": "安全规则配置",
+        "securityMgmt_subtitle": "配置 Shell 命令白名单和阻断规则",
+        "securityMgmt_tabShellAllowed": "命令白名单",
+        "securityMgmt_tabDefaultAllow": "默认允许命令",
+        "securityMgmt_tabHardBlock": "硬阻断规则",
+        "securityMgmt_tabSoftBlock": "软阻断规则",
+        "securityMgmt_addRule": "新增规则",
+        "securityMgmt_commandLabel": "命令",
+        "securityMgmt_patternLabel": "正则模式",
+        "securityMgmt_valuePlaceholder_cmd": "输入命令名，例如 ls",
+        "securityMgmt_valuePlaceholder_pattern": "输入正则表达式",
+        "securityMgmt_descPlaceholder": "选填，描述这条规则的作用",
+        "securityMgmt_statusLabel": "状态",
+        "securityMgmt_enabled": "启用",
+        "securityMgmt_disabled": "禁用",
+        "securityMgmt_confirmDeleteMsg": "确定删除此规则？",
+        "securityMgmt_noRules": "暂无规则",
+        "securityMgmt_addFirstRule": "创建第一个规则",
+
         // 暗黑模式
         "darkMode_on": "暗黑模式",
         "darkMode_off": "明亮模式"
@@ -845,6 +865,26 @@ const locale: any = {
         "context_requestFailed": "[Request failed]",
         "context_requestErr": "Request failed",
 
+        // Security Rules
+        "securityMgmt_title": "Security Rules",
+        "securityMgmt_subtitle": "Configure shell command whitelist and blocking rules",
+        "securityMgmt_tabShellAllowed": "Command Whitelist",
+        "securityMgmt_tabDefaultAllow": "Default Allowed Commands",
+        "securityMgmt_tabHardBlock": "Hard Block Rules",
+        "securityMgmt_tabSoftBlock": "Soft Block Rules",
+        "securityMgmt_addRule": "Add Rule",
+        "securityMgmt_commandLabel": "Command",
+        "securityMgmt_patternLabel": "Pattern",
+        "securityMgmt_valuePlaceholder_cmd": "Enter command name, e.g. ls",
+        "securityMgmt_valuePlaceholder_pattern": "Enter regex pattern",
+        "securityMgmt_descPlaceholder": "Optional, describe the purpose of this rule",
+        "securityMgmt_statusLabel": "Status",
+        "securityMgmt_enabled": "Enabled",
+        "securityMgmt_disabled": "Disabled",
+        "securityMgmt_confirmDeleteMsg": "Delete this rule?",
+        "securityMgmt_noRules": "No rules",
+        "securityMgmt_addFirstRule": "Create first rule",
+
         // Dark mode
         "darkMode_on": "Dark mode",
         "darkMode_off": "Light mode"
@@ -1254,6 +1294,26 @@ const locale: any = {
         "context_errorPrefix": "[エラー] ",
         "context_requestFailed": "[リクエスト失敗]",
         "context_requestErr": "リクエスト失敗",
+
+        // Security Rules
+        "securityMgmt_title": "セキュリティルール",
+        "securityMgmt_subtitle": "シェルコマンドのホワイトリストとブロックルールを設定",
+        "securityMgmt_tabShellAllowed": "コマンドホワイトリスト",
+        "securityMgmt_tabDefaultAllow": "デフォルト許可コマンド",
+        "securityMgmt_tabHardBlock": "ハードブロックルール",
+        "securityMgmt_tabSoftBlock": "ソフトブロックルール",
+        "securityMgmt_addRule": "ルールを追加",
+        "securityMgmt_commandLabel": "コマンド",
+        "securityMgmt_patternLabel": "パターン",
+        "securityMgmt_valuePlaceholder_cmd": "コマンド名を入力（例: ls）",
+        "securityMgmt_valuePlaceholder_pattern": "正規表現パターンを入力",
+        "securityMgmt_descPlaceholder": "任意、このルールの目的を説明",
+        "securityMgmt_statusLabel": "ステータス",
+        "securityMgmt_enabled": "有効",
+        "securityMgmt_disabled": "無効",
+        "securityMgmt_confirmDeleteMsg": "このルールを削除しますか？",
+        "securityMgmt_noRules": "ルールがありません",
+        "securityMgmt_addFirstRule": "最初のルールを作成",
 
         // Dark mode
         "darkMode_on": "ダークモード",

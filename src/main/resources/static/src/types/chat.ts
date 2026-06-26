@@ -154,6 +154,17 @@ export interface FileAttachment {
   status: 'uploading' | 'done' | 'error'
 }
 
+// === Security Rule ===
+export interface SecurityRule {
+  id?: string
+  type: 'SHELL_ALLOWED' | 'DEFAULT_ALLOW' | 'HARD_BLOCK' | 'SOFT_BLOCK'
+  value: string
+  description: string
+  enabled: boolean
+  createdAt?: number
+  updatedAt?: number
+}
+
 // === Confirm Action Event ===
 export interface ConfirmActionEvent {
   confirmId: string
