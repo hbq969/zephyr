@@ -110,7 +110,7 @@ public class SecurityEvaluator {
         }
 
         Result result = switch (toolName) {
-            case "execute_shell" -> evaluateShell(arguments, mode, boundary);
+            case "execute_shell" -> evaluateShell(arguments, mode);
             case "list_processes", "kill_process" -> Result.allow();
             case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode, boundary);
             default -> {
@@ -129,7 +129,7 @@ public class SecurityEvaluator {
         return result;
     }
 
-    private Result evaluateShell(Map<String, Object> arguments, String mode, WorkspaceBoundary boundary) {
+    private Result evaluateShell(Map<String, Object> arguments, String mode) {
         if (arguments == null || !arguments.containsKey("command")) {
             return Result.allow();
         }
@@ -139,9 +139,8 @@ public class SecurityEvaluator {
 
         SecurityConfigService.ConfigSnapshot snap = securityConfigService.getSnapshot();
 
-        debug("[安全追踪] evaluateShell cmd=`{}`, mode={}, boundary={}, hardBlock={}, softBlock={}, defaultAllow={}",
+        debug("[安全追踪] evaluateShell cmd=`{}`, mode={}, hardBlock={}, softBlock={}, defaultAllow={}",
                 command, mode,
-                boundary.isPresent() ? boundary.path() : "NONE",
                 snap.hardBlockPatterns().size(), snap.softBlockPatterns().size(), snap.defaultAllowCommands().size());
 
         // 1. HARD BLOCK 检查（所有模式强制执行）
@@ -159,38 +158,24 @@ public class SecurityEvaluator {
             return Result.allow();
         }
 
-        // 3. workspace 边界检查：命令中的绝对路径必须在 workspace 内
-        if (boundary.isPresent() && hasPathOutsideWorkspace(command, boundary)) {
-            log.info("[安全] WORKSPACE_BOUNDARY 触发确认 — shell 命令: {}", command);
-            return Result.confirm(RULE_WORKSPACE_BOUNDARY,
-                    "shell 命令中的路径超出工作空间范围");
-        }
-        debug("[安全追踪] workspace 边界检查 -> 通过（boundary={}）",
-                boundary.isPresent() ? boundary.path() : "NONE");
-
-        // 4. SOFT BLOCK 检查
+        // 3. SOFT BLOCK 检查
         debug("[安全追踪] SOFT_BLOCK 检查开始（{}条规则）...", snap.softBlockPatterns().size());
-        boolean anySoftBlockMatched = false;
         for (Pattern p : snap.softBlockPatterns()) {
             boolean matched = ReUtil.contains(p, command);
             debug("[安全追踪]   SOFT_BLOCK 规则 `{}` -> {}", p.pattern(), matched ? "命中" : "未命中");
             if (!matched) continue;
 
-            anySoftBlockMatched = true;
-            // acceptEdits 模式：shell 重定向到 workspace 内文件应免批（文件编辑语义）
-            if ("acceptEdits".equalsIgnoreCase(mode) && isRedirectPattern(p.pattern())
-                    && boundary.isPresent() && !hasPathOutsideWorkspace(command, boundary)) {
-                debug("[安全追踪]   -> acceptEdits 重定向豁免（workspace 内），跳过");
+            // acceptEdits 模式：shell 重定向操作视为文件编辑，免批
+            if ("acceptEdits".equalsIgnoreCase(mode) && isRedirectPattern(p.pattern())) {
+                debug("[安全追踪]   -> acceptEdits 重定向豁免，跳过");
                 continue;
             }
             log.info("[安全] SOFT_BLOCK 触发确认 — 命令: {}, 命中规则: {}", command, p.pattern());
             return Result.confirm("SOFT_BLOCK", "该命令具有破坏性，需要用户确认");
         }
-        if (!anySoftBlockMatched) {
-            debug("[安全追踪] SOFT_BLOCK({}条) -> 无命中", snap.softBlockPatterns().size());
-        }
+        debug("[安全追踪] SOFT_BLOCK({}条) -> 全部通过", snap.softBlockPatterns().size());
 
-        // 5. default 模式：只读命令放行，其余需确认
+        // 4. default 模式：只读命令放行，其余需确认
         if (!"acceptEdits".equalsIgnoreCase(mode) && !"bypass".equalsIgnoreCase(mode)) {
             debug("[安全追踪] MODE_DEFAULT 检查开始...");
             if (command.contains("&&") || command.contains("||")
@@ -219,36 +204,6 @@ public class SecurityEvaluator {
     private boolean isRedirectPattern(String rawPattern) {
         return rawPattern.contains(">") && (rawPattern.contains("\\s*\\\\S")
                 || rawPattern.contains("redirect") || rawPattern.contains("overwrite"));
-    }
-
-    /** 检查 shell 命令中是否有绝对路径指向 workspace 外部 */
-    private boolean hasPathOutsideWorkspace(String command, WorkspaceBoundary boundary) {
-        // 提取命令名，如果是绝对路径则跳过（如 /usr/bin/mkdir）
-        String cmdName = command.split("\\s+", 2)[0];
-        boolean cmdIsAbsPath = cmdName.startsWith("/");
-
-        // 提取命令中所有绝对路径
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("/(?:[^\\s;|&<>\"'`$()\\\\]+/)*[^\\s;|&<>\"'`$()\\\\]+")
-                .matcher(command);
-        while (m.find()) {
-            String pathStr = m.group();
-            // 跳过命令名本身
-            if (cmdIsAbsPath && pathStr.equals(cmdName)) continue;
-            // 跳过已知的非文件系统路径
-            if (pathStr.startsWith("/dev/") || pathStr.startsWith("/proc/") || pathStr.startsWith("/sys/")) continue;
-            try {
-                Path targetPath = boundary.resolveTarget(pathStr);
-                if (!boundary.contains(targetPath)) {
-                    debug("[安全追踪] workspace 路径越界: {} (workspace={})", pathStr, boundary.path());
-                    return true;
-                }
-            } catch (Exception ignored) {
-                debug("[安全追踪] workspace 路径解析异常: {} -> {}", pathStr, ignored.getMessage());
-                return true;
-            }
-        }
-        return false;
     }
 
     private Result evaluateFileWrite(Map<String, Object> arguments, String mode, WorkspaceBoundary boundary) {

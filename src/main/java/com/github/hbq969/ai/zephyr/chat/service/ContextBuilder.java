@@ -236,9 +236,10 @@ public class ContextBuilder {
         if (ws == null) return "";
 
         StringBuilder sb = new StringBuilder();
-        sb.append("当前工作目录: ").append(ws.getPath()).append("\n");
-        if (!MODE_BYPASS.equalsIgnoreCase(mode)) {
-            sb.append("此路径的父目录、兄弟目录均不属于工作空间，仅此目录及其子目录内的文件可以访问。\n");
+        sb.append("沙箱目录: ").append(ws.getPath()).append("\n");
+        log.info("+++++ 沙箱目录={}",ws.getPath());
+        if (MODE_DEFAULT.equalsIgnoreCase(mode)) {
+            sb.append("此路径的父目录、兄弟目录均不属于沙箱目录，仅此目录及其子目录内的文件可以访问。\n");
         }
         return sb.toString();
     }
