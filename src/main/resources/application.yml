@@ -308,6 +308,7 @@ zephyr:
     tmp-workspace-name: tmp  # 系统默认 tmp workspace 名称
   security:
     enabled: true  # 是否启用安全评估
+    debug: false  # 是否启用安全追踪日志（INFO 级别输出完整评估链路）
     confirm-timeout-seconds: 300  # 用户确认超时秒数
     max-bypass-attempts: 2  # 连续绕过 HARD BLOCK 最大次数
     # === HARD BLOCK 规则（命中即禁止执行） ===

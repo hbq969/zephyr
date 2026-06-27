@@ -336,6 +336,8 @@ public class ZephyrConfigProperties {
     public static class Security {
         /** 是否启用安全评估，默认 true */
         private boolean enabled = true;
+        /** 是否启用安全追踪日志（INFO 级别输出完整链路），默认 false */
+        private boolean debug = false;
         /** 用户确认超时秒数，超时自动拒绝，默认 300 */
         private int confirmTimeoutSeconds = 300;
         /** 连续绕过 HARD BLOCK 最大次数，超出强制终止，默认 3 */

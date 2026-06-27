@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElLoading } from 'element-plus'
+import { ElLoading, ElMessage } from 'element-plus'
 import router from '@/router'
 
 export default (config: any) => {
@@ -10,6 +10,17 @@ export default (config: any) => {
   })
 
   let loadingInstance: any
+
+  function showError(msg: string) {
+    ElMessage({ message: msg, type: 'error' })
+  }
+
+  function extractErrorMessage(error: any): string {
+    if (error?.response?.data?.errorMessage) return error.response.data.errorMessage
+    if (error?.response?.data?.message) return error.response.data.message
+    if (error?.message) return error.message
+    return '请求失败，请稍后再试'
+  }
 
   instance.interceptors.request.use(function(config: any) {
     if (config.url && !config.url.startsWith('/chat') && !config.url.startsWith('/conversations') && !config.url.startsWith('/workspace')) {
@@ -30,6 +41,7 @@ export default (config: any) => {
     return response
   }, function(error: any) {
     if (loadingInstance) loadingInstance.close()
+    showError(extractErrorMessage(error))
     return Promise.reject(error)
   })
 

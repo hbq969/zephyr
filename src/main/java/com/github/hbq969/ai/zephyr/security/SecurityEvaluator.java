@@ -79,6 +79,8 @@ public class SecurityEvaluator {
                 cfg.getSecurity().getHardBlock().getPathPrefixes() != null
                         ? cfg.getSecurity().getHardBlock().getPathPrefixes()
                         : List.of());
+        log.info("[安全] SecurityEvaluator 初始化完成 — enabled={}, debug={}, hardBlockPathPrefixes={}",
+                cfg.getSecurity().isEnabled(), cfg.getSecurity().isDebug(), hardBlockPathPrefixes);
     }
 
     /**
@@ -91,12 +93,17 @@ public class SecurityEvaluator {
     public Result evaluate(String toolName, Map<String, Object> arguments, String userName, String mode,
                            WorkspaceBoundary boundary) {
         if (!cfg.getSecurity().isEnabled()) {
+            debug("[安全追踪] 安全评估已全局关闭（zephyr.security.enabled=false），放行 tool={}", toolName);
             return Result.allow();
         }
+
+        debug("[安全追踪] === 入口 === tool={}, mode={}, user={}, boundary={}",
+                toolName, mode, userName, boundary.isPresent() ? boundary.path() : "NONE");
 
         // 全局角色检查：所有工具统一入口
         if (builtinToolService.requiresAdmin(userName, toolName)) {
             Result r = Result.block("ROLE_CHECK", "无权限（非 admin 用户）");
+            debug("[安全追踪] ROLE_CHECK -> BLOCK tool={}, user={}", toolName, userName);
             auditLogger.log("SECURITY_CHECK", toolName, r.decision().name(),
                     r.rule() + ": " + r.reason(), userName);
             return r;
@@ -106,7 +113,10 @@ public class SecurityEvaluator {
             case "execute_shell" -> evaluateShell(arguments, mode, boundary);
             case "list_processes", "kill_process" -> Result.allow();
             case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode, boundary);
-            default -> Result.allow();
+            default -> {
+                debug("[安全追踪] tool={} 非 shell/文件类工具，走 LLM 自评估，直接放行", toolName);
+                yield Result.allow();
+            }
         };
 
         if (result.decision() != Decision.ALLOW) {
@@ -114,6 +124,8 @@ public class SecurityEvaluator {
                     result.rule() + ": " + result.reason(), userName);
         }
 
+        debug("[安全追踪] === 结果 === tool={}, decision={}, rule={}, reason={}",
+                toolName, result.decision(), result.rule(), result.reason());
         return result;
     }
 
@@ -127,6 +139,11 @@ public class SecurityEvaluator {
 
         SecurityConfigService.ConfigSnapshot snap = securityConfigService.getSnapshot();
 
+        debug("[安全追踪] evaluateShell cmd=`{}`, mode={}, boundary={}, hardBlock={}, softBlock={}, defaultAllow={}",
+                command, mode,
+                boundary.isPresent() ? boundary.path() : "NONE",
+                snap.hardBlockPatterns().size(), snap.softBlockPatterns().size(), snap.defaultAllowCommands().size());
+
         // 1. HARD BLOCK 检查（所有模式强制执行）
         for (Pattern p : snap.hardBlockPatterns()) {
             if (ReUtil.contains(p, command)) {
@@ -134,9 +151,11 @@ public class SecurityEvaluator {
                 return Result.block("HARD_BLOCK", "命令匹配安全红线规则，禁止执行");
             }
         }
+        debug("[安全追踪] HARD_BLOCK({}条) -> 全部通过", snap.hardBlockPatterns().size());
 
         // 2. bypass 模式：放行
         if ("bypass".equalsIgnoreCase(mode)) {
+            debug("[安全追踪] bypass 模式 -> 跳过 SOFT_BLOCK 和 MODE_DEFAULT，直接放行");
             return Result.allow();
         }
 
@@ -146,22 +165,34 @@ public class SecurityEvaluator {
             return Result.confirm(RULE_WORKSPACE_BOUNDARY,
                     "shell 命令中的路径超出工作空间范围");
         }
+        debug("[安全追踪] workspace 边界检查 -> 通过（boundary={}）",
+                boundary.isPresent() ? boundary.path() : "NONE");
 
         // 4. SOFT BLOCK 检查
+        debug("[安全追踪] SOFT_BLOCK 检查开始（{}条规则）...", snap.softBlockPatterns().size());
+        boolean anySoftBlockMatched = false;
         for (Pattern p : snap.softBlockPatterns()) {
-            if (!ReUtil.contains(p, command)) continue;
+            boolean matched = ReUtil.contains(p, command);
+            debug("[安全追踪]   SOFT_BLOCK 规则 `{}` -> {}", p.pattern(), matched ? "命中" : "未命中");
+            if (!matched) continue;
 
+            anySoftBlockMatched = true;
             // acceptEdits 模式：shell 重定向到 workspace 内文件应免批（文件编辑语义）
             if ("acceptEdits".equalsIgnoreCase(mode) && isRedirectPattern(p.pattern())
                     && boundary.isPresent() && !hasPathOutsideWorkspace(command, boundary)) {
+                debug("[安全追踪]   -> acceptEdits 重定向豁免（workspace 内），跳过");
                 continue;
             }
             log.info("[安全] SOFT_BLOCK 触发确认 — 命令: {}, 命中规则: {}", command, p.pattern());
             return Result.confirm("SOFT_BLOCK", "该命令具有破坏性，需要用户确认");
         }
+        if (!anySoftBlockMatched) {
+            debug("[安全追踪] SOFT_BLOCK({}条) -> 无命中", snap.softBlockPatterns().size());
+        }
 
         // 5. default 模式：只读命令放行，其余需确认
         if (!"acceptEdits".equalsIgnoreCase(mode) && !"bypass".equalsIgnoreCase(mode)) {
+            debug("[安全追踪] MODE_DEFAULT 检查开始...");
             if (command.contains("&&") || command.contains("||")
                     || command.contains(";") || command.contains("\n")) {
                 log.info("[安全] MODE_DEFAULT 触发确认 — 复合命令: {}", command);
@@ -172,7 +203,10 @@ public class SecurityEvaluator {
             if (lastSlash >= 0) {
                 cmdName = cmdName.substring(lastSlash + 1);
             }
-            if (!snap.defaultAllowCommands().contains(cmdName)) {
+            boolean inAllowList = snap.defaultAllowCommands().contains(cmdName);
+            debug("[安全追踪] MODE_DEFAULT cmdName={}, defaultAllow 列表({}条)中{}",
+                    cmdName, snap.defaultAllowCommands().size(), inAllowList ? "存在 -> 放行" : "不存在 -> 需确认");
+            if (!inAllowList) {
                 log.info("[安全] MODE_DEFAULT 触发确认 — 非只读命令: {} (主命令: {})", command, cmdName);
                 return Result.confirm("MODE_DEFAULT", "Default 模式下 shell 命令需要用户确认");
             }
@@ -206,9 +240,11 @@ public class SecurityEvaluator {
             try {
                 Path targetPath = boundary.resolveTarget(pathStr);
                 if (!boundary.contains(targetPath)) {
+                    debug("[安全追踪] workspace 路径越界: {} (workspace={})", pathStr, boundary.path());
                     return true;
                 }
             } catch (Exception ignored) {
+                debug("[安全追踪] workspace 路径解析异常: {} -> {}", pathStr, ignored.getMessage());
                 return true;
             }
         }
@@ -221,6 +257,9 @@ public class SecurityEvaluator {
             filePath = arguments.getOrDefault("filePath", "").toString();
         }
         String normalizedPath = Path.of(filePath).normalize().toString();
+
+        debug("[安全追踪] evaluateFileWrite path={}, mode={}, boundary={}",
+                normalizedPath, mode, boundary.isPresent() ? boundary.path() : "NONE");
 
         // HARD BLOCK：修改安全 prompt 文件（大小写不敏感）
         String lowerPath = normalizedPath.toLowerCase();
@@ -241,6 +280,7 @@ public class SecurityEvaluator {
 
         // bypass 模式：放行
         if ("bypass".equalsIgnoreCase(mode)) {
+            debug("[安全追踪] bypass 模式 -> 文件写入直接放行");
             return Result.allow();
         }
 
@@ -265,5 +305,11 @@ public class SecurityEvaluator {
         }
 
         return Result.allow();
+    }
+
+    private void debug(String format, Object... args) {
+        if (cfg.getSecurity().isDebug()) {
+            log.info(format, args);
+        }
     }
 }

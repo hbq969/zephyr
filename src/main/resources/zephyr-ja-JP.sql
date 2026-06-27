@@ -485,6 +485,8 @@ UNION ALL
     SELECT 'seed_soft_12', 'SOFT_BLOCK', '(?:kill\s+-9|pkill)', '强制杀进程', 1, 1735800000
 UNION ALL
     SELECT 'seed_soft_13', 'SOFT_BLOCK', 'chmod\s+777', 'chmod 777', 1, 1735800000
+UNION ALL
+    SELECT 'seed_soft_14', 'SOFT_BLOCK', '>\s*\S+', '重定向覆写文件', 1, 1735800000
 WHERE NOT EXISTS (SELECT 1 FROM zephyr_security_rules);
 
 -- ============================================================
