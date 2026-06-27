@@ -82,7 +82,8 @@ public class SecurityEvaluator {
     }
 
     /**
-     * 评估工具调用。仅对 execute_shell 和文件写入类工具做模式匹配，
+     * 评估工具调用。入口处统一做角色检查（非 admin 用户拦截受控工具），
+     * 然后针对 execute_shell 和文件写入类工具做安全模式匹配，
      * 其余工具调用返回 ALLOW（由 LLM 自评估负责）。
      *
      * @param mode 权限模式：default | acceptEdits | bypass
@@ -93,25 +94,17 @@ public class SecurityEvaluator {
             return Result.allow();
         }
 
+        // 全局角色检查：所有工具统一入口
+        if (builtinToolService.requiresAdmin(userName, toolName)) {
+            Result r = Result.block("ROLE_CHECK", "无权限（非 admin 用户）");
+            auditLogger.log("SECURITY_CHECK", toolName, r.decision().name(),
+                    r.rule() + ": " + r.reason(), userName);
+            return r;
+        }
+
         Result result = switch (toolName) {
-            case "execute_shell" -> {
-                if (builtinToolService.requiresAdmin(userName, "execute_shell")) {
-                    yield Result.block("ROLE_CHECK", "命令未执行（无权限）");
-                }
-                yield evaluateShell(arguments, mode, boundary);
-            }
-            case "list_processes" -> {
-                if (builtinToolService.requiresAdmin(userName, "list_processes")) {
-                    yield Result.block("ROLE_CHECK", "命令未执行（无权限）");
-                }
-                yield Result.allow();
-            }
-            case "kill_process" -> {
-                if (builtinToolService.requiresAdmin(userName, "kill_process")) {
-                    yield Result.block("ROLE_CHECK", "命令未执行（无权限）");
-                }
-                yield Result.allow();
-            }
+            case "execute_shell" -> evaluateShell(arguments, mode, boundary);
+            case "list_processes", "kill_process" -> Result.allow();
             case "write_file", "edit_file" -> evaluateFileWrite(arguments, mode, boundary);
             default -> Result.allow();
         };
