@@ -97,8 +97,9 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
 
 修改 `src/main/java/com/github/hbq969/ai/zephyr/builtintool/service/impl/BuiltinToolServiceImpl.java`：
 
-在第 3 行 import 区域加 `McpDao` import：
+在第 3 行 import 区域加 `McpDao` 和 `Set` import：
 ```java
+import java.util.Set;
 import com.github.hbq969.ai.zephyr.mcp.dao.McpDao;
 ```
 
@@ -584,7 +585,20 @@ Expected: `body` 数组包含 9 个元素：execute_shell, list_processes, kill_
 [内置工具管控] MCP 工具名集合已加载: X 个
 ```
 
-- [ ] **Step 7: Git log 确认提交链完整**
+- [ ] **Step 7: 验证非 admin 用户被拦截 write_file**
+
+创建一个非 admin 用户、用其调用 chat/security-evaluate 接口（或直接查 SecurityEvaluator 日志），确认 `write_file` 被 ROLE_CHECK 拦截。
+
+检查启动日志中 ROLE_CHECK 记录格式：
+```
+[内置工具管控] 非 admin 用户被拦截: tool=write_file, lookupKey=write_file, user=xxx, roles=[...]
+```
+
+- [ ] **Step 8: 验证纯读工具不受影响**
+
+检查日志确认 `read`、`grep` 等不在管控缓存中的工具，`requiresAdmin` 返回 false。
+
+- [ ] **Step 9: Git log 确认提交链完整**
 
 ```bash
 git log --oneline -5
