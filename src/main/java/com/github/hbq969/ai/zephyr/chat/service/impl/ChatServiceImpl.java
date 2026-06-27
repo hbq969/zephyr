@@ -262,6 +262,7 @@ public class ChatServiceImpl implements ChatService {
                                         .data(ChatEvent.builder()
                                                 .type("tool_result")
                                                 .toolName(tc.getName())
+                                                .toolInput(tc.getArguments())
                                                 .toolOutput(output)
                                                 .toolStatus((String) tr.get("status"))
                                                 .build()));
@@ -374,6 +375,7 @@ public class ChatServiceImpl implements ChatService {
         // 内置命令：直接处理，不走 LLM
         switch (cmdName) {
             case "clear" -> {
+                backgroundProcessManager.killByConversationId(cid);
                 chatDao.deleteMessagesByConvId(cid);
                 chatDao.deleteConversation(cid, userName);
                 log.info("[会话] /clear 清空对话 cid={}, user={}", cid, userName);
@@ -553,6 +555,9 @@ public class ChatServiceImpl implements ChatService {
                     case "kill_process" -> killProcess(tc.getArguments(), userName);
                     default -> executeMcpTool(tc.getName(), tc.getArguments(), userName);
                 };
+            } catch (ToolRejectedException e) {
+                content = e.getMessage();
+                toolStatus = "rejected";
             } catch (Exception e) {
                 content = "工具执行错误: " + e.getMessage();
                 toolStatus = "error";
@@ -579,6 +584,7 @@ public class ChatServiceImpl implements ChatService {
                                 .data(ChatEvent.builder()
                                         .type("tool_result")
                                         .toolName(toolCalls.get(i).getName())
+                                        .toolInput(toolCalls.get(i).getArguments())
                                         .toolOutput(results.get(i).get("content").toString())
                                         .toolStatus((String) results.get(i).get("status"))
                                         .build()));
@@ -607,6 +613,7 @@ public class ChatServiceImpl implements ChatService {
             m.put("id", tc.getId());
             m.put("name", tc.getName());
             m.put("input", tc.getArguments());
+            m.put("output", results.get(i).get("content"));
             m.put("status", results.get(i).get("status"));
             list.add(m);
         }
@@ -904,7 +911,7 @@ public class ChatServiceImpl implements ChatService {
 
         String mode = cfg.getShell().getMode();
         if (SHELL_MODE_DISABLED.equals(mode)) {
-            return "Shell 命令执行已禁用";
+            throw new ToolRejectedException("Shell 命令执行已禁用");
         }
 
         String command = args.get("command").toString().trim();
@@ -924,7 +931,7 @@ public class ChatServiceImpl implements ChatService {
             if (!snap.shellAllowedCommands().contains(cmdName)) {
                 String msg = "命令 '" + cmdName + "' 不在白名单中，拒绝执行";
                 log.info(msg);
-                return msg;
+                throw new ToolRejectedException(msg);
             }
         }
 
@@ -1012,5 +1019,11 @@ public class ChatServiceImpl implements ChatService {
         long pid = ((Number) args.get("pid")).longValue();
         boolean killed = backgroundProcessManager.kill(userName, pid);
         return killed ? "进程 " + pid + " 已终止" : "进程 " + pid + " 未找到或已结束";
+    }
+
+    private static class ToolRejectedException extends RuntimeException {
+        ToolRejectedException(String message) {
+            super(message);
+        }
     }
 }

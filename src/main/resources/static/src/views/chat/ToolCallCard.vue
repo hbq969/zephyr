@@ -39,6 +39,29 @@ const elapsedText = computed(() => {
 
 onBeforeUnmount(stopTimer)
 
+const CMD_MAX_LEN = 20
+
+const BUILTIN_TOOLS = new Set([
+  'use_skill', 'use_memory', 'search_knowledge',
+  'execute_shell', 'list_processes', 'kill_process'
+])
+
+function truncate(s: string) {
+  return s.length > CMD_MAX_LEN ? s.substring(0, CMD_MAX_LEN) + '...' : s
+}
+
+const displayName = computed(() => {
+  const name = props.tool.name
+  const input = props.tool.input
+  if (name === 'use_skill' && input?.skill_name) return `use_skill: ${input.skill_name}`
+  if (name === 'use_memory' && input?.memory_name) return `use_memory: ${input.memory_name}`
+  if (name === 'search_knowledge' && input?.query) return `search_knowledge: ${truncate(String(input.query))}`
+  if (name === 'execute_shell' && input?.command) return `execute_shell: ${truncate(String(input.command))}`
+  if (name === 'kill_process' && input?.pid != null) return `kill_process: PID ${input.pid}`
+  if (!BUILTIN_TOOLS.has(name)) return `MCP: ${name}`
+  return name
+})
+
 const inputStr = computed(() => {
   if (!props.tool.input || Object.keys(props.tool.input).length === 0) return ''
   return JSON.stringify(props.tool.input, null, 2)
@@ -58,7 +81,7 @@ onMounted(() => { if (isRunning.value) startTimer() })
     <div class="tool-header" @click="collapsed = !collapsed">
       <span class="tool-text">
         <Icon icon="lucide:wrench" class="tool-icon" />
-        {{ tool.name }}
+        {{ displayName }}
         <template v-if="isRunning">
           <span class="dot-anim"><i>.</i><i>.</i><i>.</i></span>
         </template>

@@ -2,6 +2,34 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.3.2] - 2026-06-27
+
+### 新增
+
+- **内置工具角色管控**：shell 族工具支持按角色开启/关闭（`execute_shell`/`list_processes`/`kill_process`），种子数据幂等插入 + 三语本地化
+- **MCP 工具全局角色管控**：`BuiltinToolService` 通过 `McpDao.queryAllDistinctToolNames` 获取完整 MCP 工具名，结合角色配置实现精准管控
+- **前端权限控制**：非 ADMIN 角色隐藏侧边栏设置入口，共享 MCP 仅可查看工具不可修改
+- **安全追踪日志**：`SecurityEvaluator` 全链路追踪日志（入口 → HARD_BLOCK → SOFT_BLOCK → MODE_DEFAULT → 结果），便于排查安全判断路径
+- **前端错误提示**：安全拦截时前端气泡展示具体阻断规则名称和原因
+- **第 14 条软阻断规则**：新增 `>\s*\S+` 规则，检测输出重定向行为
+- **工具执行拒绝状态**：被安全规则拦截的工具结果前端展示橙色盾牌+拒绝（而非绿色对勾+成功），`dispatchTools` 统一设置 `status: "rejected"`
+- **主题切换优化**：主题切换按钮移至主页右上角，修复暗黑模式代码块样式
+- **工具调用卡片展示优化**：`execute_shell` 展示具体命令名，`search_knowledge` 展示查询关键词，`use_skill`/`use_memory` 展示参数名，MCP 工具加 `MCP:` 前缀，长文本自动截断
+
+### 修复
+
+- **execute_shell 白名单拒绝误显成功**：shell 命令因不在白名单内被拒绝执行时抛 `ToolRejectedException`，前端气泡正确显示拒绝状态
+- **/clear 漏杀后台进程**：清空对话时补充 `backgroundProcessManager.killByConversationId(cid)`，防止残留后台进程
+- **MCP 下拉列表只展示已连接服务**：聊天输入框 MCP 下拉过滤未连接的服务，避免用户选中不可用工具
+- **异步线程 UserContext 丢失**：`@Async` 方法内无法获取当前用户，修复后前端增加模型未配置提示
+
+### 变更
+
+- **角色检查统一上提**：各 case 中的角色检查逻辑移到 `SecurityEvaluator` 入口统一处理，减少分散判断
+- **安全绕过次数调整**：`maxBypassAttempts` 从 1 调整为 2，允许在确认模式下多一次重试机会
+- **shell 路径越界改为提示词约束**：移除 Shell 命令正则路径越界检查，改为 prompt 中约束 LLM 行为
+- **数据库初始化解耦**：`InitialServiceImpl` 改用 `ApplicationListener<ScriptInitialDoneEvent>` 模式，`@PostConstruct` 不再操作 DB
+
 ## [1.3.1] - 2026-06-26
 
 ### 新增

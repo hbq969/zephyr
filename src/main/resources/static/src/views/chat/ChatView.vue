@@ -174,6 +174,7 @@ function onSend(text: string, filePaths?: string[]) {
             chatStore.upsertToolCall(event.toolName, {
               status,
               output: event.toolOutput,
+              input: (event.toolInput as Record<string, unknown>) || {},
             })
           } else if (event.type === 'confirm_action' && event.content) {
             try {
