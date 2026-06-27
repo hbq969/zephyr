@@ -309,7 +309,7 @@ zephyr:
   security:
     enabled: true  # 是否启用安全评估
     confirm-timeout-seconds: 300  # 用户确认超时秒数
-    max-bypass-attempts: 1  # 连续绕过 HARD BLOCK 最大次数
+    max-bypass-attempts: 2  # 连续绕过 HARD BLOCK 最大次数
     # === HARD BLOCK 规则（命中即禁止执行） ===
     hard-block:
       path-prefixes:
