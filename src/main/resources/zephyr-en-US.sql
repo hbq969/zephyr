@@ -490,12 +490,42 @@ WHERE NOT EXISTS (SELECT 1 FROM zephyr_security_rules);
 -- ============================================================
 -- Builtin tool control seed data: migrated from InitialServiceImpl.insertSeed
 -- ============================================================
+-- Builtin Tool Control Seed Data (per-row idempotent, safe for incremental deployment)
+-- ============================================================
 
 INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'execute_shell', 'Execute arbitrary shell commands in workspace directory, supports foreground blocking and background running', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'execute_shell');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'list_processes', 'List all background processes started by the current user and their PIDs', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'list_processes');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'kill_process', 'Terminate the specified background process by PID', 1, 1735800000, 1735800000
-WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls);
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'kill_process');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'write_file', 'Write/create files, supports overwrite and append modes', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'write_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'edit_file', 'Edit files via precise string replacement', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'edit_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_skill', 'Invoke custom skill modules, extending agent capabilities', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_skill');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_memory', 'Read/write persistent memory, retain context across sessions', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_memory');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'search_knowledge', 'Semantic search document fragments in the knowledge base', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'search_knowledge');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'mcp_all', 'Global MCP external tool switch (controls all MCP tools availability)', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'mcp_all');
 

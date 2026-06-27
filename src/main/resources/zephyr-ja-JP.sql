@@ -490,12 +490,42 @@ WHERE NOT EXISTS (SELECT 1 FROM zephyr_security_rules);
 -- ============================================================
 -- ビルトインツール制御シードデータ：InitialServiceImpl.insertSeed から移行
 -- ============================================================
+-- ビルトインツール制御シードデータ（行ごとに冪等、増分デプロイ安全）
+-- ============================================================
 
 INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'execute_shell', 'ワークスペースディレクトリで任意のシェルコマンドを実行、フォアグラウンド/バックグラウンド対応', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'execute_shell');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'list_processes', '現在のユーザーが起動したすべてのバックグラウンドプロセスとそのPIDを表示', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'list_processes');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'kill_process', '指定されたPIDのバックグラウンドプロセスを終了', 1, 1735800000, 1735800000
-WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls);
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'kill_process');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'write_file', 'ファイルの書き込み/作成、上書き/追記対応', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'write_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'edit_file', 'ファイルを正確な文字列置換で編集', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'edit_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_skill', 'カスタムスキルモジュールを呼び出し、エージェント機能を拡張', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_skill');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_memory', '永続記憶の読み書き、セッション間でコンテキストを保持', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_memory');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'search_knowledge', 'ナレッジベースで関連ドキュメント断片を意味検索', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'search_knowledge');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'mcp_all', 'MCP 外部ツールのグローバルスイッチ（全 MCP ツールの可用性を制御）', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'mcp_all');
 

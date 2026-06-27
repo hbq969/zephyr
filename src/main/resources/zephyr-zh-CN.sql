@@ -495,14 +495,42 @@ UNION ALL
 WHERE NOT EXISTS (SELECT 1 FROM zephyr_security_rules);
 
 -- ============================================================
--- 内置工具管控种子数据：从 InitialServiceImpl.insertSeed 迁移
+-- 内置工具管控种子数据（逐行幂等，增量部署安全）
 -- ============================================================
 
 INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'execute_shell', '在工作空间目录执行任意 shell 命令，支持前台阻塞和后台运行', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'execute_shell');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'list_processes', '列出当前用户启动的所有后台进程及其 PID', 1, 1735800000, 1735800000
-UNION ALL
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'list_processes');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
     SELECT 'kill_process', '根据 PID 终止指定的后台进程', 1, 1735800000, 1735800000
-WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls);
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'kill_process');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'write_file', '写入/创建文件，支持覆盖和追加模式', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'write_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'edit_file', '精确字符串替换编辑文件', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'edit_file');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_skill', '调用自定义技能模块，扩展 Agent 能力', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_skill');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'use_memory', '读写持久化记忆，跨会话保留上下文', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'use_memory');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'search_knowledge', '在知识库中语义检索相关文档片段', 0, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'search_knowledge');
+
+INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin, created_at, updated_at)
+    SELECT 'mcp_all', 'MCP 外部工具全局开关（控制所有 MCP 工具的可用性）', 1, 1735800000, 1735800000
+WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'mcp_all');
 
