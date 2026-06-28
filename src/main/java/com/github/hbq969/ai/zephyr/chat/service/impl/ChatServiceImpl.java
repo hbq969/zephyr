@@ -91,32 +91,53 @@ public class ChatServiceImpl implements ChatService {
     public SseEmitter send(String userName, String conversationId, String workspaceId,
                            String originalMessage, String mode, List<String> filePaths) {
 
-        // === 同步阶段：解析 conversationId、注册 SessionHandle、创建 SseEmitter ===
-        String cid = (conversationId != null && !conversationId.isEmpty())
+        String cid = resolveConversationId(conversationId);
+        String workspacePath = resolveWorkspacePath(workspaceId);
+        ensureWorkspaceDir(workspacePath);
+
+        ConversationSessionManager.SessionHandle handle = sessionManager.register(cid, userName, workspacePath);
+        SseEmitter emitter = createSseEmitter(cid, handle);
+
+        com.github.hbq969.code.sm.login.model.UserInfo currentUser = UserContext.getNoCheck();
+        sessionManager.getExecutor().execute(() -> {
+            if (currentUser != null) {
+                UserContext.set(currentUser);
+            }
+            processChatAsync(userName, cid, workspaceId, originalMessage, mode, filePaths,
+                    conversationId, handle, emitter);
+        });
+
+        return emitter;
+    }
+
+    // ==================== send 方法的分解 ====================
+
+    private String resolveConversationId(String conversationId) {
+        return (conversationId != null && !conversationId.isEmpty())
                 ? conversationId
                 : UUID.fastUUID().toString(true).substring(0, SHORT_ID_LENGTH);
+    }
 
-        // 解析 workspace 路径
-        String workspacePath;
+    private String resolveWorkspacePath(String workspaceId) {
         if (workspaceId != null && !workspaceId.isEmpty()) {
             WorkspaceEntity ws = workspaceDao.queryById(workspaceId);
-            workspacePath = (ws != null && ws.getPath() != null && !ws.getPath().isBlank())
-                    ? ws.getPath()
-                    : System.getProperty("user.home");
-        } else {
-            workspacePath = System.getProperty("user.home");
+            if (ws != null && ws.getPath() != null && !ws.getPath().isBlank()) {
+                return ws.getPath();
+            }
         }
+        return System.getProperty("user.home");
+    }
 
-        // 确保工作目录存在（DB 记录有但磁盘目录可能被误删，ProcessBuilder 要求目录必须存在）
+    private void ensureWorkspaceDir(String workspacePath) {
         java.io.File wsDir = new java.io.File(workspacePath);
         if (!wsDir.exists()) {
             wsDir.mkdirs();
         }
+    }
 
-        ConversationSessionManager.SessionHandle handle = sessionManager.register(cid, userName, workspacePath);
-
+    private SseEmitter createSseEmitter(String cid,
+                                        ConversationSessionManager.SessionHandle handle) {
         SseEmitter emitter = new SseEmitter(cfg.getChat().getSse().getTimeoutMillis());
-
         emitter.onTimeout(() -> {
             log.info("[会话] SSE 超时 cid={}", cid);
             handle.cancel();
@@ -125,210 +146,260 @@ public class ChatServiceImpl implements ChatService {
             log.warn("[会话] SSE 客户端断开 cid={}: {}", cid, th.getMessage());
             handle.cancel();
         });
-
-        // === 异步阶段 ===
-        com.github.hbq969.code.sm.login.model.UserInfo currentUser = UserContext.getNoCheck();
-        sessionManager.getExecutor().execute(() -> {
-            if (currentUser != null) {
-                UserContext.set(currentUser);
-            }
-            boolean completed = false;
-            try {
-                long now = System.currentTimeMillis() / 1000;
-                long msgSeq = now;
-
-                handle.checkCancel();
-
-                // 0. 预处理斜杠命令
-                String message = originalMessage;
-                if (message.startsWith("/")) {
-                    String handled = handleSlashCommand(message, userName, cid, emitter, now, handle);
-                    if (handled == null) {
-                        completed = true;
-                        return;
-                    }
-                    message = handled;
-                }
-
-                handle.checkCancel();
-
-                // 1. 确保会话存在（cid 已预生成）
-                if (conversationId == null || conversationId.isEmpty()) {
-                    ConversationEntity conv = new ConversationEntity();
-                    conv.setId(cid);
-                    conv.setUserName(userName);
-                    conv.setTitle(message.length() > TITLE_MAX_LENGTH ? message.substring(0, TITLE_MAX_LENGTH) : message);
-                    conv.setWorkspaceId(workspaceId);
-                    conv.setCreatedAt(now);
-                    conv.setUpdatedAt(now);
-                    chatDao.insertConversation(conv);
-                    log.info("[会话] 新建对话 cid={}, user={}, title={}", cid, userName, conv.getTitle());
-                    emitter.send(SseEmitter.event().name("message")
-                            .data(ChatEvent.builder().type("meta").content(cid).build()));
-                }
-
-                handle.checkCancel();
-
-                // 2. 组装上下文
-                ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode != null ? mode : "default");
-                List<Map<String, Object>> messages = ctx.getMessages();
-
-                String userContent = message;
-                if (filePaths != null && !filePaths.isEmpty()) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("[用户上传了以下文件，请根据扩展名使用对应的 skill 处理]\n");
-                    for (String p : filePaths) {
-                        String ext = "";
-                        String name = p.substring(p.lastIndexOf('/') + 1);
-                        int dotIdx = name.lastIndexOf('.');
-                        if (dotIdx > 0) {
-                            ext = name.substring(dotIdx).toLowerCase();
-                            int usIdx = name.indexOf('_');
-                            if (usIdx > 0 && usIdx < dotIdx) {
-                                name = name.substring(usIdx + 1);
-                            }
-                        }
-                        String skillHint = switch (ext) {
-                            case ".pdf" -> " → 调用 use_skill(\"pdf\")";
-                            case ".xlsx", ".xls" -> " → 调用 use_skill(\"xlsx\")";
-                            case ".docx", ".doc" -> " → 调用 use_skill(\"docx\")";
-                            case ".pptx", ".ppt" -> " → 调用 use_skill(\"pptx\")";
-                            case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp" ->
-                                    " → 调用 use_skill(\"image-analysis\")";
-                            default -> "";
-                        };
-                        sb.append("- ").append(name).append(skillHint).append("\n");
-                        sb.append("  路径: ").append(p).append("\n");
-                    }
-                    sb.append("\n用户消息: ").append(message);
-                    userContent = sb.toString();
-                }
-                messages.add(Map.of("role", "user", "content", userContent));
-
-                // 3. 持久化 user 消息
-                MessageEntity userMsg = new MessageEntity();
-                userMsg.setId(UUID.fastUUID().toString(true).substring(0, SHORT_ID_LENGTH));
-                userMsg.setConversationId(cid);
-                userMsg.setRole(ROLE_USER);
-                userMsg.setContent(message);
-                userMsg.setCreatedAt(msgSeq++);
-                chatDao.insertMessage(userMsg);
-
-                handle.checkCancel();
-
-                // 4. 工具调用循环
-                LlmResult result = null;
-                int totalInputTokens = 0, totalOutputTokens = 0, rounds = 0;
-                while (true) {
-                    handle.checkCancel();
-                    result = llmClient.chat(ctx.getModel(), messages, ctx.getTools(), emitter, cid, handle);
-                    rounds++;
-                    if (result.getUsage() != null) {
-                        totalInputTokens += result.getUsage().getOrDefault("inputTokens", 0);
-                        totalOutputTokens += result.getUsage().getOrDefault("outputTokens", 0);
-                    }
-
-                    handle.touch();
-
-                    if (result.hasToolCalls()) {
-                        Map<String, Object> assistantMsg = new LinkedHashMap<>();
-                        assistantMsg.put("role", ROLE_ASSISTANT);
-                        assistantMsg.put("content", result.getContent() != null ? result.getContent() : "");
-                        if (result.getToolCalls() != null) {
-                            assistantMsg.put("tool_calls", result.getToolCalls().stream().map(tc -> {
-                                Map<String, Object> m = new LinkedHashMap<>();
-                                m.put("id", tc.getId());
-                                m.put("type", TOOL_CALL_TYPE_FUNCTION);
-                                m.put("function", Map.of("name", tc.getName(), "arguments", gson.toJson(tc.getArguments())));
-                                return m;
-                            }).toList());
-                        }
-                        messages.add(assistantMsg);
-                        String assistantMsgId = persistAssistantMessage(cid, result, msgSeq++);
-
-                        List<String> enabledKbIds = cid != null ? knowledgeDao.queryKbIdsByConversation(cid) : List.of();
-                        List<Map<String, Object>> toolResults = dispatchTools(result.getToolCalls(), userName, enabledKbIds, cid, mode, emitter, handle, assistantMsgId);
-                        handle.touch();
-
-                        chatDao.updateMessageToolCallsJson(assistantMsgId,
-                                buildToolCallsJsonFromResults(result.getToolCalls(), toolResults));
-
-                        for (int i = 0; i < result.getToolCalls().size(); i++) {
-                            LlmResult.ToolCall tc = result.getToolCalls().get(i);
-                            Map<String, Object> tr = toolResults.get(i);
-                            String output = tr.get("content").toString();
-                            try {
-                                emitter.send(SseEmitter.event().name("message")
-                                        .data(ChatEvent.builder()
-                                                .type("tool_result")
-                                                .toolName(tc.getName())
-                                                .toolInput(tc.getArguments())
-                                                .toolOutput(output)
-                                                .toolStatus((String) tr.get("status"))
-                                                .build()));
-                            } catch (IOException e) {
-                                log.warn("推送 tool_result 事件失败: {}", e.getMessage());
-                            }
-                        }
-
-                        messages.addAll(toolResults);
-
-                        for (int i = 0; i < result.getToolCalls().size(); i++) {
-                            LlmResult.ToolCall tc = result.getToolCalls().get(i);
-                            MessageEntity toolMsg = new MessageEntity();
-                            toolMsg.setId(UUID.fastUUID().toString(true).substring(0, SHORT_ID_LENGTH));
-                            toolMsg.setConversationId(cid);
-                            toolMsg.setRole(ROLE_TOOL);
-                            toolMsg.setContent(toolResults.get(i).get("content").toString());
-                            toolMsg.setToolCallId(tc.getId());
-                            toolMsg.setCreatedAt(msgSeq++);
-                            chatDao.insertMessage(toolMsg);
-                        }
-
-                        handle.checkCancel();
-                    } else {
-                        if (isNotBlank(result.getContent()) || result.hasToolCalls()) {
-                            persistAssistantMessage(cid, result, msgSeq++);
-                        }
-                        if (rounds > 1 || totalInputTokens + totalOutputTokens > 0) {
-                            log.info("对话完成 — 共 {} 轮, 输入: {} tokens, 输出: {} tokens, 合计: {} tokens",
-                                    rounds, totalInputTokens, totalOutputTokens, totalInputTokens + totalOutputTokens);
-                        }
-                        emitter.send(SseEmitter.event().name("message")
-                                .data(ChatEvent.builder().type("done").build()));
-                        completed = true;
-                        return;
-                    }
-                }
-            } catch (ConversationSessionManager.CancelSessionException e) {
-                log.info("[SSE] 连接已取消 cid={}", cid);
-                llmClient.cancelCall(cid);
-            } catch (Exception e) {
-                boolean disconnected = e instanceof IOException
-                        && e.getMessage() != null && e.getMessage().contains("CANCEL");
-                if (disconnected) {
-                    log.info("[会话] SSE 客户端断开，中断 SSE 流 cid={}", cid);
-                } else {
-                    log.error("[会话] 异常 cid={}", cid, e);
-                    try {
-                        emitter.send(SseEmitter.event().name("message")
-                                .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
-                    } catch (Exception ignored) {
-                    }
-                }
-            } finally {
-                try {
-                    emitter.complete();
-                } catch (Exception ignored) {
-                }
-                handle.killTrackedProcesses();
-                log.info("[会话] SSE 响应完成 cid={}, completed={}", cid, completed);
-                sessionManager.remove(cid);
-                UserContext.remove();
-            }
-        });
-
         return emitter;
+    }
+
+    /**
+     * 异步聊天处理：斜杠命令 → 会话创建 → 上下文构建 → LLM 循环。
+     */
+    private void processChatAsync(String userName, String cid, String workspaceId,
+                                  String originalMessage, String mode, List<String> filePaths,
+                                  String conversationId,
+                                  ConversationSessionManager.SessionHandle handle,
+                                  SseEmitter emitter) {
+        boolean completed = false;
+        try {
+            long now = System.currentTimeMillis() / 1000;
+            long msgSeq = now;
+            handle.checkCancel();
+
+            // 0. 斜杠命令预处理
+            String message = originalMessage;
+            if (message.startsWith("/")) {
+                String handled = handleSlashCommand(message, userName, cid, emitter, now, handle);
+                if (handled == null) {
+                    completed = true;
+                    return;
+                }
+                message = handled;
+            }
+
+            handle.checkCancel();
+
+            // 1. 确保会话存在
+            if (conversationId == null || conversationId.isEmpty()) {
+                createConversation(cid, userName, message, workspaceId, now, emitter);
+            }
+
+            handle.checkCancel();
+
+            // 2. 构建上下文和用户消息
+            ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode != null ? mode : "default");
+            List<Map<String, Object>> messages = ctx.getMessages();
+            String userContent = buildUserContentWithFiles(message, filePaths);
+            messages.add(Map.of("role", "user", "content", userContent));
+
+            // 3. 持久化用户消息
+            msgSeq = persistUserMessage(cid, message, msgSeq);
+
+            handle.checkCancel();
+
+            // 4. LLM 工具调用循环
+            runLlmLoop(ctx, messages, cid, userName, mode, emitter, handle, msgSeq);
+
+            completed = true;
+        } catch (ConversationSessionManager.CancelSessionException e) {
+            log.info("[SSE] 连接已取消 cid={}", cid);
+            llmClient.cancelCall(cid);
+        } catch (Exception e) {
+            handleChatException(e, cid, emitter);
+        } finally {
+            cleanupChat(emitter, handle, cid, completed);
+        }
+    }
+
+    /** 将文件路径列表拼接到用户消息中，提示 LLM 使用对应 skill。 */
+    private String buildUserContentWithFiles(String message, List<String> filePaths) {
+        if (filePaths == null || filePaths.isEmpty()) {
+            return message;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("[用户上传了以下文件，请根据扩展名使用对应的 skill 处理]\n");
+        for (String p : filePaths) {
+            String name = p.substring(p.lastIndexOf('/') + 1);
+            String ext = "";
+            int dotIdx = name.lastIndexOf('.');
+            if (dotIdx > 0) {
+                ext = name.substring(dotIdx).toLowerCase();
+                int usIdx = name.indexOf('_');
+                if (usIdx > 0 && usIdx < dotIdx) {
+                    name = name.substring(usIdx + 1);
+                }
+            }
+            String skillHint = switch (ext) {
+                case ".pdf" -> " → 调用 use_skill(\"pdf\")";
+                case ".xlsx", ".xls" -> " → 调用 use_skill(\"xlsx\")";
+                case ".docx", ".doc" -> " → 调用 use_skill(\"docx\")";
+                case ".pptx", ".ppt" -> " → 调用 use_skill(\"pptx\")";
+                case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp" ->
+                        " → 调用 use_skill(\"image-analysis\")";
+                default -> "";
+            };
+            sb.append("- ").append(name).append(skillHint).append("\n");
+            sb.append("  路径: ").append(p).append("\n");
+        }
+        sb.append("\n用户消息: ").append(message);
+        return sb.toString();
+    }
+
+    private void createConversation(String cid, String userName, String message,
+                                    String workspaceId, long now, SseEmitter emitter) throws IOException {
+        ConversationEntity conv = new ConversationEntity();
+        conv.setId(cid);
+        conv.setUserName(userName);
+        conv.setTitle(message.length() > TITLE_MAX_LENGTH ? message.substring(0, TITLE_MAX_LENGTH) : message);
+        conv.setWorkspaceId(workspaceId);
+        conv.setCreatedAt(now);
+        conv.setUpdatedAt(now);
+        chatDao.insertConversation(conv);
+        log.info("[会话] 新建对话 cid={}, user={}, title={}", cid, userName, conv.getTitle());
+        emitter.send(SseEmitter.event().name("message")
+                .data(ChatEvent.builder().type("meta").content(cid).build()));
+    }
+
+    private long persistUserMessage(String cid, String message, long msgSeq) {
+        MessageEntity userMsg = new MessageEntity();
+        userMsg.setId(UUID.fastUUID().toString(true).substring(0, SHORT_ID_LENGTH));
+        userMsg.setConversationId(cid);
+        userMsg.setRole(ROLE_USER);
+        userMsg.setContent(message);
+        userMsg.setCreatedAt(msgSeq++);
+        chatDao.insertMessage(userMsg);
+        return msgSeq;
+    }
+
+    /** LLM 工具调用循环：反复调用 LLM 直到无工具调用或会话取消。 */
+    private void runLlmLoop(ContextBuilder.Context ctx, List<Map<String, Object>> messages,
+                            String cid, String userName, String mode,
+                            SseEmitter emitter, ConversationSessionManager.SessionHandle handle,
+                            long msgSeq) throws IOException {
+        int totalInputTokens = 0, totalOutputTokens = 0, rounds = 0;
+        while (true) {
+            handle.checkCancel();
+            LlmResult result = llmClient.chat(ctx.getModel(), messages, ctx.getTools(), emitter, cid, handle);
+            rounds++;
+            if (result.getUsage() != null) {
+                totalInputTokens += result.getUsage().getOrDefault("inputTokens", 0);
+                totalOutputTokens += result.getUsage().getOrDefault("outputTokens", 0);
+            }
+            handle.touch();
+
+            if (result.hasToolCalls()) {
+                msgSeq = processToolCallRound(result, messages, cid, userName, mode, emitter, handle, msgSeq);
+                handle.checkCancel();
+            } else {
+                if (isNotBlank(result.getContent()) || result.hasToolCalls()) {
+                    persistAssistantMessage(cid, result, msgSeq);
+                }
+                if (rounds > 1 || totalInputTokens + totalOutputTokens > 0) {
+                    log.info("对话完成 — 共 {} 轮, 输入: {} tokens, 输出: {} tokens, 合计: {} tokens",
+                            rounds, totalInputTokens, totalOutputTokens, totalInputTokens + totalOutputTokens);
+                }
+                emitter.send(SseEmitter.event().name("message")
+                        .data(ChatEvent.builder().type("done").build()));
+                return;
+            }
+        }
+    }
+
+    /** 处理单轮工具调用：构建 assistant 消息 → 分发工具 → 推送结果 → 持久化。返回更新后的 msgSeq。 */
+    private long processToolCallRound(LlmResult result, List<Map<String, Object>> messages,
+                                      String cid, String userName, String mode,
+                                      SseEmitter emitter,
+                                      ConversationSessionManager.SessionHandle handle,
+                                      long msgSeq) {
+        Map<String, Object> assistantMsg = new LinkedHashMap<>();
+        assistantMsg.put("role", ROLE_ASSISTANT);
+        assistantMsg.put("content", result.getContent() != null ? result.getContent() : "");
+        if (result.getToolCalls() != null) {
+            assistantMsg.put("tool_calls", result.getToolCalls().stream().map(tc -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", tc.getId());
+                m.put("type", TOOL_CALL_TYPE_FUNCTION);
+                m.put("function", Map.of("name", tc.getName(), "arguments", gson.toJson(tc.getArguments())));
+                return m;
+            }).toList());
+        }
+        messages.add(assistantMsg);
+        String assistantMsgId = persistAssistantMessage(cid, result, msgSeq++);
+
+        List<String> enabledKbIds = cid != null ? knowledgeDao.queryKbIdsByConversation(cid) : List.of();
+        List<Map<String, Object>> toolResults = dispatchTools(
+                result.getToolCalls(), userName, enabledKbIds, cid, mode, emitter, handle, assistantMsgId);
+        handle.touch();
+
+        chatDao.updateMessageToolCallsJson(assistantMsgId,
+                buildToolCallsJsonFromResults(result.getToolCalls(), toolResults));
+
+        sendToolResultEvents(emitter, result.getToolCalls(), toolResults);
+
+        messages.addAll(toolResults);
+
+        return persistToolMessages(cid, result.getToolCalls(), toolResults, msgSeq);
+    }
+
+    private void sendToolResultEvents(SseEmitter emitter, List<LlmResult.ToolCall> toolCalls,
+                                      List<Map<String, Object>> toolResults) {
+        for (int i = 0; i < toolCalls.size(); i++) {
+            LlmResult.ToolCall tc = toolCalls.get(i);
+            Map<String, Object> tr = toolResults.get(i);
+            try {
+                emitter.send(SseEmitter.event().name("message")
+                        .data(ChatEvent.builder()
+                                .type("tool_result")
+                                .toolName(tc.getName())
+                                .toolInput(tc.getArguments())
+                                .toolOutput(tr.get("content").toString())
+                                .toolStatus((String) tr.get("status"))
+                                .build()));
+            } catch (IOException e) {
+                log.warn("推送 tool_result 事件失败: {}", e.getMessage());
+            }
+        }
+    }
+
+    private long persistToolMessages(String cid, List<LlmResult.ToolCall> toolCalls,
+                                     List<Map<String, Object>> toolResults, long msgSeq) {
+        for (int i = 0; i < toolCalls.size(); i++) {
+            LlmResult.ToolCall tc = toolCalls.get(i);
+            MessageEntity toolMsg = new MessageEntity();
+            toolMsg.setId(UUID.fastUUID().toString(true).substring(0, SHORT_ID_LENGTH));
+            toolMsg.setConversationId(cid);
+            toolMsg.setRole(ROLE_TOOL);
+            toolMsg.setContent(toolResults.get(i).get("content").toString());
+            toolMsg.setToolCallId(tc.getId());
+            toolMsg.setCreatedAt(msgSeq++);
+            chatDao.insertMessage(toolMsg);
+        }
+        return msgSeq;
+    }
+
+    private void handleChatException(Exception e, String cid, SseEmitter emitter) {
+        boolean disconnected = e instanceof IOException
+                && e.getMessage() != null && e.getMessage().contains("CANCEL");
+        if (disconnected) {
+            log.info("[会话] SSE 客户端断开，中断 SSE 流 cid={}", cid);
+        } else {
+            log.error("[会话] 异常 cid={}", cid, e);
+            try {
+                emitter.send(SseEmitter.event().name("message")
+                        .data(ChatEvent.builder().type("error").content(e.getMessage()).build()));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void cleanupChat(SseEmitter emitter,
+                             ConversationSessionManager.SessionHandle handle,
+                             String cid, boolean completed) {
+        try {
+            emitter.complete();
+        } catch (Exception ignored) {
+        }
+        handle.killTrackedProcesses();
+        log.info("[会话] SSE 响应完成 cid={}, completed={}", cid, completed);
+        sessionManager.remove(cid);
+        UserContext.remove();
     }
 
     private String persistAssistantMessage(String cid, LlmResult result, long now) {
