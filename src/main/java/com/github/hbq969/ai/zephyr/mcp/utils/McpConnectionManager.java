@@ -40,7 +40,7 @@ public class McpConnectionManager implements ApplicationListener<ScriptInitialDo
     @Override
     public void onApplicationEvent(ScriptInitialDoneEvent event) {
         if (!initialized.compareAndSet(false, true)) {
-            log.info("MCP 启动清理已跳过（已执行过一次），避免重复初始化");
+            log.debug("MCP 启动清理已跳过（已执行过一次），避免重复初始化");
             return;
         }
         cleanupOrphanProcesses();
