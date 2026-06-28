@@ -2,6 +2,24 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.3.3] - 2026-06-28
+
+### 新增
+
+- **MCP reconnect_on_startup**：MCP 服务器配置新增 `reconnect_on_startup` 字段，Zephyr 启动时自动重连标记为 reconnect 的 MCP 服务器
+- **应用名称可配置**：`whoami` 接口返回 `appName`，AI 助手标签和身份标识可通过配置动态设置
+
+### 变更
+
+- **移除命令面板**：聊天输入区移除命令选择面板，简化交互
+- **修复 /clear 后会话恢复问题**：清空对话后重新发送消息时正确恢复会话上下文
+- **工具执行气泡标题格式**：从 `xxx: yyyy` 改为 `xxx(yyyy)`，MCP 前缀改为小写 `mcp`
+- **MCP 日志优化**：重复初始化跳过日志降为 debug 级别
+
+### 修复
+
+- **MCP 重连死循环**：`ScriptInitialDoneEvent` 重复触发导致重连死循环，新增 `AtomicBoolean` 幂等守卫确保清理和重连只执行一次
+
 ## [1.3.2] - 2026-06-27
 
 ### 新增
