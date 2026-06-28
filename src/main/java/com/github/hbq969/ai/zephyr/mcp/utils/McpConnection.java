@@ -93,11 +93,26 @@ public class McpConnection {
             }
         }
         process = pb.start();
+        // 轮询等待子进程启动（npx 需要时间拉取包并启动 node），最长等 5s
+        long deadline = System.currentTimeMillis() + 5000;
+        List<ProcessHandle> children = List.of();
+        while (System.currentTimeMillis() < deadline) {
+            ProcessHandle cur = ProcessHandle.of(process.pid()).orElse(null);
+            if (cur != null) {
+                children = cur.descendants().toList();
+                if (!children.isEmpty()) break;
+            }
+            try { Thread.sleep(300); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+        }
         Path pidFile = pidFilePath();
         try {
             Files.createDirectories(pidFile.getParent());
-            Files.writeString(pidFile, String.valueOf(process.pid()));
-            log.info("MCP PID 已记录: server={}, pid={}", server.getName(), process.pid());
+            StringBuilder sb = new StringBuilder(String.valueOf(process.pid()));
+            for (ProcessHandle child : children) {
+                sb.append('\n').append(child.pid());
+            }
+            Files.writeString(pidFile, sb.toString());
+            log.info("MCP PID 已记录: server={}, processTree={}", server.getName(), sb.toString().replace("\n", " -> "));
         } catch (Exception e) {
             log.warn("写入 MCP PID 文件失败: {}", pidFile, e);
         }
@@ -356,17 +371,38 @@ public class McpConnection {
 
     private void killProcessTree() {
         long pid = process.pid();
-        ProcessHandle.of(pid).ifPresent(ph -> {
-            List<ProcessHandle> children = ph.descendants().toList();
-            log.info("MCP 进程树: server={}, parentPid={}, childrenPids={}",
-                    server.getName(), pid, children.stream().map(c -> String.valueOf(c.pid())).toList());
-            for (ProcessHandle child : children) {
-                boolean ok = child.destroyForcibly();
-                log.info("MCP kill 子进程: pid={}, 结果={}", child.pid(), ok);
+        // 先尝试从 PID 文件获取完整的已记录进程树（捕获 npx 已退出但 node 仍在运行的情况）
+        Path pidFile = pidFilePath();
+        if (Files.exists(pidFile)) {
+            try {
+                List<Long> knownPids = Files.readAllLines(pidFile).stream()
+                        .map(String::trim).filter(s -> !s.isEmpty()).map(Long::parseLong).toList();
+                for (int i = knownPids.size() - 1; i >= 0; i--) {
+                    ProcessHandle.of(knownPids.get(i)).ifPresent(ph -> {
+                        ph.descendants().forEach(ProcessHandle::destroyForcibly);
+                        ph.destroyForcibly();
+                    });
+                }
+            } catch (Exception e) {
+                log.warn("读取 PID 文件备用方案失败: server={}", server.getName(), e);
             }
-            boolean ok = ph.destroyForcibly();
-            log.info("MCP kill 父进程: pid={}, 结果={}", pid, ok);
+        }
+        // 主路径：通过 ProcessHandle 处理
+        ProcessHandle.of(pid).ifPresent(ph -> {
+            ph.descendants().forEach(ProcessHandle::destroyForcibly);
         });
+        process.destroyForcibly();
+        // 等待并重试
+        try { Thread.sleep(200); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        if (process.isAlive()) {
+            log.warn("MCP killProcessTree: 进程未终止, 再次尝试, pid={}", pid);
+            ProcessHandle.of(pid).ifPresent(ph -> {
+                ph.descendants().forEach(ProcessHandle::destroyForcibly);
+                ph.destroyForcibly();
+            });
+            process.destroyForcibly();
+        }
+        log.info("MCP 进程树已终止: server={}, pid={}, parentAlive={}", server.getName(), pid, process.isAlive());
     }
 
     public void close() {
@@ -374,8 +410,30 @@ public class McpConnection {
             if (type == Type.STDIO && process != null) {
                 long pid = process.pid();
                 killProcessTree();
-                try { Files.deleteIfExists(pidFilePath()); } catch (Exception ignored) {}
-                log.info("MCP 进程已终止: server={}, pid={}", server.getName(), pid);
+                try { Thread.sleep(200); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                // 仅在父进程已终止时才删除 PID 文件，避免 npx 已退出但 node 仍在运行的孤儿场景
+                if (!process.isAlive()) {
+                    boolean allDead = true;
+                    Path pidFile = pidFilePath();
+                    if (Files.exists(pidFile)) {
+                        try {
+                            for (String line : Files.readAllLines(pidFile)) {
+                                long recordedPid = Long.parseLong(line.trim());
+                                if (ProcessHandle.of(recordedPid).isPresent()) {
+                                    allDead = false;
+                                    log.warn("MCP 子进程残留: pid={}, 保留 PID 文件待下次清理", recordedPid);
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("验证 PID 文件失败", e);
+                            allDead = false;
+                        }
+                    }
+                    if (allDead) {
+                        Files.deleteIfExists(pidFile);
+                        log.info("MCP 进程已终止: server={}, pid={}", server.getName(), pid);
+                    }
+                }
             }
         } catch (Exception ignored) {}
     }

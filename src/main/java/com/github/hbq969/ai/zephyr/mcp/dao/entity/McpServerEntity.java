@@ -14,6 +14,7 @@ public class McpServerEntity {
     private String url;
     private String headers;
     private String status;
+    private Integer reconnectOnStartup = 0;
     private String scope = "user";
     private Long createdAt;
     private Long updatedAt;

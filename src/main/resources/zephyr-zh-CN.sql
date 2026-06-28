@@ -536,3 +536,6 @@ INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin,
     SELECT 'mcp_all', 'MCP 外部工具全局开关（控制所有 MCP 工具的可用性）', 1, 1735800000, 1735800000
 WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'mcp_all');
 
+ALTER TABLE zephyr_mcp_servers ADD COLUMN IF NOT EXISTS reconnect_on_startup smallint default 0;
+UPDATE zephyr_mcp_servers SET reconnect_on_startup = 1 WHERE status = 'connected';
+

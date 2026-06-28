@@ -531,3 +531,6 @@ INSERT INTO zephyr_builtin_tool_controls (tool_name, description, require_admin,
     SELECT 'mcp_all', 'MCP 外部ツールのグローバルスイッチ（全 MCP ツールの可用性を制御）', 1, 1735800000, 1735800000
 WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = 'mcp_all');
 
+ALTER TABLE zephyr_mcp_servers ADD COLUMN IF NOT EXISTS reconnect_on_startup smallint default 0;
+UPDATE zephyr_mcp_servers SET reconnect_on_startup = 1 WHERE status = 'connected';
+

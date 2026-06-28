@@ -16,6 +16,7 @@
       headers text,
       status varchar(16) default 'disconnected',
       scope varchar(16) default 'user',
+      reconnect_on_startup smallint default 0,
       created_at bigint,
       updated_at bigint
     );

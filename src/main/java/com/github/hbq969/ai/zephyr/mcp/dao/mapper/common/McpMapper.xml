@@ -7,6 +7,7 @@
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
                url, headers, status, scope,
+               reconnect_on_startup as reconnectOnStartup,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers
         where user_name = #{userName} and scope = 'user'
@@ -14,8 +15,8 @@
     </select>
 
     <insert id="insertServer">
-        insert into zephyr_mcp_servers (id, user_name, name, transport, command, args, env_vars, url, headers, status, scope, created_at, updated_at)
-        values (#{id}, #{userName}, #{name}, #{transport}, #{command}, #{args}, #{envVars}, #{url}, #{headers}, #{status}, #{scope}, #{createdAt}, #{updatedAt})
+        insert into zephyr_mcp_servers (id, user_name, name, transport, command, args, env_vars, url, headers, status, scope, reconnect_on_startup, created_at, updated_at)
+        values (#{id}, #{userName}, #{name}, #{transport}, #{command}, #{args}, #{envVars}, #{url}, #{headers}, #{status}, #{scope}, #{reconnectOnStartup}, #{createdAt}, #{updatedAt})
     </insert>
 
     <update id="updateServer">
@@ -23,6 +24,7 @@
         set name = #{name}, transport = #{transport},
             command = #{command}, args = #{args}, env_vars = #{envVars},
             url = #{url}, headers = #{headers},
+            reconnect_on_startup = #{reconnectOnStartup},
             updated_at = #{updatedAt}
         where id = #{id} and user_name = #{userName}
     </update>
@@ -35,6 +37,7 @@
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
                url, headers, status, scope,
+               reconnect_on_startup as reconnectOnStartup,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers where id = #{id}
     </select>
@@ -46,14 +49,6 @@
     <update id="resetAllServerStatus">
         update zephyr_mcp_servers set status = #{status}
     </update>
-
-    <select id="queryConnectedServers" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
-        select id, user_name as userName, name, transport,
-               command, args, env_vars as envVars,
-               url, headers, status, scope,
-               created_at as createdAt, updated_at as updatedAt
-        from zephyr_mcp_servers where status = 'connected'
-    </select>
 
     <select id="queryToolById" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpToolEntity">
         select id, user_name as userName, server_id as serverId,
@@ -124,6 +119,7 @@
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
                url, headers, status, scope,
+               reconnect_on_startup as reconnectOnStartup,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers
         where scope = 'shared'
@@ -178,6 +174,7 @@
         select id, user_name as userName, name, transport,
                command, args, env_vars as envVars,
                url, headers, status, scope,
+               reconnect_on_startup as reconnectOnStartup,
                created_at as createdAt, updated_at as updatedAt
         from zephyr_mcp_servers
         where name = #{name} and scope = #{scope}
@@ -189,5 +186,19 @@
         where tool_name is not null
         order by tool_name
     </select>
+
+    <select id="queryServersToReconnect" resultType="com.github.hbq969.ai.zephyr.mcp.dao.entity.McpServerEntity">
+        select id, user_name as userName, name, transport,
+               command, args, env_vars as envVars,
+               url, headers, status, scope,
+               reconnect_on_startup as reconnectOnStartup,
+               created_at as createdAt, updated_at as updatedAt
+        from zephyr_mcp_servers
+        where reconnect_on_startup = 1
+    </select>
+
+    <update id="updateReconnectOnStartup">
+        update zephyr_mcp_servers set reconnect_on_startup = #{reconnectOnStartup} where id = #{id}
+    </update>
 
 </mapper>

@@ -91,6 +91,7 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
         entity.setHeaders(headers.isEmpty() ? "" : encryptHeaders(headers));
         entity.setStatus(STATUS_DISCONNECTED);
         entity.setScope(scope);
+        entity.setReconnectOnStartup(Integer.valueOf(body.getOrDefault("reconnectOnStartup", "0")));
         long now = System.currentTimeMillis() / 1000;
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
@@ -120,6 +121,8 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
         if (!headers.isEmpty()) {
             entity.setHeaders(encryptHeaders(headers));
         }
+        String reconnectVal = body.get("reconnectOnStartup");
+        if (reconnectVal != null) entity.setReconnectOnStartup(Integer.valueOf(reconnectVal));
         entity.setUpdatedAt(System.currentTimeMillis() / 1000);
         mcpDao.updateServer(entity);
         log.info("MCP 服务器配置已更新: id={}, name={}, user={}", id, body.get("name"), userName);
@@ -163,6 +166,8 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
     @Override
     public void connect(String id, String userName) {
         connect0(id, userName, true);
+        mcpDao.updateReconnectOnStartup(id, 1);
+        log.info("MCP 手工连接，reconnect_on_startup 已设为 1: id={}, user={}", id, userName);
     }
 
     private void connect0(String id, String userName, boolean checkPermission) {
@@ -174,6 +179,15 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
 
         if (checkPermission && SCOPE_SHARED.equals(server.getScope())) {
             checkSharedManage();
+        }
+
+        if (!checkPermission) {
+            McpServerEntity current = mcpDao.queryServerById(id);
+            if (current == null || current.getReconnectOnStartup() == null || current.getReconnectOnStartup() != 1) {
+                log.warn("MCP 重连跳过，reconnect_on_startup 已变更为 {}: id={}, user={}",
+                        current != null ? current.getReconnectOnStartup() : "null", id, userName);
+                return;
+            }
         }
 
         log.info("MCP 开始连接: name={}, transport={}, command={}, user={}",
@@ -241,6 +255,7 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
         McpServerEntity server = mcpDao.queryServerById(id);
         log.info("MCP 断开连接: id={}, name={}, user={}", id,
                 server != null ? server.getName() : id, userName);
+        mcpDao.updateReconnectOnStartup(id, 0);
         if (server != null && SCOPE_SHARED.equals(server.getScope())) {
             connectionManager.removeAllConnectionsForServer(id);
         } else {
@@ -353,7 +368,13 @@ public class McpServiceImpl implements McpService, ApplicationListener<ScriptIni
 
     @Override
     public void reconnectOnStartup() {
-        List<McpServerEntity> servers = connectionManager.getStartupReconnectList();
+        List<McpServerEntity> servers;
+        try {
+            servers = mcpDao.queryServersToReconnect();
+        } catch (Exception e) {
+            log.warn("查询待重连 MCP 服务器列表失败", e);
+            return;
+        }
         if (servers.isEmpty()) {
             log.info("无需要重连的 MCP 服务器");
             return;
