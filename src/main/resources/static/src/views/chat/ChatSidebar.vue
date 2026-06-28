@@ -69,7 +69,7 @@ function selectAndCloseSidebar(id: string) {
 <template>
   <aside class="sidebar" :class="{ collapsed: convStore.sidebarCollapsed }">
     <div class="sidebar-header">
-      <span class="logo">zephyr</span>
+      <span class="logo">{{ settingsStore.appName }}</span>
       <span class="spacer"></span>
       <button class="btn-icon" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_collapseTooltip">
         <Icon icon="lucide:panel-left-close" />

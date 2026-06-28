@@ -16,7 +16,6 @@ const inputRef = ref<HTMLDivElement>()
 const settingsStore = useSettingsStore()
 const showModelList = ref(false)
 const showAbility = ref(false)
-const showCommand = ref(false)
 const hoveredAbility = ref('')
 const hasInput = ref(false)
 const mcpGroups = ref<{ server: string; tools: { name: string; desc: string; scope: string }[] }[]>([])
@@ -152,11 +151,7 @@ const abilityItems = [
   { key: 'mcp', label: 'MCP' },
   { key: 'skills', label: 'Skills' },
 ]
-const commandItems = [
-  { cmd: '/context', label: langData.inputArea_contextUsage },
-  { cmd: '/clear', label: langData.cmd_clearChat },
-  { cmd: '/help', label: langData.cmd_viewHelp },
-]
+function sendClear() { emit('send', '/clear') }
 
 function formatContextSize(tokens?: number | string): string {
   const n = Number(tokens)
@@ -430,30 +425,6 @@ async function loadSkills() {
   finally { skillLoading.value = false }
 }
 
-function insertCommand(cmd: string) {
-  // 会话/操作命令：直接发送
-  if (cmd.startsWith('/')) {
-    emit('send', cmd)
-    closeAll()
-    return
-  }
-  // 兼容：其他命令作为纯文本插入
-  const el = inputRef.value
-  if (el) {
-    el.focus()
-    const sel = window.getSelection()
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0)
-      range.deleteContents()
-      range.insertNode(document.createTextNode(cmd + ' '))
-      range.collapse(false)
-      sel.removeAllRanges()
-      sel.addRange(range)
-    }
-  }
-  closeAll()
-}
-
 function insertTag(type: 'mcp' | 'skill' | 'file', name: string, displayName?: string) {
   const el = inputRef.value
   if (!el) return
@@ -530,7 +501,6 @@ function closeAll() {
   showModelList.value = false
   showKbList.value = false
   showAbility.value = false
-  showCommand.value = false
   hoveredAbility.value = ''
 }
 
@@ -747,17 +717,10 @@ function closeAll() {
             </div>
           </div>
 
-          <!-- 命令 -->
-          <div class="tool-pick" @click.stop="closeAll(); showCommand = !showCommand">
-            <Icon icon="lucide:terminal" class="pick-icon" />
-            <span>{{ langData.inputArea_command }}</span>
-            <Icon icon="lucide:chevron-down" class="pick-arrow" />
-            <div v-if="showCommand" class="pick-dropdown" @click.stop>
-              <div v-for="it in commandItems" :key="it.cmd" class="pick-option" @click="insertCommand(it.cmd)">
-                <span class="cmd-name">{{ it.cmd }}</span>
-                <span class="cmd-desc">{{ it.label }}</span>
-              </div>
-            </div>
+          <!-- 清空上下文 -->
+          <div class="tool-pick" @click.stop="sendClear()" :title="langData.cmd_clearChat">
+            <Icon icon="lucide:eraser" class="pick-icon" />
+            <span>{{ langData.cmd_clearChat }}</span>
           </div>
         </div>
 
@@ -783,7 +746,7 @@ function closeAll() {
       <div v-if="showModelList" class="model-overlay" @click="closeModelList"></div>
       <div v-if="showKbList" class="model-overlay" @click="showKbList = false"></div>
       <div v-if="showAbility" class="model-overlay" @click="showAbility = false"></div>
-      <div v-if="showCommand" class="model-overlay" @click="showCommand = false"></div>
+
     </Teleport>
     <WorkspaceDialog v-if="showNewWorkspace" @close="showNewWorkspace = false" />
   </div>

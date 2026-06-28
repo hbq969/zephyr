@@ -11,6 +11,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const mcpToolCount = ref(0)
   const skills = ref<SkillConfig[]>([])
   const isAdmin = ref(false)
+  const appName = ref('zephyr')
   const memories = ref<MemoryItem[]>([])
   const knowledgeBases = ref<any[]>([])
   const contextUsed = ref(0)
@@ -408,6 +409,7 @@ export const useSettingsStore = defineStore('settings', () => {
       const res = await axios({ url: '/chat/whoami', method: 'get' })
       if (res.data.state === 'OK' && res.data.body) {
         isAdmin.value = res.data.body.isAdmin === true
+        if (res.data.body.appName) appName.value = res.data.body.appName
       }
     } catch (_) {}
   }
@@ -418,7 +420,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   return {
-    currentModel, models, modelsLoaded, mcpServers, mcpToolCount, skills, isAdmin, memories, knowledgeBases,
+    currentModel, models, modelsLoaded, mcpServers, mcpToolCount, skills, isAdmin, appName, memories, knowledgeBases,
     contextUsed, contextLoaded, contextTotal, contextPercent, contextDetail,
     setModel, addModel,
     loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote, detectContextRemote, detectCtxRaw, fetchModels, toggleModelScope,

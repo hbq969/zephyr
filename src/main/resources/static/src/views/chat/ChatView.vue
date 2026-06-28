@@ -8,7 +8,7 @@ import ChatSidebar from './ChatSidebar.vue'
 import ChatArea from './ChatArea.vue'
 import InputArea from './InputArea.vue'
 import StatusBar from './StatusBar.vue'
-import CommandPalette from './CommandPalette.vue'
+
 import SettingsPanel from './SettingsPanel.vue'
 import { Icon } from '@iconify/vue'
 import { getLangData } from '@/i18n/locale'
@@ -104,21 +104,6 @@ function onSend(text: string, filePaths?: string[]) {
     msg(langData.inputArea_noModelWarning, 'warning')
     return
   }
-  if (text === '/context') {
-    axios({ url: '/chat/context-usage', method: 'get', params: { conversationId: convStore.currentId } })
-      .then(res => {
-        if (res.data.state === 'OK') {
-          const info = res.data.body
-          chatStore.addMessage({ id: nextMsgId(), role: 'system', content: langData.context_usageInfo + JSON.stringify(info, null, 2), timestamp: Date.now() / 1000 })
-        }
-      })
-    return
-  }
-  if (text === '/help') {
-    chatStore.addMessage({ id: nextMsgId(), role: 'system', content: langData.context_helpTitle, timestamp: Date.now() / 1000 })
-    return
-  }
-
   chatStore.startSession()
   if (abortController) abortController.abort()
   abortController = new AbortController()
@@ -188,8 +173,10 @@ function onSend(text: string, filePaths?: string[]) {
           } else if (event.type === 'clear') {
             const oldCid = convStore.currentId
             chatStore.clearMessages()
-            convStore.currentId = null
-            if (oldCid) convStore.removeConversation(oldCid)
+            if (oldCid) {
+              convStore.removeConversation(oldCid)
+              if (convStore.currentId) restoreConversation(convStore.currentId)
+            }
           } else if (event.type === 'done') {
             chatStore.pruneEmptyAssistant()
             refreshConversationList()
@@ -337,7 +324,7 @@ onMounted(() => {
         <button class="tb-btn" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_expandTooltip">
           <Icon icon="lucide:panel-left-open" />
         </button>
-        <span class="tb-logo" @click="convStore.toggleSidebar()">zephyr</span>
+        <span class="tb-logo" @click="convStore.toggleSidebar()">{{ settingsStore.appName }}</span>
         <span class="tb-divider"></span>
         <button class="tb-btn" :title="langData.chatSidebar_newChat" @click="newChat">
           <Icon icon="lucide:plus-circle" />
@@ -370,7 +357,7 @@ onMounted(() => {
       </Teleport>
 
       <ChatArea />
-      <CommandPalette />
+
       <InputArea @send="onSend" @stop="onStop" />
       <StatusBar />
     </div>

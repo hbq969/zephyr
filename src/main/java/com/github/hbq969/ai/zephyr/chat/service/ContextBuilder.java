@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+
 import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.*;
 
 @Component
@@ -123,6 +124,7 @@ public class ContextBuilder {
 
         // 6. 渲染角色 prompt
         Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("assistantIdentity", cfg.getChat().getAssistantIdentity());
         vars.put("workspaceInfo", buildWorkspaceInfo(conversationId, mode));
         vars.put("fileSystemSecurity", fileSystemSecurityPrompt(mode));
         vars.put("skillIndex", skillIndex);
@@ -160,7 +162,8 @@ public class ContextBuilder {
             Map<String, Object> params;
             if (t.getParametersJson() != null && !t.getParametersJson().isEmpty()) {
                 params = gson.fromJson(t.getParametersJson(),
-                        new TypeToken<Map<String, Object>>(){}.getType());
+                        new TypeToken<Map<String, Object>>() {
+                        }.getType());
             } else {
                 params = new LinkedHashMap<>();
                 params.put("type", JSON_TYPE_OBJECT);
@@ -235,13 +238,12 @@ public class ContextBuilder {
         WorkspaceEntity ws = workspaceDao.queryById(conv.getWorkspaceId());
         if (ws == null) return "";
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("沙箱目录: ").append(ws.getPath()).append("\n");
-        log.info("+++++ 沙箱目录={}",ws.getPath());
+        Map<String, String> vars = new HashMap<>();
+        vars.put("wsHome", ws.getPath());
         if (MODE_DEFAULT.equalsIgnoreCase(mode)) {
-            sb.append("此路径的父目录、兄弟目录均不属于沙箱目录，仅此目录及其子目录内的文件可以访问。\n");
+            vars.put("wsInfo", "此路径的父目录、兄弟目录均不属于沙箱目录，仅此目录及其子目录内的文件可以访问。");
         }
-        return sb.toString();
+        return promptLoader.render("workspace/info.md", vars);
     }
 
     private String buildKnowledgeBaseInfo(String conversationId) {
@@ -285,7 +287,8 @@ public class ContextBuilder {
                 }
                 if (e.getToolCallsJson() != null && !e.getToolCallsJson().isEmpty()) {
                     List<Map<String, Object>> stored = gson.fromJson(e.getToolCallsJson(),
-                            new TypeToken<List<Map<String, Object>>>(){}.getType());
+                            new TypeToken<List<Map<String, Object>>>() {
+                            }.getType());
                     // 转换为 OpenAI 格式：{id, input} → {id, type:"function", function:{name, arguments}}
                     List<Map<String, Object>> openaiFormat = new ArrayList<>();
                     for (Map<String, Object> tc : stored) {

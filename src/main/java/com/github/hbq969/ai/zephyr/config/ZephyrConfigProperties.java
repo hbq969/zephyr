@@ -52,6 +52,9 @@ public class ZephyrConfigProperties {
     /** 工作空间相关配置 */
     private Workspace workspace = new Workspace();
 
+    /** 应用展示名称（前端 logo、空状态标题），默认 "zephyr" */
+    private String appName = "zephyr";
+
     /** 安全相关配置 */
     private Security security = new Security();
 
@@ -76,6 +79,9 @@ public class ZephyrConfigProperties {
 
         /** 上下文估算 */
         private Context context = new Context();
+
+        /** AI 助手身份声明，作为 system prompt 首行，默认 "你是一个 AI 助手，名为 zephyr。" */
+        private String assistantIdentity = "你是一个 AI 助手，名为 zephyr。";
 
         /** 会话空闲超时秒数，默认 1800（30 分钟），超时后自动标记取消 */
         private int sessionIdleTimeoutSeconds = 1800;

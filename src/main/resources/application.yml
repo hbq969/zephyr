@@ -237,6 +237,7 @@ operlog:
   batch-timeout-mills: 5000
 
 zephyr:
+  app-name: zephyr  # 应用展示名称（前端 logo、空状态标题）
   chat:
     max-history-messages: 200  # 单次对话最多携带的历史消息条数，超出截断
     upload:
@@ -250,6 +251,7 @@ zephyr:
     context:
       token-estimation-ratio: 0.3  # token 估算系数（字符数 × 系数）
       skill-token-threshold: 1000  # tool 内容超过此 token 数判定为 skill 而非 memory
+    assistant-identity: "你是一个 AI 助手，名为 zephyr。"  # AI 助手身份声明，作为 system prompt 首行
     session-idle-timeout-seconds: 1800  # 会话空闲超时（秒），30 分钟无活动自动取消
     session-scan-interval-seconds: 60  # 会话超时扫描间隔（秒）
   llm:
@@ -310,7 +312,7 @@ zephyr:
     enabled: true  # 是否启用安全评估
     debug: false  # 是否启用安全追踪日志（INFO 级别输出完整评估链路）
     confirm-timeout-seconds: 300  # 用户确认超时秒数
-    max-bypass-attempts: 2  # 连续绕过 HARD BLOCK 最大次数
+    max-bypass-attempts: 1  # 连续绕过 HARD BLOCK 最大次数
     # === HARD BLOCK 规则（命中即禁止执行） ===
     hard-block:
       path-prefixes:

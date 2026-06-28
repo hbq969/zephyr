@@ -2,6 +2,7 @@
 import { ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/store/chat'
 import { useConversationsStore } from '@/store/conversations'
+import { useSettingsStore } from '@/store/settings'
 import MessageBubble from './MessageBubble.vue'
 import { Icon } from '@iconify/vue'
 import { getLangData } from '@/i18n/locale'
@@ -9,6 +10,7 @@ import { getLangData } from '@/i18n/locale'
 const chatStore = useChatStore()
 const langData = getLangData()
 const convStore = useConversationsStore()
+const settingsStore = useSettingsStore()
 const areaRef = ref<HTMLElement>()
 
 const fontSize = ref(16)
@@ -74,7 +76,7 @@ watch(
     </div>
     <div v-if="chatStore.messages.length === 0" class="empty-state">
       <div class="empty-icon">z</div>
-      <p class="empty-title">zephyr</p>
+      <p class="empty-title">{{ settingsStore.appName }}</p>
       <p class="empty-sub">{{ langData.chatArea_emptySub }}</p>
     </div>
     <MessageBubble v-for="(msg, i) in chatStore.messages" :key="msg.id" :message="msg" :isLast="i === chatStore.messages.length - 1 && chatStore.streaming" />

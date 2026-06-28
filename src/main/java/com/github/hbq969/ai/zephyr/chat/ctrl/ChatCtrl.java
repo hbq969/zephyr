@@ -2,6 +2,7 @@ package com.github.hbq969.ai.zephyr.chat.ctrl;
 
 import com.github.hbq969.ai.zephyr.chat.model.ChatRequest;
 import com.github.hbq969.ai.zephyr.chat.service.ChatService;
+import com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties;
 import com.github.hbq969.code.common.restful.ReturnMessage;
 import com.github.hbq969.code.common.spring.context.UserInfo;
 import com.github.hbq969.code.common.utils.GsonUtils;
@@ -26,6 +27,9 @@ public class ChatCtrl {
 
     @Resource
     private ChatService chatService;
+
+    @Resource
+    private ZephyrConfigProperties cfg;
 
     private String userName() {
         UserInfo ui = UserContext.getNoCheck();
@@ -66,12 +70,14 @@ public class ChatCtrl {
     @ResponseBody
     @SMRequiresPermissions(menu = "zephyr_api", menuDesc = "zephyr智能体", apiKey = "chat_whoami", apiDesc = "聊天接口_获取当前用户")
     public ReturnMessage<?> whoami() {
+        String appName = cfg.getAppName();
         com.github.hbq969.code.sm.login.model.UserInfo ui = UserContext.getNoCheck();
         if (ui == null) {
             return ReturnMessage.success(new java.util.HashMap<String, Object>() {{
                 put("username", DEFAULT_USERNAME);
                 put("avatar", DEFAULT_AVATAR);
                 put("isAdmin", false);
+                put("appName", appName);
             }});
         }
         String uname = ui.getUserName();
@@ -80,6 +86,7 @@ public class ChatCtrl {
             put("username", uname);
             put("avatar", uname.substring(0, 1).toUpperCase());
             put("isAdmin", admin);
+            put("appName", appName);
         }});
     }
 
