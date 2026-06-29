@@ -523,19 +523,25 @@ public class ChatServiceImpl implements ChatService {
             }
             case "compact" -> {
                 ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode);
-                TokenCacheService.CompactResult cr = tokenCacheService.compact(
-                        ctx.getMessages(), ctx.getModel(), llmClient, cid, emitter, handle);
-                if (cr != null) {
-                    emitter.send(SseEmitter.event().name(SSE_EVENT_COMPACT)
-                            .data(ChatEvent.builder()
-                                    .type(SSE_EVENT_COMPACT)
-                                    .preTokens(cr.getPreCompactTokens())
-                                    .postTokens(cr.getPostCompactTokens())
-                                    .build()));
-                } else {
+                try {
+                    TokenCacheService.CompactResult cr = tokenCacheService.compact(
+                            ctx.getMessages(), ctx.getModel(), llmClient, cid, emitter, handle);
+                    if (cr != null) {
+                        emitter.send(SseEmitter.event().name(SSE_EVENT_COMPACT)
+                                .data(ChatEvent.builder()
+                                        .type(SSE_EVENT_COMPACT)
+                                        .preTokens(cr.getPreCompactTokens())
+                                        .postTokens(cr.getPostCompactTokens())
+                                        .build()));
+                    } else {
+                        emitter.send(SseEmitter.event().name("message")
+                                .data(ChatEvent.builder().type("error")
+                                        .content("compaction failed").build()));
+                    }
+                } catch (TokenCacheServiceImpl.CompactCircuitBrokenException e) {
                     emitter.send(SseEmitter.event().name("message")
                             .data(ChatEvent.builder().type("error")
-                                    .content("compaction failed").build()));
+                                    .content("压缩被熔断: " + e.getMessage()).build()));
                 }
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("done").build()));

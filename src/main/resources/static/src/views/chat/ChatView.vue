@@ -171,8 +171,8 @@ function onSend(text: string, filePaths?: string[]) {
             convStore.currentId = event.content
             refreshConversationList()
           } else if (event.type === 'compact') {
-            const preK = event.preTokens ? (event.preTokens / 1024).toFixed(1) : '?'
-            const postK = event.postTokens ? (event.postTokens / 1024).toFixed(1) : '?'
+            const preK = event.preTokens != null ? (event.preTokens / 1024).toFixed(1) : '?'
+            const postK = event.postTokens != null ? (event.postTokens / 1024).toFixed(1) : '?'
             chatStore.addMessage({ id: nextMsgId(), role: 'compact', content: `${langData.cmd_compactCtx}（${preK}K → ${postK}K tokens）`, timestamp: Date.now() / 1000 })
             settingsStore.loadContextUsage(convStore.currentId)
           } else if (event.type === 'clear') {

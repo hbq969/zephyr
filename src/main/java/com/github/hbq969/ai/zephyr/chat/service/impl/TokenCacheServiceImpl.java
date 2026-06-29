@@ -56,7 +56,7 @@ public class TokenCacheServiceImpl implements TokenCacheService {
     public boolean shouldCompact(List<Map<String, Object>> messages, ModelConfigEntity model) {
         if (COMPACTING.get()) return false;
         long maxCtx = model.getMaxContextTokens() != null ? model.getMaxContextTokens() : 200_000L;
-        int threshold = (int) (maxCtx - cfg.getChat().getCompact().getAutoCompactBuffer());
+        int threshold = Math.max((int) (maxCtx - cfg.getChat().getCompact().getAutoCompactBuffer()), 0);
         return estimateTokens(messages) > threshold;
     }
 
