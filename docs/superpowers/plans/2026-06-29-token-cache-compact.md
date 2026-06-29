@@ -253,6 +253,7 @@ public static final String SSE_EVENT_COMPACT = "compact";
 package com.github.hbq969.ai.zephyr.chat.service;
 
 import com.github.hbq969.ai.zephyr.chat.client.LlmClient;
+import com.github.hbq969.ai.zephyr.chat.service.ConversationSessionManager;
 import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -277,7 +278,8 @@ public interface TokenCacheService {
 
     /** 执行压缩，返回组装好的新消息列表。失败返回 null */
     CompactResult compact(List<Map<String, Object>> messages, ModelConfigEntity model,
-                           LlmClient llmClient, String cid, SseEmitter emitter) throws IOException;
+                           LlmClient llmClient, String cid, SseEmitter emitter,
+                           ConversationSessionManager.SessionHandle handle) throws IOException;
 
     @Data
     @Builder
@@ -303,6 +305,7 @@ import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.ROLE_USER;
 import cn.hutool.cache.Cache;
 import cn.hutool.cache.impl.TimedCache;
 import com.github.hbq969.ai.zephyr.chat.client.LlmClient;
+import com.github.hbq969.ai.zephyr.chat.service.ConversationSessionManager;
 import com.github.hbq969.ai.zephyr.chat.service.TokenCacheService;
 import com.github.hbq969.ai.zephyr.config.ZephyrConfigProperties;
 import com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity;
@@ -362,7 +365,8 @@ public class TokenCacheServiceImpl implements TokenCacheService {
 
     @Override
     public CompactResult compact(List<Map<String, Object>> messages, ModelConfigEntity model,
-                                  LlmClient llmClient, String cid, SseEmitter emitter) throws IOException {
+                                  LlmClient llmClient, String cid, SseEmitter emitter,
+                                  ConversationSessionManager.SessionHandle handle) throws IOException {
         COMPACTING.set(true);
         try {
             int preTokens = estimateTokens(messages);
@@ -413,7 +417,7 @@ public class TokenCacheServiceImpl implements TokenCacheService {
 
             // 3. 调 LLM 获取摘要（无 tools）
             LlmClient.LlmResult summaryResult = llmClient.chat(model, summaryMessages, List.of(),
-                    emitter, cid + "-compact", null);
+                    emitter, cid + "-compact", handle);
 
             String summary = summaryResult.getContent();
             if (summary == null || summary.isBlank()) {
@@ -425,7 +429,7 @@ public class TokenCacheServiceImpl implements TokenCacheService {
             // 4. 组装新消息列表
             List<Map<String, Object>> compactMessages = new ArrayList<>();
             compactMessages.add(keptMessages.get(0)); // system prompt
-            compactMessages.add(Map.of(ROLE_SYSTEM, "content",
+            compactMessages.add(Map.of("role", ROLE_SYSTEM, "content",
                     "## 历史对话摘要\n\n" + summary + "\n\n---"));
             for (int i = 1; i < keptMessages.size(); i++) {
                 compactMessages.add(keptMessages.get(i));
@@ -448,6 +452,8 @@ public class TokenCacheServiceImpl implements TokenCacheService {
                     .postCompactTokens(postTokens)
                     .compactMessages(compactMessages)
                     .build();
+        } catch (CompactCircuitBrokenException e) {
+            throw e; // 熔断异常直接抛出，不重复计数
         } catch (Exception e) {
             log.warn("[压缩] cid={} LLM 调用失败: {}", cid, e.getMessage());
             recordCircuitBreaker(cid, estimateTokens(messages));
@@ -549,7 +555,7 @@ if (cfg.getChat().getCompact().isAutoEnabled()
         && tokenCacheService.shouldCompact(messages, ctx.getModel())) {
     try {
         TokenCacheService.CompactResult cr = tokenCacheService.compact(
-                messages, ctx.getModel(), llmClient, cid, emitter);
+                messages, ctx.getModel(), llmClient, cid, emitter, handle);
         if (cr != null) {
             messages.clear();
             messages.addAll(cr.getCompactMessages());
@@ -573,14 +579,29 @@ if (cfg.getChat().getCompact().isAutoEnabled()
 
 - [ ] **Step 4: /compact 斜杠命令**
 
-在 `handleSlashCommand` 中添加：
+`handleSlashCommand` 签名需增加 `String mode` 和 `SessionHandle handle` 两个参数：
+
+```java
+// 旧签名：
+private String handleSlashCommand(String message, String userName, String cid,
+                                   SseEmitter emitter, long now,
+                                   ConversationSessionManager.SessionHandle handle)
+// 新签名（加 String mode）：
+private String handleSlashCommand(String message, String userName, String cid,
+                                   SseEmitter emitter, long now, String mode,
+                                   ConversationSessionManager.SessionHandle handle)
+```
+
+调用处 `processChatAsync` 中 line 169 传入 `mode` 即可。
+
+在 `handleSlashCommand` 中添加 compact 分支：
 
 ```java
 case "compact" -> {
     ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode);
     try {
         TokenCacheService.CompactResult cr = tokenCacheService.compact(
-                ctx.getMessages(), ctx.getModel(), llmClient, cid, emitter);
+                ctx.getMessages(), ctx.getModel(), llmClient, cid, emitter, handle);
         if (cr != null) {
             emitter.send(SseEmitter.event().name(SSE_EVENT_COMPACT)
                     .data(ChatEvent.builder()
@@ -811,7 +832,7 @@ compactEnabled: true,  // 可从后端配置读取
 ```html
 <div class="ctx-group">
   <Icon icon="lucide:archive" class="s-icon" />
-  <span>{{ chatStore.compactEnabled ? '压缩:开' : '压缩:关' }}</span>
+  <span>{{ settingsStore.compactEnabled ? langData.cmd_compactCtx + ':开' : langData.cmd_compactCtx + ':关' }}</span>
 </div>
 ```
 
