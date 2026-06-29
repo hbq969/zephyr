@@ -33,7 +33,7 @@ body {
   background: #faf9f5;
   color: #3d3d3a;
   -webkit-font-smoothing: antialiased;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* ========================================

@@ -5,7 +5,7 @@ import type { Conversation, ConvGroup } from '@/types/chat'
 export const useConversationsStore = defineStore('conversations', () => {
   const conversations = ref<Conversation[]>([])
   const currentId = ref<string | null>(null)
-  const sidebarCollapsed = ref(false)
+  const sidebarCollapsed = ref(true)
 
   const current = computed(() =>
     conversations.value.find(c => c.id === currentId.value) ?? null
