@@ -913,7 +913,7 @@ public class ChatServiceImpl implements ChatService {
         if (ws == null) {
             throw new IllegalArgumentException("工作空间不存在");
         }
-        if (!ws.getUserName().equals(userName)) {
+        if (ws.getIsSystem() != WORKSPACE_IS_SYSTEM && !ws.getUserName().equals(userName)) {
             throw new IllegalArgumentException("无权访问该工作空间");
         }
         String originalName = file.getOriginalFilename();

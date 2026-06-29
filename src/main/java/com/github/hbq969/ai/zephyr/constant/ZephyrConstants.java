@@ -18,6 +18,8 @@ public final class ZephyrConstants {
     public static final String SYSTEM_USERNAME = "system";
     /** 系统 workspace 标记键 */
     public static final String KEY_IS_SYSTEM = "isSystem";
+    /** workspace isSystem 值：系统创建，所有用户可访问 */
+    public static final int WORKSPACE_IS_SYSTEM = 1;
     public static final String DEFAULT_AVATAR = "A";
 
     // === 通用响应 ===
