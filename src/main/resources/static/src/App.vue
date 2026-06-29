@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="app-root">
     <router-view/>
   </div>
 </template>
@@ -23,9 +23,9 @@
 html {
   scrollbar-width: none;
 }
-html::-webkit-scrollbar { width: 1px; height: 1px; }
+html::-webkit-scrollbar { width: 2px; height: 2px; }
 html::-webkit-scrollbar-track { background: transparent; }
-html::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.40); }
+html::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.80); }
 html::-webkit-scrollbar-corner { background: transparent; }
 
 body {
@@ -35,6 +35,16 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
+
+.app-root {
+  height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.app-root::-webkit-scrollbar { width: 2px; height: 2px; }
+.app-root::-webkit-scrollbar-track { background: transparent; }
+.app-root::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.80); }
+.app-root::-webkit-scrollbar-corner { background: transparent; }
 
 /* ========================================
    Element Plus theme override — DESIGN.md colors
@@ -122,7 +132,7 @@ html.dark body {
   color: #a09d96;
 }
 html.dark *::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.80);
 }
 
 html.dark {
