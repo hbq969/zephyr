@@ -62,216 +62,42 @@ public class LlmClient {
         String baseUrl = model.getBaseUrl();
         if (!baseUrl.endsWith("/")) baseUrl += "/";
 
-        JsonObject bodyJson = new JsonObject();
-        bodyJson.addProperty("model", model.getName());
-        bodyJson.addProperty("stream", true);
-        bodyJson.add("messages", gson.toJsonTree(messages));
-
-        if (tools != null && !tools.isEmpty()) {
-            bodyJson.add("tools", gson.toJsonTree(tools));
-        }
-
-        // 注入模型参数（temperature、top_p、max_tokens 等 + 点号路径展开为嵌套对象）
         Map<String, Object> params = parseParams(model.getParams());
-        if (params != null) {
-            for (Map.Entry<String, Object> e : params.entrySet()) {
-                if ("request_timeout".equals(e.getKey())) continue;
-                if (e.getKey().contains(".")) {
-                    setNestedProperty(bodyJson, e.getKey(), e.getValue());
-                } else {
-                    addJsonProperty(bodyJson, e.getKey(), e.getValue());
-                }
-            }
-        }
-
-        JsonObject streamOpts = new JsonObject();
-        streamOpts.addProperty(STREAM_INCLUDE_USAGE, true);
-        bodyJson.add("stream_options", streamOpts);
-
-        // ponytail: cache_control 以 OpenAI 扩展格式附加，兼容性由 API proxy 决定
-        if ("anthropic".equals(model.getProtocol())) {
-            JsonObject cacheControl = new JsonObject();
-            cacheControl.addProperty("type", "ephemeral");
-
-            JsonArray msgs = bodyJson.getAsJsonArray("messages");
-            if (msgs != null && msgs.size() > 0) {
-                JsonObject firstMsg = msgs.get(0).getAsJsonObject();
-                if (ROLE_SYSTEM.equals(firstMsg.get("role").getAsString())) {
-                    String sysContent = firstMsg.get("content").getAsString();
-                    JsonArray sysBlocks = new JsonArray();
-                    JsonObject textBlock = new JsonObject();
-                    textBlock.addProperty("type", "text");
-                    textBlock.addProperty("text", sysContent);
-                    textBlock.add("cache_control", cacheControl);
-                    sysBlocks.add(textBlock);
-                    firstMsg.add("content", sysBlocks);
-                }
-
-                JsonObject lastMsg = msgs.get(msgs.size() - 1).getAsJsonObject();
-                JsonElement lastContent = lastMsg.get("content");
-                if (lastContent != null && lastContent.isJsonPrimitive()) {
-                    JsonArray blocks = new JsonArray();
-                    JsonObject block = new JsonObject();
-                    block.addProperty("type", "text");
-                    block.addProperty("text", lastContent.getAsString());
-                    block.add("cache_control", cacheControl);
-                    blocks.add(block);
-                    lastMsg.add("content", blocks);
-                }
-            }
-        }
-
+        JsonObject bodyJson = buildRequestBody(model, messages, tools, params);
         int timeout = getTimeoutSeconds(params);
-        RequestBody reqBody = RequestBody.create(gson.toJson(bodyJson), JSON);
-        OkHttpClient client = (timeout != cfg.getLlm().getClient().getReadTimeoutSeconds())
-                ? httpClient.newBuilder().readTimeout(timeout, TimeUnit.SECONDS).build()
-                : httpClient;
         Request request = new Request.Builder()
                 .url(baseUrl + CHAT_COMPLETIONS_PATH)
                 .header(AUTHORIZATION_HEADER, BEARER_PREFIX + apiKey)
                 .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-                .post(reqBody)
+                .post(RequestBody.create(gson.toJson(bodyJson), JSON))
                 .build();
+        OkHttpClient client = (timeout != cfg.getLlm().getClient().getReadTimeoutSeconds())
+                ? httpClient.newBuilder().readTimeout(timeout, TimeUnit.SECONDS).build()
+                : httpClient;
 
-        StringBuilder fullContent = new StringBuilder();
-        StringBuilder fullThinking = new StringBuilder();
-        List<LlmResult.ToolCall> toolCalls = new ArrayList<>();
-        JsonArray accumulatedToolCalls = new JsonArray();
-        Map<String, Integer> usageResult = new LinkedHashMap<>();
-
-        String bodyStr = gson.toJson(bodyJson);
-        log.info("请求模型 {}，消息数: {}，上下文约 {} 字符", model.getName(), messages.size(), bodyStr.length());
+        log.info("请求模型 {}，消息数: {}，上下文约 {} 字符", model.getName(), messages.size(), gson.toJson(bodyJson).length());
 
         okhttp3.Call call = client.newCall(request);
         activeCalls.put(conversationId, call);
+        StreamCollector coll = new StreamCollector();
         try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
-                int code = response.code();
-                String errorBody = "";
-                try {
-                    if (response.body() != null) errorBody = response.body().string();
-                } catch (Exception ignored) {}
-                log.warn("LLM API 调用失败: {} {} - {}", baseUrl + CHAT_COMPLETIONS_PATH, code, errorBody);
-                String errMsg = String.format("API 错误 [%d]: %s", code,
-                        errorBody.isEmpty() ? (code == HTTP_STATUS_UNAUTHORIZED ? "API Key 无效" : code == HTTP_STATUS_NOT_FOUND ? "接口不存在，请检查 Base URL" : "请求失败") : errorBody);
-                emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
-                        .data(ChatEvent.builder().type(SSE_EVENT_ERROR).content(errMsg).build()));
-                return LlmResult.builder().content("").build();
+                return handleHttpError(response, baseUrl, emitter);
             }
-
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(response.body().byteStream(), StandardCharsets.UTF_8));
             String line;
             try {
-            while ((line = reader.readLine()) != null) {
-                if (line.startsWith(SSE_DATA_PREFIX)) {
+                while ((line = reader.readLine()) != null) {
+                    if (!line.startsWith(SSE_DATA_PREFIX)) continue;
                     String data = line.substring(6).trim();
                     if (data.equals(SSE_DONE_MARKER)) break;
 
                     handle.touch();
                     handle.checkCancel();
-
-                    try {
-                        JsonObject event = gson.fromJson(data, JsonObject.class);
-                        if (event.has("choices") && event.getAsJsonArray("choices").size() > 0) {
-                            JsonElement choiceEl = event.getAsJsonArray("choices").get(0);
-                            if (!choiceEl.isJsonObject()) continue;
-                            JsonObject choice = choiceEl.getAsJsonObject();
-                            JsonObject delta = (choice.has("delta") && !choice.get("delta").isJsonNull())
-                                    ? choice.getAsJsonObject("delta") : null;
-                            if (delta == null) continue;
-
-                            // text content
-                            if (delta.has("content") && !delta.get("content").isJsonNull()) {
-                                String token = delta.get("content").getAsString();
-                                fullContent.append(token);
-                                emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
-                                        .data(ChatEvent.builder().type(SSE_EVENT_TOKEN).content(token).build()));
-                            }
-
-                            // thinking (DeepSeek)
-                            if (delta.has("reasoning_content") && !delta.get("reasoning_content").isJsonNull()) {
-                                String thinking = delta.get("reasoning_content").getAsString();
-                                fullThinking.append(thinking);
-                                emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
-                                        .data(ChatEvent.builder().type(SSE_EVENT_THINKING).content(thinking).build()));
-                            }
-
-                            // tool calls
-                            if (delta.has("tool_calls") && !delta.get("tool_calls").isJsonNull()) {
-                                JsonArray tcArray = delta.getAsJsonArray("tool_calls");
-                                Set<String> emittedNames = new HashSet<>();
-                                for (int i = 0; i < tcArray.size(); i++) {
-                                    JsonObject tc = tcArray.get(i).getAsJsonObject();
-                                    int idx = tc.has("index") ? tc.get("index").getAsInt() : 0;
-                                    while (accumulatedToolCalls.size() <= idx) {
-                                        accumulatedToolCalls.add(new JsonObject());
-                                    }
-                                    JsonObject accumulated = accumulatedToolCalls.get(idx).getAsJsonObject();
-
-                                    if (tc.has("id")) accumulated.addProperty("id", tc.get("id").getAsString());
-                                    if (tc.has("function")) {
-                                        JsonObject func = tc.getAsJsonObject("function");
-                                        if (!accumulated.has("function")) accumulated.add("function", new JsonObject());
-                                        JsonObject accFunc = accumulated.getAsJsonObject("function");
-                                        if (func.has("name")) {
-                                            String name = func.get("name").getAsString();
-                                            accFunc.addProperty("name", name);
-                                            // 首次解析到 name 时推送 tool_call 事件
-                                            if (emittedNames.add(String.valueOf(idx) + ":" + name)) {
-                                                try {
-                                                    emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
-                                                            .data(ChatEvent.builder()
-                                                                    .type(SSE_EVENT_TOOL_CALL)
-                                                                    .toolName(name)
-                                                                    .build()));
-                                                } catch (IOException e) {
-                                                    log.warn("推送 tool_call 事件失败: {}", e.getMessage());
-                                                }
-                                            }
-                                        }
-                                        if (func.has("arguments")) {
-                                            String args = accFunc.has("arguments") ? accFunc.get("arguments").getAsString() : "";
-                                            accFunc.addProperty("arguments", args + func.get("arguments").getAsString());
-                                        }
-                                    }
-                                }
-                            }
-
-                            // finish reason
-                            if (choice.has("finish_reason") && !choice.get("finish_reason").isJsonNull()) {
-                                String finishReason = choice.get("finish_reason").getAsString();
-                                if (FINISH_REASON_TOOL_CALLS.equals(finishReason)) {
-                                    for (int i = 0; i < accumulatedToolCalls.size(); i++) {
-                                        JsonObject tc = accumulatedToolCalls.get(i).getAsJsonObject();
-                                        JsonObject func = tc.getAsJsonObject("function");
-                                        LlmResult.ToolCall toolCall = LlmResult.ToolCall.builder()
-                                                .id(tc.has("id") ? tc.get("id").getAsString() : "")
-                                                .name(func.get("name").getAsString())
-                                                .arguments(gson.fromJson(func.get("arguments").getAsString(),
-                                                        new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType()))
-                                                .build();
-                                        toolCalls.add(toolCall);
-                                    }
-                                }
-                            }
-                        }
-
-                        // usage
-                        if (event.has(USAGE_KEY) && !event.get(USAGE_KEY).isJsonNull()) {
-                            JsonObject usage = event.getAsJsonObject(USAGE_KEY);
-                            if (usage.has("prompt_tokens")) usageResult.put(USAGE_INPUT_TOKENS, usage.get("prompt_tokens").getAsInt());
-                            if (usage.has("completion_tokens")) usageResult.put(USAGE_OUTPUT_TOKENS, usage.get("completion_tokens").getAsInt());
-                            emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
-                                    .data(ChatEvent.builder().type(SSE_EVENT_USAGE).usage(usageResult).build()));
-                        }
-                    } catch (com.google.gson.JsonSyntaxException e) {
-                        log.warn("解析 SSE 事件失败: {}", e.getMessage());
-                    }
+                    processSseData(data, emitter, coll);
                 }
-            }
             } catch (IOException e) {
-                // cancelCall 触发的是预期行为，不抛异常
                 if (!activeCalls.containsKey(conversationId)) {
                     log.debug("LLM 调用已被取消: {}", conversationId);
                 } else {
@@ -282,19 +108,214 @@ public class LlmClient {
             activeCalls.remove(conversationId, call);
         }
 
-        if (!usageResult.isEmpty()) {
-            log.info("模型 {} 返回 — 输入: {} tokens, 输出: {} tokens", model.getName(), usageResult.getOrDefault(USAGE_INPUT_TOKENS, 0), usageResult.getOrDefault(USAGE_OUTPUT_TOKENS, 0));
-        } else {
-            log.info("模型 {} 返回 — 内容长度: {} 字符", model.getName(), fullContent.length());
+        return coll.toResult(model);
+    }
+
+    // === 流式累积状态 ===
+    private static class StreamCollector {
+        final StringBuilder content = new StringBuilder();
+        final StringBuilder thinking = new StringBuilder();
+        final List<LlmResult.ToolCall> toolCalls = new ArrayList<>();
+        final JsonArray accumulatedToolCalls = new JsonArray();
+        final Map<String, Integer> usage = new LinkedHashMap<>();
+
+        LlmResult toResult(ModelConfigEntity model) {
+            if (!usage.isEmpty()) {
+                log.info("模型 {} 返回 — 输入: {} tokens, 输出: {} tokens",
+                        model.getName(), usage.getOrDefault(USAGE_INPUT_TOKENS, 0), usage.getOrDefault(USAGE_OUTPUT_TOKENS, 0));
+            } else {
+                log.info("模型 {} 返回 — 内容长度: {} 字符", model.getName(), content.length());
+            }
+            return LlmResult.builder()
+                    .content(content.toString())
+                    .thinking(thinking.length() > 0 ? thinking.toString() : null)
+                    .toolCalls(toolCalls.isEmpty() ? null : toolCalls)
+                    .usage(usage.isEmpty() ? null : usage)
+                    .build();
+        }
+    }
+
+    // === 请求构建 ===
+
+    private JsonObject buildRequestBody(ModelConfigEntity model, List<Map<String, Object>> messages,
+                                         List<ToolDef> tools, Map<String, Object> params) {
+        JsonObject body = new JsonObject();
+        body.addProperty("model", model.getName());
+        body.addProperty("stream", true);
+        body.add("messages", gson.toJsonTree(messages));
+        if (tools != null && !tools.isEmpty()) {
+            body.add("tools", gson.toJsonTree(tools));
+        }
+        injectParams(body, params);
+        JsonObject streamOpts = new JsonObject();
+        streamOpts.addProperty(STREAM_INCLUDE_USAGE, true);
+        body.add("stream_options", streamOpts);
+        applyCacheControl(body, model.getProtocol());
+        return body;
+    }
+
+    private void injectParams(JsonObject body, Map<String, Object> params) {
+        if (params == null) return;
+        for (Map.Entry<String, Object> e : params.entrySet()) {
+            if ("request_timeout".equals(e.getKey())) continue;
+            if (e.getKey().contains(".")) {
+                setNestedProperty(body, e.getKey(), e.getValue());
+            } else {
+                addJsonProperty(body, e.getKey(), e.getValue());
+            }
+        }
+    }
+
+    // ponytail: cache_control 以 OpenAI 扩展格式附加，兼容性由 API proxy 决定
+    private void applyCacheControl(JsonObject body, String protocol) {
+        if (!"anthropic".equals(protocol)) return;
+        JsonObject cc = new JsonObject();
+        cc.addProperty("type", "ephemeral");
+
+        JsonArray msgs = body.getAsJsonArray("messages");
+        if (msgs == null || msgs.size() == 0) return;
+
+        JsonObject firstMsg = msgs.get(0).getAsJsonObject();
+        if (ROLE_SYSTEM.equals(firstMsg.get("role").getAsString())) {
+            firstMsg.add("content", wrapWithCacheControl(firstMsg.get("content").getAsString(), cc));
         }
 
-        return LlmResult.builder()
-                .content(fullContent.toString())
-                .thinking(fullThinking.length() > 0 ? fullThinking.toString() : null)
-                .toolCalls(toolCalls.isEmpty() ? null : toolCalls)
-                .usage(usageResult.isEmpty() ? null : usageResult)
-                .build();
+        JsonObject lastMsg = msgs.get(msgs.size() - 1).getAsJsonObject();
+        JsonElement lastContent = lastMsg.get("content");
+        if (lastContent != null && lastContent.isJsonPrimitive()) {
+            lastMsg.add("content", wrapWithCacheControl(lastContent.getAsString(), cc));
+        }
     }
+
+    private JsonArray wrapWithCacheControl(String text, JsonObject cacheControl) {
+        JsonArray blocks = new JsonArray();
+        JsonObject block = new JsonObject();
+        block.addProperty("type", "text");
+        block.addProperty("text", text);
+        block.add("cache_control", cacheControl);
+        blocks.add(block);
+        return blocks;
+    }
+
+    // === SSE 事件处理 ===
+
+    private LlmResult handleHttpError(Response response, String baseUrl, SseEmitter emitter) throws IOException {
+        int code = response.code();
+        String errorBody = "";
+        try {
+            if (response.body() != null) errorBody = response.body().string();
+        } catch (Exception ignored) {}
+        log.warn("LLM API 调用失败: {} {} - {}", baseUrl + CHAT_COMPLETIONS_PATH, code, errorBody);
+        String errMsg = String.format("API 错误 [%d]: %s", code,
+                errorBody.isEmpty() ? (code == HTTP_STATUS_UNAUTHORIZED ? "API Key 无效" : code == HTTP_STATUS_NOT_FOUND ? "接口不存在，请检查 Base URL" : "请求失败") : errorBody);
+        emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
+                .data(ChatEvent.builder().type(SSE_EVENT_ERROR).content(errMsg).build()));
+        return LlmResult.builder().content("").build();
+    }
+
+    private void processSseData(String data, SseEmitter emitter, StreamCollector coll) throws IOException {
+        try {
+            JsonObject event = gson.fromJson(data, JsonObject.class);
+            if (event.has("choices") && event.getAsJsonArray("choices").size() > 0) {
+                JsonElement choiceEl = event.getAsJsonArray("choices").get(0);
+                if (!choiceEl.isJsonObject()) { log.warn("SSE choices[0] 非 JSON 对象，跳过"); return; }
+                JsonObject choice = choiceEl.getAsJsonObject();
+                JsonObject delta = (choice.has("delta") && !choice.get("delta").isJsonNull())
+                        ? choice.getAsJsonObject("delta") : null;
+                if (delta != null) {
+                    processDeltaContent(delta, emitter, coll);
+                    processDeltaThinking(delta, emitter, coll);
+                    processToolCallDelta(delta, emitter, coll);
+                    processFinishReason(choice, coll);
+                }
+            }
+            collectUsage(event, emitter, coll);
+        } catch (com.google.gson.JsonSyntaxException e) {
+            log.warn("解析 SSE 事件失败: {}", e.getMessage());
+        }
+    }
+
+    private void processDeltaContent(JsonObject delta, SseEmitter emitter, StreamCollector coll) throws IOException {
+        if (!delta.has("content") || delta.get("content").isJsonNull()) return;
+        String token = delta.get("content").getAsString();
+        coll.content.append(token);
+        emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
+                .data(ChatEvent.builder().type(SSE_EVENT_TOKEN).content(token).build()));
+    }
+
+    private void processDeltaThinking(JsonObject delta, SseEmitter emitter, StreamCollector coll) throws IOException {
+        if (!delta.has("reasoning_content") || delta.get("reasoning_content").isJsonNull()) return;
+        String thinking = delta.get("reasoning_content").getAsString();
+        coll.thinking.append(thinking);
+        emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
+                .data(ChatEvent.builder().type(SSE_EVENT_THINKING).content(thinking).build()));
+    }
+
+    private void processToolCallDelta(JsonObject delta, SseEmitter emitter, StreamCollector coll) {
+        if (!delta.has("tool_calls") || delta.get("tool_calls").isJsonNull()) return;
+        JsonArray tcArray = delta.getAsJsonArray("tool_calls");
+        Set<String> emittedNames = new HashSet<>();
+        for (int i = 0; i < tcArray.size(); i++) {
+            JsonObject tc = tcArray.get(i).getAsJsonObject();
+            int idx = tc.has("index") ? tc.get("index").getAsInt() : 0;
+            while (coll.accumulatedToolCalls.size() <= idx) {
+                coll.accumulatedToolCalls.add(new JsonObject());
+            }
+            JsonObject accumulated = coll.accumulatedToolCalls.get(idx).getAsJsonObject();
+            if (tc.has("id")) accumulated.addProperty("id", tc.get("id").getAsString());
+            if (tc.has("function")) {
+                accumulateFunctionArg(tc.getAsJsonObject("function"), accumulated, idx, emittedNames, emitter);
+            }
+        }
+    }
+
+    private void accumulateFunctionArg(JsonObject func, JsonObject accumulated, int idx,
+                                       Set<String> emittedNames, SseEmitter emitter) {
+        if (!accumulated.has("function")) accumulated.add("function", new JsonObject());
+        JsonObject accFunc = accumulated.getAsJsonObject("function");
+        if (func.has("name")) {
+            String name = func.get("name").getAsString();
+            accFunc.addProperty("name", name);
+            if (emittedNames.add(idx + ":" + name)) {
+                try {
+                    emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
+                            .data(ChatEvent.builder().type(SSE_EVENT_TOOL_CALL).toolName(name).build()));
+                } catch (IOException e) {
+                    log.warn("推送 tool_call 事件失败: {}", e.getMessage());
+                }
+            }
+        }
+        if (func.has("arguments")) {
+            String prev = accFunc.has("arguments") ? accFunc.get("arguments").getAsString() : "";
+            accFunc.addProperty("arguments", prev + func.get("arguments").getAsString());
+        }
+    }
+
+    private void processFinishReason(JsonObject choice, StreamCollector coll) {
+        if (!choice.has("finish_reason") || choice.get("finish_reason").isJsonNull()) return;
+        if (!FINISH_REASON_TOOL_CALLS.equals(choice.get("finish_reason").getAsString())) return;
+        for (int i = 0; i < coll.accumulatedToolCalls.size(); i++) {
+            JsonObject tc = coll.accumulatedToolCalls.get(i).getAsJsonObject();
+            JsonObject func = tc.getAsJsonObject("function");
+            coll.toolCalls.add(LlmResult.ToolCall.builder()
+                    .id(tc.has("id") ? tc.get("id").getAsString() : "")
+                    .name(func.get("name").getAsString())
+                    .arguments(gson.fromJson(func.get("arguments").getAsString(),
+                            new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType()))
+                    .build());
+        }
+    }
+
+    private void collectUsage(JsonObject event, SseEmitter emitter, StreamCollector coll) throws IOException {
+        if (!event.has(USAGE_KEY) || event.get(USAGE_KEY).isJsonNull()) return;
+        JsonObject usage = event.getAsJsonObject(USAGE_KEY);
+        if (usage.has("prompt_tokens")) coll.usage.put(USAGE_INPUT_TOKENS, usage.get("prompt_tokens").getAsInt());
+        if (usage.has("completion_tokens")) coll.usage.put(USAGE_OUTPUT_TOKENS, usage.get("completion_tokens").getAsInt());
+        emitter.send(SseEmitter.event().name(SSE_EVENT_MESSAGE)
+                .data(ChatEvent.builder().type(SSE_EVENT_USAGE).usage(coll.usage).build()));
+    }
+
+    // === 参数工具方法 ===
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseParams(String paramsJson) {
