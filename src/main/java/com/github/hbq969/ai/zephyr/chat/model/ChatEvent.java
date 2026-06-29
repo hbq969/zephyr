@@ -18,4 +18,6 @@ public class ChatEvent {
     private String toolStatus;
     private Object usage;
     private String error;
+    private Integer preTokens;
+    private Integer postTokens;
 }

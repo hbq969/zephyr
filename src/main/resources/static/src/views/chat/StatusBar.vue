@@ -112,6 +112,11 @@ const duration = computed(() => {
       <span class="ctx-pct" :style="{ color: ctxColor }">{{ ctxPercent }}%</span>
     </div>
 
+    <div v-if="settingsStore.compactEnabled" class="status-item">
+      <Icon icon="lucide:archive" class="s-icon" />
+      <span>{{ langData.cmd_compactCtx }}</span>
+    </div>
+
     <span class="spacer"></span>
 
     <div v-if="duration" class="duration">

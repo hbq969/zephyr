@@ -3,7 +3,7 @@ export type ChatMode = 'default' | 'acceptEdits' | 'bypass'
 
 // === SSE Chat Event ===
 export interface ChatEvent {
-  type: 'token' | 'thinking' | 'tool_call' | 'tool_result' | 'usage' | 'compaction' | 'done' | 'error' | 'clear'
+  type: 'token' | 'thinking' | 'tool_call' | 'tool_result' | 'usage' | 'compact' | 'done' | 'error' | 'clear'
   content?: string
   toolName?: string
   toolInput?: Record<string, unknown>
@@ -11,12 +11,14 @@ export interface ChatEvent {
   toolStatus?: string
   usage?: { inputTokens: number; outputTokens: number }
   error?: string
+  preTokens?: number
+  postTokens?: number
 }
 
 // === Message ===
 export interface Message {
   id: string
-  role: 'user' | 'assistant' | 'system' | 'tool'
+  role: 'user' | 'assistant' | 'system' | 'tool' | 'compact'
   content: string
   thinking?: string
   toolCalls?: ToolCall[]

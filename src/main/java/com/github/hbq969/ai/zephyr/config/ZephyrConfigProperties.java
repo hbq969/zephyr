@@ -74,6 +74,9 @@ public class ZephyrConfigProperties {
         /** SSE 流式连接 */
         private Sse sse = new Sse();
 
+        /** 上下文自动压缩 */
+        private Compact compact = new Compact();
+
         /** 工具输出清洗 */
         private ToolOutput toolOutput = new ToolOutput();
 
@@ -101,6 +104,16 @@ public class ZephyrConfigProperties {
         public static class Sse {
             /** SSE 连接超时（毫秒），默认无限制（会话空闲超时驱动生命周期） */
             private long timeoutMillis = Long.MAX_VALUE;
+        }
+
+        @Data
+        public static class Compact {
+            /** 保留最近 N 轮对话用于上下文，超出部分从中间截断，默认 20 */
+            private int keepRecentRounds = 20;
+            /** 触发自动压缩的 token 缓冲区阈值，默认 10_000 */
+            private int autoCompactBuffer = 10_000;
+            /** 是否启用自动压缩，默认 true */
+            private boolean autoEnabled = true;
         }
 
         @Data

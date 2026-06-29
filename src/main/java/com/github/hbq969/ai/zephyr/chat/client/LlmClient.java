@@ -88,6 +88,39 @@ public class LlmClient {
         streamOpts.addProperty(STREAM_INCLUDE_USAGE, true);
         bodyJson.add("stream_options", streamOpts);
 
+        // ponytail: cache_control 以 OpenAI 扩展格式附加，兼容性由 API proxy 决定
+        if ("anthropic".equals(model.getProtocol())) {
+            JsonObject cacheControl = new JsonObject();
+            cacheControl.addProperty("type", "ephemeral");
+
+            JsonArray msgs = bodyJson.getAsJsonArray("messages");
+            if (msgs != null && msgs.size() > 0) {
+                JsonObject firstMsg = msgs.get(0).getAsJsonObject();
+                if (ROLE_SYSTEM.equals(firstMsg.get("role").getAsString())) {
+                    String sysContent = firstMsg.get("content").getAsString();
+                    JsonArray sysBlocks = new JsonArray();
+                    JsonObject textBlock = new JsonObject();
+                    textBlock.addProperty("type", "text");
+                    textBlock.addProperty("text", sysContent);
+                    textBlock.add("cache_control", cacheControl);
+                    sysBlocks.add(textBlock);
+                    firstMsg.add("content", sysBlocks);
+                }
+
+                JsonObject lastMsg = msgs.get(msgs.size() - 1).getAsJsonObject();
+                JsonElement lastContent = lastMsg.get("content");
+                if (lastContent != null && lastContent.isJsonPrimitive()) {
+                    JsonArray blocks = new JsonArray();
+                    JsonObject block = new JsonObject();
+                    block.addProperty("type", "text");
+                    block.addProperty("text", lastContent.getAsString());
+                    block.add("cache_control", cacheControl);
+                    blocks.add(block);
+                    lastMsg.add("content", blocks);
+                }
+            }
+        }
+
         int timeout = getTimeoutSeconds(params);
         RequestBody reqBody = RequestBody.create(gson.toJson(bodyJson), JSON);
         OkHttpClient client = (timeout != cfg.getLlm().getClient().getReadTimeoutSeconds())

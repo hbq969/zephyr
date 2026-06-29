@@ -83,6 +83,8 @@ public final class ZephyrConstants {
     public static final String SSE_EVENT_USAGE = "usage";
     /** SSE event 名称：操作确认 */
     public static final String SSE_EVENT_CONFIRM_ACTION = "confirm_action";
+    /** SSE event 名称：上下文压缩 */
+    public static final String SSE_EVENT_COMPACT = "compact";
 
     // === 工具名称 ===
     public static final String TOOL_USE_SKILL = "use_skill";

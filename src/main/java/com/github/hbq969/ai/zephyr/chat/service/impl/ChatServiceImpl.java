@@ -11,6 +11,7 @@ import com.github.hbq969.ai.zephyr.chat.model.ChatEvent;
 import com.github.hbq969.ai.zephyr.chat.model.LlmResult;
 import com.github.hbq969.ai.zephyr.chat.service.ChatService;
 import com.github.hbq969.ai.zephyr.chat.service.ContextBuilder;
+import com.github.hbq969.ai.zephyr.chat.service.TokenCacheService;
 import com.github.hbq969.ai.zephyr.chat.service.ConversationSessionManager;
 import com.github.hbq969.ai.zephyr.chat.service.BackgroundProcessManager;
 import com.github.hbq969.ai.zephyr.security.AuditLogger;
@@ -79,6 +80,8 @@ public class ChatServiceImpl implements ChatService {
     private AuditLogger auditLogger;
     @Resource
     private SecurityConfigService securityConfigService;
+    @Resource
+    private TokenCacheService tokenCacheService;
 
     // 绕过重试计数器（会话级）
     private final Map<String, Integer> bypassAttempts = new ConcurrentHashMap<>();
@@ -166,7 +169,7 @@ public class ChatServiceImpl implements ChatService {
             // 0. 斜杠命令预处理
             String message = originalMessage;
             if (message.startsWith("/")) {
-                String handled = handleSlashCommand(message, userName, cid, emitter, now, handle);
+                String handled = handleSlashCommand(message, userName, cid, emitter, now, mode, handle);
                 if (handled == null) {
                     completed = true;
                     return;
@@ -276,6 +279,25 @@ public class ChatServiceImpl implements ChatService {
         int totalInputTokens = 0, totalOutputTokens = 0, rounds = 0;
         while (true) {
             handle.checkCancel();
+            if (cfg.getChat().getCompact().isAutoEnabled()
+                    && tokenCacheService.shouldCompact(messages, ctx.getModel())) {
+                try {
+                    TokenCacheService.CompactResult cr = tokenCacheService.compact(
+                            messages, ctx.getModel(), llmClient, cid, emitter, handle);
+                    if (cr != null) {
+                        messages.clear();
+                        messages.addAll(cr.getCompactMessages());
+                        emitter.send(SseEmitter.event().name(SSE_EVENT_COMPACT)
+                                .data(ChatEvent.builder()
+                                        .type(SSE_EVENT_COMPACT)
+                                        .preTokens(cr.getPreCompactTokens())
+                                        .postTokens(cr.getPostCompactTokens())
+                                        .build()));
+                    }
+                } catch (TokenCacheServiceImpl.CompactCircuitBrokenException e) {
+                    log.warn("[compact] cid={} circuit broken", cid);
+                }
+            }
             LlmResult result = llmClient.chat(ctx.getModel(), messages, ctx.getTools(), emitter, cid, handle);
             rounds++;
             if (result.getUsage() != null) {
@@ -436,7 +458,7 @@ public class ChatServiceImpl implements ChatService {
      * 返回非 null 字符串表示改写后的消息（继续走 LLM 流程）。
      */
     private String handleSlashCommand(String message, String userName, String cid,
-                                      SseEmitter emitter, long now,
+                                      SseEmitter emitter, long now, String mode,
                                       ConversationSessionManager.SessionHandle handle) throws IOException {
         String cmd = message.trim();
         int spaceIdx = cmd.indexOf(' ');
@@ -468,6 +490,7 @@ public class ChatServiceImpl implements ChatService {
                         
                         ### 会话
                         - `/context` — 查看上下文占比
+                        - `/compact` — 压缩当前对话上下文
                         
                         ### 操作
                         - `/clear` — 清空当前对话
@@ -496,6 +519,26 @@ public class ChatServiceImpl implements ChatService {
                 emitter.send(SseEmitter.event().name("message")
                         .data(ChatEvent.builder().type("done").build()));
                 emitter.complete();
+                return null;
+            }
+            case "compact" -> {
+                ContextBuilder.Context ctx = contextBuilder.build(userName, cid, mode);
+                TokenCacheService.CompactResult cr = tokenCacheService.compact(
+                        ctx.getMessages(), ctx.getModel(), llmClient, cid, emitter, handle);
+                if (cr != null) {
+                    emitter.send(SseEmitter.event().name(SSE_EVENT_COMPACT)
+                            .data(ChatEvent.builder()
+                                    .type(SSE_EVENT_COMPACT)
+                                    .preTokens(cr.getPreCompactTokens())
+                                    .postTokens(cr.getPostCompactTokens())
+                                    .build()));
+                } else {
+                    emitter.send(SseEmitter.event().name("message")
+                            .data(ChatEvent.builder().type("error")
+                                    .content("compaction failed").build()));
+                }
+                emitter.send(SseEmitter.event().name("message")
+                        .data(ChatEvent.builder().type("done").build()));
                 return null;
             }
         }
@@ -970,7 +1013,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     private int estimateTokens(String text) {
-        return (int) Math.ceil(text.length() * cfg.getChat().getContext().getTokenEstimationRatio());
+        return tokenCacheService.estimateTokens(text);
     }
 
     private boolean isNotBlank(String s) {

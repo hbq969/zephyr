@@ -134,7 +134,15 @@ onUpdated(setupCodeBlocks)
 
 <template>
   <div class="msg-row" :class="message.role">
-    <div v-if="message.role === 'user'" class="msg-bubble user-bubble">
+    <div v-if="message.role === 'compact'" class="compact-boundary">
+      <el-divider>
+        <div class="compact-inner">
+          <Icon icon="lucide:folders" class="compact-icon" />
+          <span class="compact-label">{{ message.content }}</span>
+        </div>
+      </el-divider>
+    </div>
+    <div v-else-if="message.role === 'user'" class="msg-bubble user-bubble">
       {{ message.content }}
     </div>
     <div v-else-if="message.role === 'tool'" class="tool-bubble">
@@ -217,6 +225,11 @@ onUpdated(setupCodeBlocks)
 .markdown-body :deep(pre code) { background: transparent; color: inherit; padding: 0; border-radius: 0; font-size: inherit; }
 html.dark .markdown-body :deep(pre) { background: #1e1d1a; color: #d4d3cf; }
 html.dark .markdown-body :deep(pre)::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+
+.compact-boundary { max-width: 820px; margin: 8px auto; padding: 0 24px; }
+.compact-inner { display: flex; align-items: center; gap: 6px; }
+.compact-icon { font-size: 14px; color: var(--el-text-color-placeholder); flex-shrink: 0; }
+.compact-label { font-size: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
 
 </style>
 
