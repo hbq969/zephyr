@@ -17,6 +17,7 @@
       model_type varchar(16) default 'llm',
       scope varchar(16) default 'user',
       dimensions int,
+      protocol varchar(32) default 'openai',
       params text
     );
     create index if not exists idx_zephyr_mc_user on zephyr_model_configs(user_name);

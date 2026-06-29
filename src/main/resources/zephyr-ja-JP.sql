@@ -534,3 +534,5 @@ WHERE NOT EXISTS (SELECT 1 FROM zephyr_builtin_tool_controls WHERE tool_name = '
 ALTER TABLE zephyr_mcp_servers ADD COLUMN IF NOT EXISTS reconnect_on_startup smallint default 0;
 UPDATE zephyr_mcp_servers SET reconnect_on_startup = 1 WHERE status = 'connected';
 
+ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS protocol VARCHAR(32) DEFAULT 'openai';
+

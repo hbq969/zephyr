@@ -17,4 +17,5 @@ public class ModelConfigEntity {
     private String modelType;
     private String scope = "user";
     private Integer dimensions;
+    private String protocol = "openai";
 }

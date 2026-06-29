@@ -4,15 +4,15 @@
 <mapper namespace="com.github.hbq969.ai.zephyr.config.dao.ModelConfigDao">
 
   <select id="queryByUserName" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
-    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params
+    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params, protocol as "protocol"
     from zephyr_model_configs
     where user_name = #{userName} and scope = 'user'
     order by created_at desc
   </select>
 
   <insert id="insert">
-    insert into zephyr_model_configs (id, user_name, name, base_url, api_key_encrypted, max_context_tokens, model_type, scope, dimensions, params, is_default, created_at, updated_at)
-    values (#{id}, #{userName}, #{name}, #{baseUrl}, #{apiKeyEncrypted}, #{maxContextTokens}, #{modelType}, #{scope}, #{dimensions}, #{params}, #{isDefault}, #{createdAt}, #{updatedAt})
+    insert into zephyr_model_configs (id, user_name, name, base_url, api_key_encrypted, max_context_tokens, model_type, scope, dimensions, protocol, params, is_default, created_at, updated_at)
+    values (#{id}, #{userName}, #{name}, #{baseUrl}, #{apiKeyEncrypted}, #{maxContextTokens}, #{modelType}, #{scope}, #{dimensions}, #{protocol}, #{params}, #{isDefault}, #{createdAt}, #{updatedAt})
   </insert>
 
   <update id="update">
@@ -23,6 +23,7 @@
     <if test="modelType != null">, model_type = #{modelType}</if>
     <if test="dimensions != null">, dimensions = #{dimensions}</if>
     <if test="params != null">, params = #{params}</if>
+    <if test="protocol != null">, protocol = #{protocol}</if>
     where id = #{id} and user_name = #{userName}
   </update>
 
@@ -31,7 +32,7 @@
   </delete>
 
   <select id="queryById" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
-    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params
+    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params, protocol as "protocol"
     from zephyr_model_configs where id = #{id}
   </select>
 
@@ -46,7 +47,7 @@
   <select id="queryByType" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
     select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted,
       is_default as isDefault, created_at as createdAt, updated_at as updatedAt,
-      max_context_tokens as maxContextTokens, params, model_type as modelType, scope, dimensions
+      max_context_tokens as maxContextTokens, params, model_type as modelType, scope, dimensions, protocol as "protocol"
     from zephyr_model_configs
     where user_name = #{userName} and model_type = #{modelType} and scope = 'user'
     order by created_at desc
@@ -55,7 +56,7 @@
   <select id="queryDefaultByType" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
     select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted,
       is_default as isDefault, created_at as createdAt, updated_at as updatedAt,
-      max_context_tokens as maxContextTokens, params, model_type as modelType, dimensions
+      max_context_tokens as maxContextTokens, params, model_type as modelType, dimensions, protocol as "protocol"
     from zephyr_model_configs
     where model_type = #{modelType} and is_default = 1 limit 1
   </select>
@@ -65,7 +66,7 @@
   </update>
 
   <select id="queryShared" resultType="com.github.hbq969.ai.zephyr.config.dao.entity.ModelConfigEntity">
-    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params
+    select id, user_name as userName, name, base_url as baseUrl, api_key_encrypted as apiKeyEncrypted, is_default as isDefault, created_at as createdAt, updated_at as updatedAt, max_context_tokens as maxContextTokens, model_type as modelType, scope, dimensions, params, protocol as "protocol"
     from zephyr_model_configs
     where scope = 'shared'
     order by created_at desc
