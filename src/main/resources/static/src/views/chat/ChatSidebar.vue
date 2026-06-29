@@ -71,9 +71,14 @@ function selectAndCloseSidebar(id: string) {
     <div class="sidebar-header">
       <span class="logo">{{ settingsStore.appName }}</span>
       <span class="spacer"></span>
-      <button class="btn-icon" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_collapseTooltip">
-        <Icon icon="lucide:panel-left-close" />
-      </button>
+      <span class="header-actions">
+        <button class="btn-icon" @click="$emit('search')" :title="langData.chatSidebar_searchConv">
+          <Icon icon="lucide:search" />
+        </button>
+        <button class="btn-icon" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_collapseTooltip">
+          <Icon icon="lucide:panel-left-close" />
+        </button>
+      </span>
     </div>
 
     <div class="new-chat-btn" @click="$emit('newChat')">
@@ -135,14 +140,15 @@ function selectAndCloseSidebar(id: string) {
 </template>
 
 <script lang="ts">
-export default { emits: ['newChat', 'openSettings'] }
+export default { emits: ['newChat', 'openSettings', 'search'] }
 </script>
 
 <style scoped>
-.sidebar { width: 280px; min-width: 280px; background: var(--el-bg-color); border-right: 1px solid var(--el-border-color); display: flex; flex-direction: column; transition: width 0.2s, min-width 0.2s; overflow: hidden; }
+.sidebar { width: 240px; min-width: 240px; background: var(--el-bg-color); border-right: 1px solid var(--el-border-color); display: flex; flex-direction: column; transition: width 0.2s, min-width 0.2s; overflow: hidden; }
 .sidebar.collapsed { width: 0; min-width: 0; border-right: none; }
 
 .sidebar-header { padding: 12px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--el-border-color); min-height: 52px; }
+.header-actions { display: flex; align-items: center; gap: 2px; }
 .logo { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; color: var(--el-text-color-primary); letter-spacing: -0.3px; white-space: nowrap; }
 .spacer { flex: 1; }
 .btn-icon { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: background 0.15s, color 0.15s; flex-shrink: 0; }

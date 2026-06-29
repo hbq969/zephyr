@@ -318,20 +318,20 @@ onMounted(() => {
 
 <template>
   <div class="app-layout">
-    <ChatSidebar @open-settings="showSettings = true" @new-chat="newChat" />
+    <ChatSidebar @open-settings="showSettings = true" @new-chat="newChat" @search="openSearch" />
     <div class="main-area">
       <div class="top-toolbar" :class="{ show: convStore.sidebarCollapsed }">
-        <button class="tb-btn" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_expandTooltip">
-          <Icon icon="lucide:panel-left-open" />
-        </button>
-        <span class="tb-logo" @click="convStore.toggleSidebar()">{{ settingsStore.appName }}</span>
-        <span class="tb-divider"></span>
-        <button class="tb-btn" :title="langData.chatSidebar_newChat" @click="newChat">
-          <Icon icon="lucide:plus-circle" />
-        </button>
-        <button class="tb-btn" :title="langData.chatSidebar_searchConv" @click="openSearch">
-          <Icon icon="lucide:search" />
-        </button>
+        <div class="tb-btn-group">
+          <button class="tb-btn" @click="convStore.toggleSidebar()" :title="langData.chatSidebar_expandTooltip">
+            <Icon icon="lucide:panel-left-open" />
+          </button>
+          <button class="tb-btn" :title="langData.chatSidebar_newChat" @click="newChat">
+            <Icon icon="lucide:plus-circle" />
+          </button>
+          <button class="tb-btn" :title="langData.chatSidebar_searchConv" @click="openSearch">
+            <Icon icon="lucide:search" />
+          </button>
+        </div>
       </div>
       <!-- 搜索弹窗 -->
       <Teleport to="body">
@@ -376,10 +376,10 @@ onMounted(() => {
 
 .top-toolbar { display: none; align-items: center; gap: 4px; position: absolute; top: 0; left: 0; z-index: 30; padding: 10px 16px; }
 .top-toolbar.show { display: flex; }
+.tb-btn-group { display: flex; align-items: center; gap: 2px; padding: 3px 4px; border-radius: 20px; background: rgba(0,0,0,0.03); border: 1px solid var(--el-border-color); }
+.tb-btn-group:hover { background: var(--el-fill-color-light); }
 .tb-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; color: var(--el-text-color-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; transition: background 0.15s, color 0.15s; }
-.tb-btn:hover { background: var(--el-fill-color-light); color: var(--el-text-color-primary); }
-.tb-logo { font-family: Georgia, 'Times New Roman', serif; font-size: 18px; color: var(--el-text-color-primary); letter-spacing: -0.3px; margin-right: 10px; cursor: pointer; white-space: nowrap; }
-.tb-divider { width: 14px; height: 1px; background: var(--el-border-color); margin: 0 6px; transform: rotate(90deg); flex-shrink: 0; }
+.tb-btn:hover { background: var(--el-fill-color); color: var(--el-text-color-primary); }
 
 /* 搜索弹窗 */
 .search-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.2); backdrop-filter: blur(2px); }
@@ -400,4 +400,8 @@ onMounted(() => {
 .search-item-time { font-size: 12px; color: var(--el-text-color-placeholder); flex-shrink: 0; }
 
 .search-empty { padding: 32px; text-align: center; font-size: 13px; color: var(--el-text-color-placeholder); }
+</style>
+
+<style>
+html.dark .tb-btn-group { background: var(--el-fill-color-light); border-color: var(--el-border-color); }
 </style>
