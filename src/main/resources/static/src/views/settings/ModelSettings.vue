@@ -58,6 +58,7 @@ const editId = ref<string | null>(null)
 const fetching = ref(false)
 const modelType = ref('llm')
 const dimensions = ref<number | undefined>(undefined)
+const protocol = ref('openai')
 
 const CTX_PRESETS = [
   { label: '128K', value: '131072' },
@@ -349,9 +350,9 @@ async function add() {
   if (!name.value.trim()) return
   const paramsJson = buildParamsJson()
   if (editId.value) {
-    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value)
+    await settingsStore.updateModelRemote(editId.value, name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value, protocol.value)
   } else {
-    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value)
+    await settingsStore.addModelRemote(name.value.trim(), baseUrl.value.trim(), apiKey.value, resolveMaxCtx(), paramsJson, modelType.value, dimensions.value, protocol.value)
   }
   resetForm()
 }
@@ -368,6 +369,7 @@ function resetForm() {
   showForm.value = false
   modelType.value = 'llm'
   dimensions.value = undefined
+  protocol.value = 'openai'
   initParams()
   thinkingOn.value = false
   matchedTemplate.value = null
@@ -393,6 +395,7 @@ function startEdit(m: any) {
   initParams(parseParamsJson(m.params))
   modelType.value = m.modelType || 'llm'
   dimensions.value = m.dimensions || undefined
+  protocol.value = m.protocol || 'openai'
   showForm.value = true
 }
 
@@ -633,6 +636,13 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
           <div v-if="modelType === 'embedding'" class="field">
             <label class="field-label">{{ langData.modelConfig_dimensionsLabel }}</label>
             <input class="field-input" type="number" v-model.number="dimensions" :placeholder="langData.modelConfig_dimensionsPlaceholder" />
+          </div>
+          <div class="field">
+            <label class="field-label">{{ langData.settings_modelProtocol || '协议' }}</label>
+            <select class="field-input" v-model="protocol">
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
           </div>
         </div>
 

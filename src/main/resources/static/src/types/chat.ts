@@ -120,6 +120,7 @@ export interface ModelConfig {
   params?: string
   modelType?: string
   dimensions?: number
+  protocol?: string
   scope?: 'user' | 'shared'
 }
 

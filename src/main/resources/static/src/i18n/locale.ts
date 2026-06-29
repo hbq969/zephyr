@@ -186,6 +186,7 @@ const locale: any = {
         "modelConfig_typeEmbedding": "Embedding 模型 (embedding)",
         "modelConfig_dimensionsLabel": "向量维度",
         "modelConfig_dimensionsPlaceholder": "例如 1024, 1536, 3072",
+        "settings_modelProtocol": "协议",
 
         // 系统命令
         "cmd_clearChat": "清空当前对话",
@@ -659,6 +660,7 @@ const locale: any = {
         "modelConfig_typeEmbedding": "Embedding Model (embedding)",
         "modelConfig_dimensionsLabel": "Dimensions",
         "modelConfig_dimensionsPlaceholder": "e.g. 1024, 1536, 3072",
+        "settings_modelProtocol": "Protocol",
 
         // Commands
         "cmd_clearChat": "Clear current chat",
@@ -1111,6 +1113,7 @@ const locale: any = {
         "modelConfig_typeEmbedding": "Embedding モデル (embedding)",
         "modelConfig_dimensionsLabel": "ベクトル次元",
         "modelConfig_dimensionsPlaceholder": "例: 1024, 1536, 3072",
+        "settings_modelProtocol": "プロトコル",
 
         // Commands
         "cmd_clearChat": "現在の会話をクリア",

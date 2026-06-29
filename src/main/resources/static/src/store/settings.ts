@@ -48,6 +48,7 @@ export const useSettingsStore = defineStore('settings', () => {
           params: m.params,
           modelType: m.modelType || 'llm',
           dimensions: m.dimensions,
+          protocol: m.protocol || 'openai',
           scope: m.scope || 'user'
         }))
         models.value = list
@@ -57,13 +58,13 @@ export const useSettingsStore = defineStore('settings', () => {
     } catch (_) { models.value = [] } finally { modelsLoaded.value = true }
   }
 
-  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number) {
-    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions } })
+  async function addModelRemote(name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number, protocol?: string) {
+    const res = await axios({ url: '/model-config/create', method: 'post', data: { name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions, protocol } })
     if (res.data.state === 'OK') await loadModels()
   }
 
-  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number) {
-    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions } })
+  async function updateModelRemote(id: string, name: string, baseUrl: string, apiKey: string, maxContextTokens: string, params: string, modelType?: string, dimensions?: number, protocol?: string) {
+    await axios({ url: '/model-config/update', method: 'post', data: { id, name, baseUrl, apiKey, maxContextTokens, params, modelType, dimensions, protocol } })
     await loadModels()
   }
 
