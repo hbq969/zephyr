@@ -19,7 +19,6 @@ export const useSettingsStore = defineStore('settings', () => {
   const contextDetail = ref<Record<string, any> | null>(null)
   const securityRules = ref<Record<string, any[]>>({})
   const securityStats = ref<Record<string, number>>({})
-  const compactEnabled = ref(true)
 
   const contextTotal = computed(() => {
     const def = models.value.find(m => m.name === currentModel.value)
@@ -423,7 +422,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     currentModel, models, modelsLoaded, mcpServers, mcpToolCount, skills, isAdmin, appName, memories, knowledgeBases,
-    contextUsed, contextLoaded, contextTotal, contextPercent, contextDetail, compactEnabled,
+    contextUsed, contextLoaded, contextTotal, contextPercent, contextDetail,
     setModel, addModel,
     loadModels, addModelRemote, updateModelRemote, deleteModelRemote, setDefaultModelRemote, detectContextRemote, detectCtxRaw, fetchModels, toggleModelScope,
     loadContextUsage,
