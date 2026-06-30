@@ -4,9 +4,27 @@
 
 ## [1.3.4] - 2026-06-30
 
+### 新增
+
+- **Token 缓存与上下文压缩**：实现 token 缓存与上下文压缩（Task 2-7），支持对话上下文自动压缩
+- **模型 protocol 字段**：`ModelConfigEntity` 增加 `protocol` 字段（openai/anthropic），前端表单/类型/store/i18n 同步支持
+
+### 变更
+
+- **ChatServiceImpl.send 拆分**：拆分 `ChatServiceImpl.send` 方法降低复杂度
+- **LlmClient#chat 拆分**：拆分 `LlmClient#chat` 方法降低复杂度
+
 ### 修复
 
 - **MCP 重启后孤儿进程残留**：`initStdio()` 覆盖 PID 文件前先杀旧文件中的残留进程，`cleanupOrphanProcesses()` 用 `isAlive()` + 3s 循环等待替代 200ms 盲等，防止 `npm exec` 进程未及时死亡导致 PID 被覆盖后成为追踪不到的孤儿
+- **模型删除确认弹窗**：模型删除时增加确认提示弹窗
+- **状态栏压缩指示器**：去掉状态栏中无意义的压缩状态指示器
+- **代码审查修复**：threshold 负值/异常捕获/null 检查问题修复
+- **实施计划 3 个致命 bug**：修正 NPE/Map swap/签名缺失问题
+- **侧边栏优化**：默认展开、折叠时按钮分组去 logo、展开时加搜索
+- **设置页滚动修复**：body `overflow:hidden` 导致设置页面无法滚动，改用 `app-root` 容器管理滚动
+- **iframe 滚动修复**：ChatView 在 iframe 中嵌入时 body 层出现滚动条
+- **文件上传权限检查**：忽略系统工作空间导致非 system 用户无法上传
 
 ## [1.3.3] - 2026-06-28
 
