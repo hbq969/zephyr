@@ -2,6 +2,33 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.3.5] - 2026-06-30
+
+### 新增
+
+- **知识库文档解析优化**：docx/pdf 从 Tika 纯文本升级为 POI/PDFBox → 标准 Markdown，支持图片提取引用、标题层级优先切分
+- **两阶段导入流程**：上传→预览修正→选择切分策略→确认导入，用户可编辑 Markdown、下载转换结果
+- **文档图片接口**：`GET /knowledge/image` 带三重权限校验（登录态 + kb scope + doc 归属 + 路径遍历防护）
+- **DocxParser**：基于 Apache POI XWPF 的 Word 解析器，输出 Markdown（标题/表格/图片/粗体斜体），自动提取内嵌图片
+- **PdfParser**：基于 Apache PDFBox 3.0.1 的 PDF 解析器，输出 Markdown，自动提取内嵌图片，支持扫描件/加密/损坏检测
+- **标题层级切分**：TextSplitter 支持按指定标题层级切分 chunk，heading_path + chunk_type 写入 Chroma metadata
+- **Chroma metadata 支持**：ChromaClient 写入 heading_path/chunk_type，支持按 metadata 过滤删除
+- **上下文提示词优化**：Tool description 从外部 prompt 文件加载，知识库检索工具注入图片引用信息
+- **召回测试分数展示**：vecScore/kwScore/rrfScore 与综合分在结果卡片顶部同行展示
+
+### 变更
+
+- **依赖升级**：新增 PDFBox 3.0.1，Tika 传递依赖排除 POI
+- **配置扩展**：新增 `imageBaseDir`、`maxFileSizeBytes` 配置项
+- **ImportDocDialog**：新设计三步导入向导（选择文件→预览修正→切分配置），支持 Markdown 实时预览和下载
+- **TextSplitter API 扩展**：`split(text, headingLevel)` 指定切分层级，`scanHeadings()` 扫描标题结构
+- **TextCleaner 增加 Markdown 模式**：保留 Markdown 语法结构，避免破坏性清洗
+
+### 修复
+
+- **消除 imageUrl 重复代码**：DocxParser/PdfParser/ContextBuilder 三处图片 URL 构建统一为 `ZephyrConstants.imageUrl()`
+- **TextSplitter 误导性循环**：`splitBySelectedHeadings` 中 for-break 循环替换为简单 if
+
 ## [1.3.4] - 2026-06-30
 
 ### 新增

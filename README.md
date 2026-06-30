@@ -125,8 +125,12 @@ Think of it as a personal AI workbench: configure your models once, connect MCP 
     <td>
       <h3>Knowledge Base</h3>
       <ul>
-        <li>Create and manage knowledge bases with document uploads</li>
-        <li>Recall testing — verify retrieval quality against queries</li>
+        <li>Create and manage knowledge bases with <strong>md/docx/pdf</strong> uploads</li>
+        <li><strong>Two-phase import</strong> — upload → preview → pick heading level → confirm</li>
+        <li>DocxParser (POI) + PdfParser (PDFBox) → <strong>standard Markdown</strong></li>
+        <li><strong>Image extraction</strong> — embedded images saved + referenced in answers</li>
+        <li><strong>Hybrid search</strong> — vector (Chroma) + keyword (BM25) → RRF fusion</li>
+        <li>Recall testing — verify retrieval quality with detailed score breakdown</li>
         <li>Scope management — shared across users or kept personal</li>
       </ul>
     </td>
@@ -247,6 +251,108 @@ zephyr/
 │   └── mappers/       # MyBatis XML (common + embedded dialects)
 └── pom.xml
 ```
+
+## Knowledge Base Architecture
+
+Zephyr 的知识库采用**混合检索 + RRF 融合**架构，支持向量语义检索和关键词精确匹配的双路召回。
+
+### 数据模型
+
+```
+KnowledgeBase (知识库)
+  ├── id, name, description
+  ├── embedModelId    → 向量嵌入模型
+  ├── scope            → user（个人）/ shared（共享）
+  └── graphEnabled     → 是否启用图谱增强
+
+KnowledgeDoc (文档)
+  ├── id, kbId, fileName, fileType (md/docx/pdf)
+  ├── content          → 原始/转换后 Markdown 内容
+  ├── sourceType       → upload（上传）/ inline（手写）
+  ├── imageCount       → 文档内嵌图片数
+  ├── status           → pending → processing → ready / error
+  └── chunkCount       → 切分后 chunk 数量
+```
+
+### 文档处理管线
+
+```
+文件上传
+  ├── md  → 直接读取，scanHeadings() 扫标题 → status=pending
+  └── docx/pdf
+        ├── DocxParser (POI) / PdfParser (PDFBox)
+        │     ├── 标题检测（outlineLvl / style / 启发式）
+        │     ├── 表格 → pipe table
+        │     ├── 图片 → ~/.zephyr/kb-images/{kbId}/{docId}/img_xxx.png
+        │     └── 输出 Markdown + imageCount
+        └── 保存 .md 到 ~/.zephyr/knowledge/{kbId}/{docId}_{name}.md
+             → status=pending
+
+用户确认导入（选择切分标题层级）
+  → TextCleaner.clean(markdown, markdownMode=true)
+  → TextSplitter.split(text, headingLevel)
+       ├── headingLevel=0 → 按段落切分
+       └── headingLevel=1-6 → 按指定层级标题切分
+            ├── headingPath → "章节 > 子章节 > 当前标题"
+            └── chunkType  → table / paragraph
+  → Chroma embed + metadata:
+       {doc_id, file_name, chunk_index, heading_path, chunk_type}
+  → KeywordIndex (内存 BM25 倒排索引)
+  → (可选) LightRAG 图谱索引
+  → status=ready
+```
+
+### 检索与融合
+
+```
+查询文本
+  ├── 查询增强 (augmentQuery) → 扩展术语
+  ├── 向量检索 (Chroma)
+  │     └── cosine 相似度 → topK*2 条，含 heading_path/chunk_type metadata
+  ├── 关键词检索 (BM25 内存索引)
+  │     └── BM25 评分 → topK*2 条
+  └── RRF 融合 (Reciprocal Rank Fusion, K=60)
+        rrfScore(chunk) = 1/(60 + vecRank) + 1/(60 + kwRank)
+        ↓
+        按 rrfScore 降序取 topK → 返回结果
+        ↓
+        上下文窗口扩展 (前后各 2 chunk)
+        ↓
+        送入 LLM 上下文
+```
+
+**RRF 的优势**：不比较原始分数绝对值，只看排名，两个检索通道排名都靠前的 chunk 会被"抬"上去。
+
+### 图片引用链路
+
+```
+文档解析 → 图片提取到 ~/.zephyr/kb-images/{kbId}/{docId}/
+         → Markdown 中插入 ![](图片URL)
+         → 检索结果含图片引用时自动注入图片说明提示词
+         → LLM 回答中图片语法原样保留
+         → 前端渲染时 GET /knowledge/image?kbId=&docId=&file=
+              ├── 登录态校验
+              ├── shared KB 全员可读，user KB 仅 owner/admin
+              ├── docId 归属校验
+              └── 路径遍历防护
+```
+
+### 召回测试
+
+```
+POST /knowledge/kb/{kbId}/recall-test
+  → 输入查询文本 + topK
+  → 返回 {content, sourceFile, score, vecScore, kwScore, rrfScore}
+  → 前端展示综合分(百分比) + 向量分 + 关键词分 + RRF 融合分
+```
+
+### 文件存储
+
+| 目录 | 内容 |
+|------|------|
+| `~/.zephyr/knowledge/{kbId}/` | 原始文件 + 转换后 .md |
+| `~/.zephyr/kb-images/{kbId}/{docId}/` | 文档内嵌图片 |
+| `~/.zephyr/chroma/` | Chroma 嵌入式向量数据库 |
 
 ## Configuration
 
