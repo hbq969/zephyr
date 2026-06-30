@@ -15,6 +15,7 @@ public class KnowledgeDocEntity {
     private String status;
     private String errorMsg;
     private String graphStatus;
+    private Integer imageCount;
     private Long createdAt;
     private Long updatedAt;
 }

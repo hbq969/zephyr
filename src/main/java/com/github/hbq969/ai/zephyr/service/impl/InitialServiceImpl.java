@@ -73,8 +73,12 @@ public class InitialServiceImpl extends AbstractScriptInitialAware {
                 () -> workspaceDao.createWorkspacesTable());
         com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_knowledge_base",
                 () -> knowledgeDao.createKnowledgeBaseTable());
-        com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_knowledge_doc",
-                () -> knowledgeDao.createKnowledgeDocTable());
+        try {
+            com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_knowledge_doc",
+                    () -> knowledgeDao.createKnowledgeDocTable());
+        } catch (Exception e) {
+            // MySQL alter table add column 非幂等，第二次启动会抛异常，忽略
+        }
         com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_conversation_kb",
                 () -> knowledgeDao.createConversationKbTable());
         com.github.hbq969.code.common.utils.ThrowUtils.call("zephyr_user_model_prefs",

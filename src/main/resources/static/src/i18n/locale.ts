@@ -98,6 +98,7 @@ const locale: any = {
         "inputArea_modeDefault": "默认 — 文件编辑和 Shell 命令均需逐条确认",
         "inputArea_modeAcceptEdits": "Accept Edits — 文件编辑自动执行，Shell 破坏性操作需确认",
         "inputArea_modeBypass": "Bypass — 所有操作自动执行，无安全闸门（仅限 CI/CD）",
+        "inputArea_kbNeedConversation": "请先发送一条消息创建对话，再选择知识库",
 
         // 消息气泡
         "msgBubble_copy": "复制",
@@ -400,6 +401,7 @@ const locale: any = {
         "knowledgeMgmt_recallTopk": "返回数量",
         "knowledgeMgmt_recallVecScore": "向量分",
         "knowledgeMgmt_recallKwScore": "关键词分",
+        "knowledgeMgmt_recallScore": "综合分",
         "knowledgeMgmt_recallRrfScore": "RRF融合分",
         "knowledgeMgmt_recallSource": "来源",
 
@@ -572,6 +574,7 @@ const locale: any = {
         "inputArea_modeDefault": "Default — confirm every file edit and shell command",
         "inputArea_modeAcceptEdits": "Accept Edits — file edits auto-approved, destructive shell commands require confirmation",
         "inputArea_modeBypass": "Bypass — all operations auto-approved, no safety gates (CI/CD only)",
+        "inputArea_kbNeedConversation": "Send a message first to create a conversation, then select knowledge bases",
 
         // Message bubble
         "msgBubble_copy": "Copy",
@@ -864,6 +867,7 @@ const locale: any = {
         "knowledgeMgmt_recallTopk": "Return Count",
         "knowledgeMgmt_recallVecScore": "Vector",
         "knowledgeMgmt_recallKwScore": "Keyword",
+        "knowledgeMgmt_recallScore": "Score",
         "knowledgeMgmt_recallRrfScore": "RRF Fusion",
         "knowledgeMgmt_recallSource": "Source",
 
@@ -1317,6 +1321,7 @@ const locale: any = {
         "knowledgeMgmt_recallTopk": "取得件数",
         "knowledgeMgmt_recallVecScore": "ベクトル",
         "knowledgeMgmt_recallKwScore": "キーワード",
+        "knowledgeMgmt_recallScore": "スコア",
         "knowledgeMgmt_recallRrfScore": "RRF融合",
         "knowledgeMgmt_recallSource": "ソース",
 

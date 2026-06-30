@@ -541,3 +541,6 @@ UPDATE zephyr_mcp_servers SET reconnect_on_startup = 1 WHERE status = 'connected
 
 ALTER TABLE zephyr_model_configs ADD COLUMN IF NOT EXISTS protocol VARCHAR(32) DEFAULT 'openai';
 
+-- 知识库文档图片计数
+alter table if exists zephyr_knowledge_doc add column if not exists image_count int default 0;
+

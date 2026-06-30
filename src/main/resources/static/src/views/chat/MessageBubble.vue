@@ -194,6 +194,7 @@ onUpdated(setupCodeBlocks)
 .tool-result-body { padding: 8px 0 0; margin: 8px 0 0; font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 11px; line-height: 1.4; color: var(--el-text-color-secondary); max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-all; border-top: 1px solid var(--el-border-color); }
 
 .markdown-body { font-size: inherit; }
+.markdown-body :deep(img) { max-width: 100%; height: auto; border-radius: 4px; }
 .markdown-body :deep(h1),
 .markdown-body :deep(h2),
 .markdown-body :deep(h3),

@@ -329,12 +329,30 @@ function loadKbData() {
   }
 }
 
-function toggleKb(kbId: string) {
+async function toggleKb(kbId: string) {
   const idx = selectedKbIds.value.indexOf(kbId)
   if (idx >= 0) { selectedKbIds.value.splice(idx, 1) }
   else { selectedKbIds.value.push(kbId) }
-  const convId = convStore.currentId
-  if (!convId) return
+
+  let convId = convStore.currentId
+  if (!convId) {
+    const kbIdsToSave = [...selectedKbIds.value]
+    try {
+      const res = await axios({ url: '/conversations/create', method: 'post', data: {} })
+      if (res.data.state === 'OK' && res.data.body) {
+        convId = res.data.body.id
+        // 先保存 KB 关联，再更新 store（addConversation 触发 watch 会清空 selectedKbIds）
+        await axios({ url: '/knowledge/conversation/kb/save', method: 'post', data: { conversationId: convId, kbIds: kbIdsToSave } })
+        convStore.addConversation(res.data.body)
+      } else {
+        selectedKbIds.value = selectedKbIds.value.filter(id => id !== kbId)
+      }
+    } catch {
+      selectedKbIds.value = selectedKbIds.value.filter(id => id !== kbId)
+    }
+    return
+  }
+
   axios({ url: '/knowledge/conversation/kb/save', method: 'post', data: { conversationId: convId, kbIds: [...selectedKbIds.value] } })
     .catch(() => msg(langData.axiosRequestErr, 'error'))
 }

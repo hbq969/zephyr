@@ -281,6 +281,30 @@ public final class ZephyrConstants {
     // === 知识库 ===
     public static final int KNOWLEDGE_TOP_K_DEFAULT = 5;
     public static final int KNOWLEDGE_BM25_K1_DEFAULT = 1;
+    public static final String DOC_STATUS_PENDING = "pending";
+
+    // === 知识库解析 ===
+    public static final long KB_MAX_FILE_SIZE_BYTES = 52_428_800L;
+    public static final String CHUNK_TYPE_TABLE = "table";
+    public static final String CHUNK_TYPE_PARAGRAPH = "paragraph";
+    public static final String CHUNK_META_HEADING_PATH = "heading_path";
+    public static final String CHUNK_META_CHUNK_TYPE = "chunk_type";
+    public static final String PARSE_ERROR_SCANNED = "scanned";
+    public static final String PARSE_ERROR_ENCRYPTED = "encrypted";
+    public static final String PARSE_ERROR_CORRUPT = "corrupt";
+    public static final String PARSE_ERROR_TOO_LARGE = "too_large";
+    public static final int MAX_CHUNK_CHARS = 4096;
+    /** PDF 扫描件检测：每页最少有效文本字符数 */
+    public static final int PDF_MIN_TEXT_CHARS_PER_PAGE = 80;
+    /** PDF 扫描件检测：有效文本占总字符比阈值 */
+    public static final double PDF_MIN_TEXT_RATIO = 0.3;
+
+    // === 工具方法 ===
+
+    /** 文档图片 URL，格式：{contextPath}/zephyr-ui/knowledge/image?kbId=...&docId=...&file=... */
+    public static String imageUrl(String contextPath, String kbId, String docId, String file) {
+        return (contextPath != null ? contextPath : "") + "/zephyr-ui/knowledge/image?kbId=" + kbId + "&docId=" + docId + "&file=" + file;
+    }
 
     // === Git ===
     public static final String GIT_COMMAND = "git";

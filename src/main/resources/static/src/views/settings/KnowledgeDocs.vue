@@ -7,6 +7,7 @@ import { msg } from '@/utils/Utils'
 import { Icon } from '@iconify/vue'
 import axios from '@/network'
 import MarkdownEditorDialog from './MarkdownEditorDialog.vue'
+import ImportDocDialog from './ImportDocDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -17,9 +18,7 @@ const kbName = ref('')
 const kbCanManage = ref(false)
 const docs = ref<any[]>([])
 const refreshingDocs = ref(false)
-const uploadVisible = ref(false)
-const uploadFile = ref<File | null>(null)
-const uploading = ref(false)
+const importVisible = ref(false)
 
 const editorVisible = ref(false)
 const editDoc = ref<any>(null)
@@ -62,23 +61,7 @@ const fetchKbName = () => {
     })
 }
 
-const handleUpload = () => {
-  if (!uploadFile.value) { msg('请选择文件', 'warning'); return }
-  uploading.value = true
-  const formData = new FormData()
-  formData.append('file', uploadFile.value)
-  formData.append('kbId', kbId)
-  axios({ url: '/knowledge/doc/upload', method: 'post', data: formData, headers: { 'Content-Type': 'multipart/form-data' } })
-    .then(res => {
-      uploading.value = false
-      if (res.data.state === 'OK') { uploadVisible.value = false; uploadFile.value = null; fetchDocs() }
-      else msg(res.data.errorMessage, 'warning')
-    })
-    .catch(err => {
-      uploading.value = false
-      msg(err?.response?.data?.errorMessage || '上传失败', 'error')
-    })
-}
+const onImported = () => { fetchDocs() }
 
 const deleteDoc = (doc: any) => {
   ElMessageBox.confirm(
@@ -98,7 +81,7 @@ const reParse = (doc: any) => {
     .catch(err => msg(err?.response?.data?.errorMessage || '重新解析失败', 'error'))
 }
 
-const statusTagType = (status: string) => status === 'ready' ? 'success' : status === 'error' ? 'danger' : 'warning'
+const statusTagType = (status: string) => status === 'ready' ? 'success' : status === 'error' ? 'danger' : status === 'pending' ? 'info' : 'warning'
 const graphStatusTagType = (s: string) => !s ? 'info' : s === 'ready' ? 'success' : s === 'error' ? 'danger' : 'warning'
 const graphStatusLabel = (s: string) => {
   if (!s) return '-'
@@ -109,6 +92,7 @@ const graphStatusLabel = (s: string) => {
 const statusLabel = (status: string) => {
   if (status === 'ready') return langData.knowledgeMgmt_docStatus_ready
   if (status === 'error') return langData.knowledgeMgmt_docStatus_error
+  if (status === 'pending') return '待确认'
   return langData.knowledgeMgmt_docStatus_processing
 }
 
@@ -149,7 +133,7 @@ onMounted(() => { fetchDocs(); fetchKbName() })
       <el-button v-if="kbCanManage" @click="openCreateInline">
         <Icon icon="lucide:edit-3" style="margin-right:4px" /> {{ langData.knowledgeMgmt_createInlineDoc }}
       </el-button>
-      <el-button v-if="kbCanManage" type="primary" @click="uploadVisible = true">
+      <el-button v-if="kbCanManage" type="primary" @click="importVisible = true">
         <Icon icon="lucide:upload" style="margin-right:4px" /> {{ langData.knowledgeMgmt_uploadDoc }}
       </el-button>
     </div>
@@ -159,7 +143,7 @@ onMounted(() => { fetchDocs(); fetchKbName() })
       <h3 class="empty-title">{{ langData.knowledgeMgmt_noDoc }}</h3>
       <p class="empty-desc">{{ langData.knowledgeMgmt_noDocHint }}</p>
       <div v-if="kbCanManage" class="empty-actions">
-        <button class="btn-primary" @click="uploadVisible = true">
+        <button class="btn-primary" @click="importVisible = true">
           <Icon icon="lucide:upload" /> {{ langData.knowledgeMgmt_uploadDoc }}
         </button>
         <button class="btn-primary" @click="openCreateInline">
@@ -219,7 +203,7 @@ onMounted(() => { fetchDocs(); fetchKbName() })
             </el-tooltip>
           </el-button>
           <el-divider direction="vertical" />
-          <el-button link size="small" @click="reParse(row)" :disabled="row.status === 'processing'">
+          <el-button link size="small" @click="reParse(row)" :disabled="row.status === 'processing' || row.status === 'pending'">
             <el-tooltip :content="langData.knowledgeMgmt_reParse">
               <Icon icon="lucide:refresh-cw" style="font-size:15px" />
             </el-tooltip>
@@ -234,24 +218,9 @@ onMounted(() => { fetchDocs(); fetchKbName() })
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="uploadVisible" :title="langData.knowledgeMgmt_uploadDoc" width="420px" destroy-on-close>
-      <el-upload
-        drag
-        :auto-upload="false"
-        :show-file-list="true"
-        :limit="1"
-        :on-change="(f: any) => { uploadFile = f.raw }"
-        :on-remove="() => { uploadFile = null }"
-      >
-        <Icon icon="lucide:upload" :width="40" style="color:var(--el-text-color-secondary);margin-bottom:8px" />
-        <div style="font-size:14px;color:var(--el-text-color-primary)">{{ langData.knowledgeMgmt_uploadDoc }}</div>
-      </el-upload>
-      <template #footer>
-        <el-button @click="uploadVisible = false">{{ langData.btnCancel }}</el-button>
-        <el-button type="primary" @click="handleUpload" :loading="uploading">{{ langData.btnConfirm }}</el-button>
-      </template>
-    </el-dialog>
   </div>
+
+  <ImportDocDialog v-model:visible="importVisible" :kb-id="kbId" @imported="onImported" />
 
   <MarkdownEditorDialog
     v-model:visible="editorVisible"

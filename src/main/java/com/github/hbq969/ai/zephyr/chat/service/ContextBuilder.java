@@ -22,6 +22,7 @@ import jakarta.annotation.Resource;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -33,6 +34,9 @@ import static com.github.hbq969.ai.zephyr.constant.ZephyrConstants.*;
 public class ContextBuilder {
 
     private static final Gson gson = new Gson();
+
+    @Value("${server.servlet.context-path}")
+    private String contextPath;
 
     @Resource
     private ModelConfigDao modelConfigDao;
@@ -137,7 +141,7 @@ public class ContextBuilder {
         // 6. 添加内置工具
         toolDefs.add(buildUseSkillTool());
         toolDefs.add(buildUseMemoryTool());
-        toolDefs.add(buildSearchKnowledgeTool());
+        toolDefs.add(buildSearchKnowledgeTool(conversationId));
         toolDefs.add(buildExecuteShellTool());
         toolDefs.add(buildListProcessesTool());
         toolDefs.add(buildKillProcessTool());
@@ -374,7 +378,7 @@ public class ContextBuilder {
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_USE_SKILL)
-                        .description("加载指定 skill 的完整指导内容到上下文")
+                        .description(promptLoader.load("tools/use-skill.md"))
                         .parameters(params)
                         .build())
                 .build();
@@ -392,22 +396,51 @@ public class ContextBuilder {
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_USE_MEMORY)
-                        .description("查看指定记忆的完整内容")
+                        .description(promptLoader.load("tools/use-memory.md"))
                         .parameters(params)
                         .build())
                 .build();
     }
 
-    private ToolDef buildSearchKnowledgeTool() {
+    private ToolDef buildSearchKnowledgeTool(String conversationId) {
         Map<String, Object> props = new LinkedHashMap<>();
         props.put(PARAM_QUERY, Map.of("type", "string", "description", "检索关键词或问题"));
         props.put(PARAM_TOP_K, Map.of("type", "integer", "description", "返回结果数量，默认 " + cfg.getKnowledge().getTopK()));
+
+        StringBuilder imgInfo = new StringBuilder();
+        if (conversationId != null && !conversationId.isEmpty()) {
+            List<String> kbIds = knowledgeDao.queryKbIdsByConversation(conversationId);
+            if (kbIds != null && !kbIds.isEmpty()) {
+                List<com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeBaseEntity> kbs =
+                        knowledgeDao.queryKbByIds(kbIds);
+                for (var kb : kbs) {
+                    var docs = knowledgeDao.queryDocsByKbId(kb.getId());
+                    for (var d : docs) {
+                        if (d.getImageCount() != null && d.getImageCount() > 0) {
+                            if (imgInfo.isEmpty()) imgInfo.append("\n当前知识库图片目录：\n");
+                            imgInfo.append("- 知识库\"").append(kb.getName())
+                                    .append("\"(kbId=").append(kb.getId())
+                                    .append(", docId=").append(d.getId())
+                                    .append(")：").append(d.getImageCount())
+                                    .append("张图片，引用格式 ![](")
+                                    .append(imageUrl(contextPath, kb.getId(), d.getId(), "文件名")).append(")\n");
+                        }
+                    }
+                }
+            }
+        }
+        if (!imgInfo.isEmpty()) {
+            imgInfo.append("检索结果中的 Markdown 图片语法（![...](...)）必须原样保留在回答中，禁止省略或改写为纯文本。");
+        }
+
+        String desc = promptLoader.render("tools/search-knowledge.md",
+                Map.of("imageDirInfo", imgInfo.toString()));
 
         return ToolDef.builder()
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_SEARCH_KNOWLEDGE)
-                        .description("从已勾选的知识库中检索相关文档片段")
+                        .description(desc)
                         .parameters(Map.of("type", JSON_TYPE_OBJECT, "properties", props, "required", List.of(PARAM_QUERY)))
                         .build())
                 .build();
@@ -422,7 +455,7 @@ public class ContextBuilder {
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_EXECUTE_SHELL)
-                        .description("在工作空间目录执行 shell 命令。前台命令（默认）阻塞等待结果返回；后台命令（background=true）立即返回，进程跨会话存活。")
+                        .description(promptLoader.load("tools/execute-shell.md"))
                         .parameters(Map.of("type", JSON_TYPE_OBJECT, "properties", props, "required", List.of(PARAM_COMMAND)))
                         .build())
                 .build();
@@ -433,7 +466,7 @@ public class ContextBuilder {
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_LIST_PROCESSES)
-                        .description("列出当前用户的所有后台进程")
+                        .description(promptLoader.load("tools/list-processes.md"))
                         .parameters(Map.of("type", JSON_TYPE_OBJECT, "properties", new LinkedHashMap<>()))
                         .build())
                 .build();
@@ -447,7 +480,7 @@ public class ContextBuilder {
                 .type(TOOL_CALL_TYPE_FUNCTION)
                 .function(ToolDef.FunctionDef.builder()
                         .name(TOOL_KILL_PROCESS)
-                        .description("终止指定后台进程")
+                        .description(promptLoader.load("tools/kill-process.md"))
                         .parameters(Map.of("type", JSON_TYPE_OBJECT, "properties", props, "required", List.of(PARAM_PID)))
                         .build())
                 .build();

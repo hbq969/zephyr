@@ -116,6 +116,21 @@ public class ChromaClient implements InitializingBean {
         post(API_PREFIX + "/collections/" + collectionId + "/add", body);
     }
 
+    /** 按元数据过滤删除 embeddings。集合不存在时静默返回 0。 */
+    public int deleteByMetadata(String collectionName, Map<String, String> where) {
+        String id = getCollectionId(collectionName);
+        if (id == null) return 0;
+        try {
+            Map<String, Object> body = Map.of("where", (Object) where);
+            String resp = post(API_PREFIX + "/collections/" + id + "/delete", body);
+            Map<String, Object> result = gson.fromJson(resp, new TypeToken<Map<String, Object>>() {}.getType());
+            if (result != null && result.get("deleted_count") != null) {
+                return ((Number) result.get("deleted_count")).intValue();
+            }
+        } catch (Exception e) { log.warn("Chroma deleteByMetadata 失败: collection={}, where={}", collectionName, where, e); }
+        return 0;
+    }
+
     public List<QueryResult> query(String collectionId, float[] queryEmbedding, int topK) {
         List<Float> qEmb = new ArrayList<>();
         for (float v : queryEmbedding) qEmb.add(v);
@@ -149,6 +164,47 @@ public class ChromaClient implements InitializingBean {
                 qr.setDocument(i < docs.size() ? docs.get(i) : "");
                 qr.setMetadata(i < metas.size() ? metas.get(i) : Map.of());
                 qr.setScore(i < dists.size() ? dists.get(i) : 0.0);
+                results.add(qr);
+            }
+        }
+        return results;
+    }
+
+    /** 列出所有 collection 名称。 */
+    public List<String> listCollections() {
+        String resp = get(API_PREFIX + "/collections");
+        List<Map<String, Object>> cols = gson.fromJson(resp, new TypeToken<List<Map<String, Object>>>(){}.getType());
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> col : cols) {
+            if (col.get("name") != null) names.add(col.get("name").toString());
+        }
+        return names;
+    }
+
+    /** 按元数据过滤拉取 chunks，用于重建关键词索引。 */
+    public List<QueryResult> getByMetadata(String collectionId, Map<String, String> where, int limit, int offset) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (where != null && !where.isEmpty()) body.put("where", where);
+        body.put("limit", limit);
+        body.put("offset", offset);
+        body.put("include", List.of("documents", "metadatas"));
+        String resp = post(API_PREFIX + "/collections/" + collectionId + "/get", body);
+        Map<String, Object> result = gson.fromJson(resp, new TypeToken<Map<String, Object>>(){}.getType());
+
+        List<QueryResult> results = new ArrayList<>();
+        @SuppressWarnings("unchecked")
+        List<String> ids = (List<String>) result.get("ids");
+        @SuppressWarnings("unchecked")
+        List<String> docs = (List<String>) result.get("documents");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> metas = (List<Map<String, String>>) result.get("metadatas");
+
+        if (ids != null) {
+            for (int i = 0; i < ids.size(); i++) {
+                QueryResult qr = new QueryResult();
+                qr.setId(ids.get(i));
+                qr.setDocument(docs != null && i < docs.size() ? docs.get(i) : "");
+                qr.setMetadata(metas != null && i < metas.size() ? metas.get(i) : Map.of());
                 results.add(qr);
             }
         }

@@ -230,6 +230,10 @@ public class ZephyrConfigProperties {
         private LightRag lightrag = new LightRag();
         /** 文档存储根目录，默认 ~/.zephyr/knowledge */
         private String dataDir = System.getProperty("user.home") + "/.zephyr/knowledge";
+        /** 文档图片存储根目录，默认 ~/.zephyr/kb-images */
+        private String imageBaseDir = System.getProperty("user.home") + "/.zephyr/kb-images";
+        /** 文档上传大小上限（字节），默认 50MB */
+        private long maxFileSizeBytes = 52_428_800L;
 
         @Data
         public static class Bm25 {

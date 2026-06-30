@@ -34,7 +34,11 @@ public interface KnowledgeDao {
     void updateDocStatus(@Param("id") String id, @Param("status") String status,
                          @Param("chunkCount") Integer chunkCount, @Param("errorMsg") String errorMsg);
 
+    /** 条件更新：仅 status='pending' 时改为 'processing'，返回受影响行数。用于 confirmImport 并发保护。 */
+    int tryLockDoc(@Param("id") String id);
+
     void updateDocGraphStatus(@Param("id") String id, @Param("graphStatus") String graphStatus);
+    void updateDocImageCount(@Param("id") String id, @Param("imageCount") int imageCount);
     void deleteDoc(@Param("id") String id);
     void deleteDocsByKbId(@Param("kbId") String kbId);
 

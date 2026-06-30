@@ -16,12 +16,17 @@ import com.github.hbq969.ai.zephyr.knowledge.pipeline.RrfMerger;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TextCleaner;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TextSplitter;
 import com.github.hbq969.ai.zephyr.knowledge.pipeline.TikaParser;
+import com.github.hbq969.ai.zephyr.knowledge.pipeline.DocxParser;
+import com.github.hbq969.ai.zephyr.knowledge.pipeline.PdfParser;
+import com.github.hbq969.ai.zephyr.knowledge.pipeline.ParseResult;
 import com.github.hbq969.ai.zephyr.knowledge.client.LightRagClient;
 import com.github.hbq969.ai.zephyr.knowledge.service.KnowledgeService;
+import com.github.hbq969.code.common.initial.event.ScriptInitialDoneEvent;
 import com.github.hbq969.code.sm.login.model.UserInfo;
 import com.github.hbq969.code.sm.login.session.UserContext;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -38,7 +43,7 @@ import java.util.*;
 
 @Slf4j
 @Service
-public class KnowledgeServiceImpl implements KnowledgeService {
+public class KnowledgeServiceImpl implements KnowledgeService, ApplicationListener<ScriptInitialDoneEvent> {
 
     @Resource
     private KnowledgeDao knowledgeDao;
@@ -53,7 +58,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private TikaParser tikaParser;
 
     @Resource
+    private DocxParser docxParser;
+
+    @Resource
+    private PdfParser pdfParser;
+
+    @Resource
     private TextCleaner textCleaner;
+
+    private final TextSplitter textSplitter = new TextSplitter();
 
     @Resource
     private EmbeddingClient embeddingClient;
@@ -235,6 +248,19 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         knowledgeDao.deleteKb(id);
         chromaClient.deleteCollection("kb_" + id);
         deleteKbDataDir(id);
+
+        Path imgDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), id);
+        try {
+            if (Files.exists(imgDir)) {
+                try (var s = Files.walk(imgDir)) {
+                    s.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try { Files.delete(p); } catch (IOException ignored) {}
+                    });
+                }
+            }
+        } catch (Exception e) {
+            log.warn("清理知识库图片失败: kbId={}", id, e);
+        }
     }
 
     @Override
@@ -250,6 +276,32 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
             keywordIndex.removeDoc(doc.getKbId(), id);
             lightRagClient.deleteDoc(doc.getKbId(), id);
+            try { chromaClient.deleteByMetadata("kb_" + doc.getKbId(), Map.of("doc_id", id)); }
+            catch (Exception e) { log.warn("清理 Chroma embeddings 失败: docId={}", id, e); }
+
+            Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), doc.getKbId());
+            try {
+                if (Files.exists(dataDir)) {
+                    try (var s = Files.newDirectoryStream(dataDir, id + "_*")) {
+                        s.forEach(f -> { try { Files.delete(f); } catch (IOException ignored) {} });
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("清理文档文件失败: docId={}", id, e);
+            }
+
+            Path imgDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), doc.getKbId(), id);
+            try {
+                if (Files.exists(imgDir)) {
+                    try (var s = Files.walk(imgDir)) {
+                        s.sorted(Comparator.reverseOrder()).forEach(p -> {
+                            try { Files.delete(p); } catch (IOException ignored) {}
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("清理文档图片失败: docId={}", id, e);
+            }
         }
         knowledgeDao.deleteDoc(id);
     }
@@ -270,46 +322,206 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Override
-    public String uploadDoc(String kbId, MultipartFile file, String userName) {
+    public Map<String, Object> uploadDoc(String kbId, MultipartFile file, String userName) {
         KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
         if (kb == null) throw new RuntimeException("知识库不存在");
         if (SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
 
+        String ft = fileType(file.getOriginalFilename());
+        if (!Set.of("md", "docx", "pdf").contains(ft)) throw new RuntimeException("仅支持 md、docx、pdf 格式文件");
+        if (file.getSize() > cfg.getKnowledge().getMaxFileSizeBytes())
+            throw new RuntimeException("文件过大（超过" + (cfg.getKnowledge().getMaxFileSizeBytes() / 1024 / 1024) + "MB）");
+
         String docId = UUID.randomUUID().toString();
+        String safeName = Path.of(file.getOriginalFilename()).getFileName().toString();
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
         try {
             Files.createDirectories(dataDir);
-            file.transferTo(dataDir.resolve(docId + "_" + file.getOriginalFilename()).toFile());
-        } catch (IOException e) {
-            throw new RuntimeException("保存文件失败", e);
+            Path dest = dataDir.resolve(docId + "_" + safeName).normalize();
+            if (!dest.startsWith(dataDir.normalize())) throw new RuntimeException("非法文件名");
+            file.transferTo(dest.toFile());
+        } catch (IOException e) { throw new RuntimeException("保存文件失败", e); }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("docId", docId); result.put("fileType", ft); result.put("fileName", safeName);
+
+        if ("md".equals(ft)) {
+            try {
+                String mdContent = Files.readString(dataDir.resolve(docId + "_" + safeName));
+                result.put("markdownPreview", mdContent);
+                result.put("headings", textSplitter.scanHeadings(mdContent));
+            } catch (IOException e) { throw new RuntimeException("读取文件失败", e); }
+        } else {
+            Path imageDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), kbId, docId);
+            ParseResult pr;
+            try (InputStream in = Files.newInputStream(dataDir.resolve(docId + "_" + safeName))) {
+                pr = switch (ft) {
+                    case "docx" -> docxParser.parse(in, kbId, docId, imageDir);
+                    case "pdf"  -> pdfParser.parse(in, kbId, docId, imageDir);
+                    default     -> new ParseResult("", 0, PARSE_ERROR_CORRUPT);
+                };
+            } catch (IOException e) { throw new RuntimeException("解析文件失败", e); }
+
+            if (!pr.isSuccess()) {
+                String msg = switch (pr.getErrorType()) {
+                    case PARSE_ERROR_SCANNED -> "扫描件不支持，请使用 OCR 后重新导入";
+                    case PARSE_ERROR_ENCRYPTED -> "加密文件不支持，请解密后重新导入";
+                    case PARSE_ERROR_CORRUPT -> "文件损坏或格式不支持";
+                    default -> "解析失败: " + pr.getErrorType();
+                };
+                throw new RuntimeException(msg);
+            }
+
+            String mdName = safeName.replaceFirst("\\.[^.]+$", "") + ".md";
+            try { Files.writeString(dataDir.resolve(docId + "_" + mdName), pr.getMarkdown()); }
+            catch (IOException e) { throw new RuntimeException("保存 markdown 失败", e); }
+
+            result.put("markdownPreview", pr.getMarkdown());
+            result.put("headings", textSplitter.scanHeadings(pr.getMarkdown()));
         }
 
         KnowledgeDocEntity doc = new KnowledgeDocEntity();
-        doc.setId(docId);
-        doc.setKbId(kbId);
-        doc.setFileName(file.getOriginalFilename());
-        doc.setFileType(fileType(file.getOriginalFilename()));
-        doc.setFileSize(file.getSize());
-        doc.setStatus("processing");
-        doc.setChunkCount(0);
+        doc.setId(docId); doc.setKbId(kbId); doc.setFileName(safeName);
+        doc.setFileType(ft); doc.setFileSize(file.getSize());
+        doc.setStatus(DOC_STATUS_PENDING); doc.setChunkCount(0);
         doc.setCreatedAt(System.currentTimeMillis() / 1000);
         knowledgeDao.insertDoc(doc);
-
-        self.processDocAsync(docId, kbId, dataDir.resolve(docId + "_" + file.getOriginalFilename()));
-        return docId;
+        return result;
     }
 
     @Override
-    public void reParseDoc(String docId, String kbId, String userName) {
+    public void confirmImport(String docId, String kbId, int headingLevel, String markdownContent, String userName) {
+        KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
+        if (kb == null) throw new RuntimeException("知识库不存在");
+        if (SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
+
         KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
         if (doc == null) throw new RuntimeException("文档不存在");
+        if (!kbId.equals(doc.getKbId())) throw new RuntimeException("文档不属于该知识库");
+        if (headingLevel < 0 || headingLevel > 6) throw new RuntimeException("标题层级必须在 0-6 之间");
+
+        int affected = knowledgeDao.tryLockDoc(docId);
+        if (affected == 0) throw new RuntimeException("文档已被其他请求确认导入");
+
+        Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
+        if (markdownContent != null && !markdownContent.isBlank()) {
+            String mdName = doc.getFileName().replaceFirst("\\.[^.]+$", "") + ".md";
+            try { Files.writeString(dataDir.resolve(docId + "_" + mdName), markdownContent); }
+            catch (IOException e) { throw new RuntimeException("保存 markdown 失败", e); }
+        }
+
+        self.processImportAsync(docId, kbId, headingLevel);
+    }
+
+    @Async
+    public void processImportAsync(String docId, String kbId, int headingLevel) {
+        try {
+            KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
+            if (doc == null) { log.warn("文档已删除: docId={}", docId); return; }
+            KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
+
+            Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
+            String text;
+            String mdName = doc.getFileName().replaceFirst("\\.[^.]+$", "") + ".md";
+            Path mdPath = dataDir.resolve(docId + "_" + mdName);
+            if (Files.exists(mdPath)) text = Files.readString(mdPath);
+            else text = Files.readString(dataDir.resolve(docId + "_" + doc.getFileName()));
+
+            text = textCleaner.clean(text, true);
+            List<TextSplitter.Chunk> chunks = textSplitter.split(text, headingLevel);
+            List<TextSplitter.Chunk> filtered = new ArrayList<>();
+            for (TextSplitter.Chunk c : chunks)
+                if (c.text.codePointCount(0, c.text.length()) >= MIN_CHUNK_CODE_POINTS) filtered.add(c);
+
+            if (filtered.isEmpty()) { knowledgeDao.updateDocStatus(docId, STATUS_ERROR, 0, "文档内容为空"); return; }
+
+            var embedModel = modelConfigDao.queryById(kb.getEmbedModelId());
+            if (embedModel == null) { knowledgeDao.updateDocStatus(docId, STATUS_ERROR, 0, "Embedding 模型未配置"); return; }
+
+            String collId = chromaClient.getOrCreateCollection("kb_" + kbId);
+            int batchSize = CHROMA_BATCH_SIZE;
+            for (int bs = 0; bs < filtered.size(); bs += batchSize) {
+                int be = Math.min(bs + batchSize, filtered.size());
+                List<String> batchIds = new ArrayList<>(); List<Map<String, String>> batchMetas = new ArrayList<>();
+                List<String> batchTexts = new ArrayList<>();
+                for (int i = bs; i < be; i++) {
+                    TextSplitter.Chunk c = filtered.get(i);
+                    batchIds.add(docId + "_" + i);
+                    Map<String, String> meta = new HashMap<>();
+                    meta.put("doc_id", docId); meta.put("file_name", doc.getFileName());
+                    meta.put("chunk_index", String.valueOf(i));
+                    meta.put(CHUNK_META_HEADING_PATH, c.headingPath != null ? c.headingPath : "");
+                    meta.put(CHUNK_META_CHUNK_TYPE, c.chunkType != null ? c.chunkType : CHUNK_TYPE_PARAGRAPH);
+                    batchMetas.add(meta); batchTexts.add(c.text);
+                }
+                chromaClient.add(collId, batchIds, embeddingClient.embed(batchTexts, embedModel), batchMetas, batchTexts);
+            }
+            keywordIndex.addChunks(kbId, docId, filtered.stream().map(c -> c.text).toList());
+            knowledgeDao.updateDocStatus(docId, "ready", filtered.size(), null);
+
+            if (Integer.valueOf(1).equals(kb.getGraphEnabled())) {
+                try {
+                    knowledgeDao.updateDocGraphStatus(docId, "indexing");
+                    lightRagClient.index(kbId, docId, text);
+                    knowledgeDao.updateDocGraphStatus(docId, "ready");
+                } catch (Exception e) { log.warn("图谱索引失败: docId={}", docId, e); knowledgeDao.updateDocGraphStatus(docId, "error"); }
+            }
+        } catch (Exception e) { log.error("文档导入处理失败: docId={}", docId, e); knowledgeDao.updateDocStatus(docId, STATUS_ERROR, 0, e.getMessage()); }
+    }
+
+    @Override
+    public Map<String, Object> reParseDoc(String docId, String kbId, String userName) {
+        KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
+        if (doc == null) throw new RuntimeException("文档不存在");
+        if (DOC_STATUS_PENDING.equals(doc.getStatus()) || "processing".equals(doc.getStatus()))
+            throw new RuntimeException("文档状态不允许重新解析");
         KnowledgeBaseEntity kb = knowledgeDao.queryKbById(kbId);
         if (kb != null && SCOPE_SHARED.equals(kb.getScope())) checkSharedManage();
-        knowledgeDao.updateDocStatus(docId, "processing", 0, null);
+
         keywordIndex.removeDoc(kbId, docId);
         lightRagClient.deleteDoc(kbId, docId);
+        try { chromaClient.deleteByMetadata("kb_" + kbId, Map.of("doc_id", docId)); }
+        catch (Exception e) { log.warn("清理 Chroma embeddings 失败: docId={}", docId, e); }
+
+        Path oldImgDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), kbId, docId);
+        try {
+            if (Files.exists(oldImgDir)) {
+                try (var s = Files.walk(oldImgDir)) {
+                    s.sorted(Comparator.reverseOrder()).forEach(p -> { try { Files.delete(p); } catch (IOException ignored) {} });
+                }
+            }
+        } catch (Exception e) { log.warn("清理旧图片失败: docId={}", docId, e); }
+
         Path dataDir = Paths.get(cfg.getKnowledge().getDataDir(), kbId);
-        self.processDocAsync(docId, kbId, dataDir.resolve(docId + "_" + doc.getFileName()));
+        Path mdPath = dataDir.resolve(docId + "_" + doc.getFileName().replaceFirst("\\.[^.]+$", "") + ".md");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("docId", docId); result.put("fileType", doc.getFileType()); result.put("fileName", doc.getFileName());
+
+        try {
+            String text;
+            Path origPath = dataDir.resolve(docId + "_" + doc.getFileName());
+            if (Files.exists(mdPath)) text = Files.readString(mdPath);
+            else if (Files.exists(origPath)) {
+                if ("docx".equals(doc.getFileType()) || "pdf".equals(doc.getFileType())) {
+                    Path imageDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), kbId, docId);
+                    ParseResult pr;
+                    try (InputStream in = Files.newInputStream(origPath)) {
+                        pr = switch (doc.getFileType()) {
+                            case "docx" -> docxParser.parse(in, kbId, docId, imageDir);
+                            case "pdf"  -> pdfParser.parse(in, kbId, docId, imageDir);
+                            default     -> new ParseResult("", 0, PARSE_ERROR_CORRUPT);
+                        };
+                    }
+                    if (!pr.isSuccess()) throw new RuntimeException("重新解析失败: " + pr.getErrorType());
+                    text = pr.getMarkdown();
+                } else text = Files.readString(origPath);
+            } else throw new RuntimeException("文档文件不存在");
+
+            result.put("headings", textSplitter.scanHeadings(text));
+            if (!"md".equals(doc.getFileType())) result.put("markdownPreview", text);
+            knowledgeDao.updateDocStatus(docId, DOC_STATUS_PENDING, 0, null);
+        } catch (IOException e) { throw new RuntimeException("读取文件失败", e); }
+        return result;
     }
 
     @Override
@@ -511,13 +723,45 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         return results;
     }
 
+    @Deprecated // v2 两阶段流程不再使用，保留供回退参考
     @Async
     public void processDocAsync(String docId, String kbId, Path filePath) {
-        try (InputStream in = Files.newInputStream(filePath)) {
+        try {
             KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
-            if (doc == null) { log.warn("文档已被删除，取消处理: docId={}", docId); return; }
-            String text = tikaParser.parse(in);
-            self.processDocContentAsync(docId, kbId, text, filePath.getFileName().toString().replace(docId + "_", ""));
+            if (doc == null) { log.warn("文档已删除: docId={}", docId); return; }
+
+            long maxSize = cfg.getKnowledge().getMaxFileSizeBytes();
+            if (Files.size(filePath) > maxSize) {
+                knowledgeDao.updateDocStatus(docId, "error", 0, "文件过大（超过" + (maxSize / 1024 / 1024) + "MB）");
+                return;
+            }
+
+            String ft = fileType(doc.getFileName());
+            Path imageDir = Paths.get(cfg.getKnowledge().getImageBaseDir(), kbId, docId);
+
+            ParseResult pr;
+            try (InputStream in = Files.newInputStream(filePath)) {
+                pr = switch (ft) {
+                    case "docx" -> docxParser.parse(in, kbId, docId, imageDir);
+                    case "pdf"  -> pdfParser.parse(in, kbId, docId, imageDir);
+                    default     -> new ParseResult(tikaParser.parse(in), 0, null);
+                };
+            }
+
+            if (!pr.isSuccess()) {
+                String msg = switch (pr.getErrorType()) {
+                    case PARSE_ERROR_SCANNED   -> "扫描件不支持，请使用 OCR 后重新导入";
+                    case PARSE_ERROR_ENCRYPTED -> "加密文件不支持，请解密后重新导入";
+                    case PARSE_ERROR_CORRUPT   -> "文件损坏或格式不支持";
+                    default                    -> "解析失败: " + pr.getErrorType();
+                };
+                knowledgeDao.updateDocStatus(docId, "error", 0, msg);
+                return;
+            }
+
+            knowledgeDao.updateDocImageCount(docId, pr.getImageCount());
+            self.processDocContentAsync(docId, kbId, pr.getMarkdown(),
+                    filePath.getFileName().toString().replace(docId + "_", ""), true);
         } catch (Exception e) {
             log.error("文档处理失败: docId={}", docId, e);
             knowledgeDao.updateDocStatus(docId, "error", 0, e.getMessage());
@@ -525,17 +769,21 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     }
 
     @Async
-    public void processDocContentAsync(String docId, String kbId, String text, String displayName) {
+    public void processDocContentAsync(String docId, String kbId, String text, String displayName, boolean isMarkdown) {
         try {
             KnowledgeDocEntity doc = knowledgeDao.queryDocById(docId);
             if (doc == null) { log.warn("文档已被删除，取消处理: docId={}", docId); return; }
 
-            text = textCleaner.clean(text);
+            text = textCleaner.clean(text, isMarkdown);
 
-            TextSplitter splitter = new TextSplitter(DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP);
-            List<String> chunks = splitter.split(text);
-            chunks = textCleaner.filterLowQualityChunks(chunks);
-            if (chunks.isEmpty()) {
+            TextSplitter splitter = new TextSplitter();
+            List<TextSplitter.Chunk> chunks = splitter.split(text);
+            List<TextSplitter.Chunk> filtered = new ArrayList<>();
+            for (TextSplitter.Chunk c : chunks) {
+                if (c.text.codePointCount(0, c.text.length()) >= MIN_CHUNK_CODE_POINTS)
+                    filtered.add(c);
+            }
+            if (filtered.isEmpty()) {
                 knowledgeDao.updateDocStatus(docId, "error", 0, "文档内容为空");
                 return;
             }
@@ -551,29 +799,32 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             String collId = chromaClient.getOrCreateCollection(collection);
 
             int batchSize = CHROMA_BATCH_SIZE;
-            for (int batchStart = 0; batchStart < chunks.size(); batchStart += batchSize) {
-                int batchEnd = Math.min(batchStart + batchSize, chunks.size());
-                List<String> batchChunks = chunks.subList(batchStart, batchEnd);
-
+            for (int bs = 0; bs < filtered.size(); bs += batchSize) {
+                int be = Math.min(bs + batchSize, filtered.size());
                 List<String> batchIds = new ArrayList<>();
                 List<Map<String, String>> batchMetas = new ArrayList<>();
-                for (int i = batchStart; i < batchEnd; i++) {
+                List<String> batchTexts = new ArrayList<>();
+                for (int i = bs; i < be; i++) {
+                    TextSplitter.Chunk c = filtered.get(i);
                     batchIds.add(docId + "_" + i);
                     Map<String, String> meta = new HashMap<>();
                     meta.put("doc_id", docId);
                     meta.put("file_name", displayName);
                     meta.put("chunk_index", String.valueOf(i));
+                    meta.put(CHUNK_META_HEADING_PATH, c.headingPath != null ? c.headingPath : "");
+                    meta.put(CHUNK_META_CHUNK_TYPE, c.chunkType != null ? c.chunkType : CHUNK_TYPE_PARAGRAPH);
                     batchMetas.add(meta);
+                    batchTexts.add(c.text);
                 }
 
-                List<float[]> batchEmbeddings = embeddingClient.embed(batchChunks, embedModel);
-                chromaClient.add(collId, batchIds, batchEmbeddings, batchMetas, batchChunks);
-                log.info("文档处理进度: docId={}, {}/{} chunks", docId, batchEnd, chunks.size());
+                List<float[]> batchEmbeddings = embeddingClient.embed(batchTexts, embedModel);
+                chromaClient.add(collId, batchIds, batchEmbeddings, batchMetas, batchTexts);
+                log.info("文档处理进度: docId={}, {}/{} chunks", docId, be, filtered.size());
             }
 
-            keywordIndex.addChunks(kbId, docId, chunks);
-            knowledgeDao.updateDocStatus(docId, "ready", chunks.size(), null);
-            log.info("文档处理完成: docId={}, chunks={}", docId, chunks.size());
+            keywordIndex.addChunks(kbId, docId, filtered.stream().map(c -> c.text).toList());
+            knowledgeDao.updateDocStatus(docId, "ready", filtered.size(), null);
+            log.info("文档处理完成: docId={}, chunks={}", docId, filtered.size());
 
             // 图谱索引（ready 之后执行，追踪状态）
             KnowledgeBaseEntity kbRef = knowledgeDao.queryKbById(kbId);
@@ -591,6 +842,12 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             log.error("文档处理失败: docId={}", docId, e);
             knowledgeDao.updateDocStatus(docId, "error", 0, e.getMessage());
         }
+    }
+
+    // 兼容旧签名（inline doc）
+    @Async
+    public void processDocContentAsync(String docId, String kbId, String text, String displayName) {
+        processDocContentAsync(docId, kbId, text, displayName, false);
     }
 
     private void deleteKbDataDir(String kbId) {
@@ -619,5 +876,44 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public void toggleKbScope(String id, String scope, String userName) {
         checkSharedManage();
         knowledgeDao.updateKbScope(id, scope);
+    }
+
+    @Override
+    public void onApplicationEvent(ScriptInitialDoneEvent event) {
+        self.rebuildKeywordIndexFromChroma();
+    }
+
+    @Async
+    public void rebuildKeywordIndexFromChroma() {
+        try {
+            List<String> collNames = chromaClient.listCollections();
+            for (String name : collNames) {
+                if (!name.startsWith("kb_")) continue;
+                String kbId = name.substring(3);
+                String collId = chromaClient.getOrCreateCollection(name);
+                Map<String, List<String>> docChunks = new LinkedHashMap<>();
+                int offset = 0;
+                int page = 200;
+                while (true) {
+                    List<ChromaClient.QueryResult> page_ = chromaClient.getByMetadata(collId, Map.of(), page, offset);
+                    if (page_.isEmpty()) break;
+                    for (ChromaClient.QueryResult r : page_) {
+                        String cid = r.getId();
+                        if (cid == null) continue;
+                        int li = cid.lastIndexOf('_');
+                        String docId = li > 0 ? cid.substring(0, li) : cid;
+                        docChunks.computeIfAbsent(docId, k -> new ArrayList<>())
+                                .add(r.getDocument() != null ? r.getDocument() : "");
+                    }
+                    offset += page_.size();
+                }
+                for (var e : docChunks.entrySet()) {
+                    keywordIndex.addChunks(kbId, e.getKey(), e.getValue());
+                }
+                log.info("关键词索引重建完成: kbId={}, 文档数={}, collection={}", kbId, docChunks.size(), name);
+            }
+        } catch (Exception e) {
+            log.warn("启动时重建关键词索引失败: {}", e.getMessage());
+        }
     }
 }

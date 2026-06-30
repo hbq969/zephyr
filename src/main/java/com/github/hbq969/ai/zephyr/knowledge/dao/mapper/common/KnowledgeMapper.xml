@@ -61,7 +61,7 @@
 
   <select id="queryDocsByKbId" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     select id, kb_id as kbId, file_name as fileName, file_type as fileType, file_size as fileSize,
-           content, source_type as sourceType, chunk_count as chunkCount, status, error_msg as errorMsg,
+           content, source_type as sourceType, chunk_count as chunkCount, image_count as imageCount, status, error_msg as errorMsg,
            graph_status as graphStatus,
            created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_doc
@@ -71,7 +71,7 @@
 
   <select id="queryDocById" resultType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     select id, kb_id as kbId, file_name as fileName, file_type as fileType, file_size as fileSize,
-           content, source_type as sourceType, chunk_count as chunkCount, status, error_msg as errorMsg,
+           content, source_type as sourceType, chunk_count as chunkCount, image_count as imageCount, status, error_msg as errorMsg,
            graph_status as graphStatus,
            created_at as createdAt, updated_at as updatedAt
     from zephyr_knowledge_doc
@@ -79,8 +79,8 @@
   </select>
 
   <insert id="insertDoc" parameterType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
-    insert into zephyr_knowledge_doc (id, kb_id, file_name, file_type, file_size, content, source_type, chunk_count, status, error_msg, graph_status, created_at)
-    values (#{id}, #{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{content}, #{sourceType}, #{chunkCount}, #{status}, #{errorMsg}, #{graphStatus}, #{createdAt})
+    insert into zephyr_knowledge_doc (id, kb_id, file_name, file_type, file_size, content, source_type, chunk_count, image_count, status, error_msg, graph_status, created_at)
+    values (#{id}, #{kbId}, #{fileName}, #{fileType}, #{fileSize}, #{content}, #{sourceType}, #{chunkCount}, #{imageCount}, #{status}, #{errorMsg}, #{graphStatus}, #{createdAt})
   </insert>
 
   <update id="updateDocStatus">
@@ -89,6 +89,10 @@
       <if test="chunkCount != null">, chunk_count = #{chunkCount}</if>
       <if test="errorMsg != null and errorMsg != ''">, error_msg = #{errorMsg}</if>
     where id = #{id}
+  </update>
+
+  <update id="tryLockDoc">
+    update zephyr_knowledge_doc set status = 'processing' where id = #{id} and status = 'pending'
   </update>
 
   <delete id="deleteDoc">
@@ -118,8 +122,14 @@
   <update id="updateDoc" parameterType="com.github.hbq969.ai.zephyr.knowledge.dao.entity.KnowledgeDocEntity">
     update zephyr_knowledge_doc
     set file_name = #{fileName}, content = #{content}, status = #{status},
-        chunk_count = #{chunkCount}, graph_status = #{graphStatus}, updated_at = #{updatedAt}
+        chunk_count = #{chunkCount},
+        <if test="imageCount != null">image_count = #{imageCount},</if>
+        graph_status = #{graphStatus}, updated_at = #{updatedAt}
     where id = #{id}
+  </update>
+
+  <update id="updateDocImageCount">
+    update zephyr_knowledge_doc set image_count = #{imageCount} where id = #{id}
   </update>
 
 

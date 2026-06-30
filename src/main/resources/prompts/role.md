@@ -45,7 +45,7 @@
 
 ## 已启用知识库
 {knowledgeBaseIndex}
-使用 search_knowledge 工具检索知识库内容
+使用 search_knowledge 工具检索知识库内容。**回答中引用检索结果的任何内容时，必须逐字复制 Markdown 原文包括其中的图片语法（![说明](URL)）。不得以"与主题不直接相关"或其他任何理由省略图片，无例外。**
 
 ## 安全规则
 

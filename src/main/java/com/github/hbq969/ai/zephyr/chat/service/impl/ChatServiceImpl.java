@@ -911,7 +911,11 @@ public class ChatServiceImpl implements ChatService {
             for (int i = 0; i < results.size(); i++) {
                 KnowledgeService.SearchResult r = results.get(i);
                 if (i > 0) sb.append(",");
-                sb.append("{\"content\": \"").append(escapeJson(r.getContent())).append("\",")
+                String content = r.getContent();
+                if (content.contains("![") && content.contains("](/")) {
+                    content += "\n\n> ⚠️ 以上内容含 Markdown 图片语法（![...](...)），回答中引用此内容时必须逐字保留图片，禁止省略。";
+                }
+                sb.append("{\"content\": \"").append(escapeJson(content)).append("\",")
                         .append("\"source\": \"").append(escapeJson(r.getSourceFile())).append("\",")
                         .append("\"score\": ").append(String.format("%.4f", r.getScore())).append("}");
             }

@@ -36,6 +36,7 @@
         primary key (id)
     );
     create index if not exists idx_kb_doc_kb_id on zephyr_knowledge_doc(kb_id);
+    alter table if exists zephyr_knowledge_doc add column if not exists image_count int default 0;
   </update>
 
   <update id="createConversationKbTable">

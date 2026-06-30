@@ -101,16 +101,12 @@ onMounted(() => { fetchKbName() })
           <div class="result-top">
             <span class="rank" :class="{ 'rank-first': i === 0 }">{{ i + 1 }}</span>
             <span class="source">{{ langData.knowledgeMgmt_recallSource }}: {{ r.sourceFile || '-' }}</span>
+            <span class="score-detail">({{ langData.knowledgeMgmt_recallVecScore }}: {{ fmtScore(r.vecScore) }}, {{ langData.knowledgeMgmt_recallKwScore }}: {{ fmtScore(r.kwScore) }}, {{ langData.knowledgeMgmt_recallRrfScore }}: {{ fmtScore(r.rrfScore) }})</span>
             <el-tag :type="scoreTagType(r.score)" size="small" effect="dark" round>
               {{ scorePercent(r.score) }}
             </el-tag>
           </div>
           <div class="result-content" v-html="highlightText(r.content, query)" />
-          <div class="result-scores">
-            <span>{{ langData.knowledgeMgmt_recallVecScore }}: {{ fmtScore(r.vecScore) }}</span>
-            <span>{{ langData.knowledgeMgmt_recallKwScore }}: {{ fmtScore(r.kwScore) }}</span>
-            <span>{{ langData.knowledgeMgmt_recallRrfScore }}: {{ fmtScore(r.rrfScore) }}</span>
-          </div>
         </div>
       </div>
     </template>
@@ -155,7 +151,7 @@ h2 { font-family: Georgia, serif; font-weight: 400; font-size: 22px; letter-spac
 .result-content { font-size: 14px; line-height: 1.7; color: var(--el-text-color-primary); margin-bottom: 6px; }
 .result-content :deep(.hl) { background: #fff3cd; padding: 0 2px; border-radius: 2px; }
 
-.result-scores { display: flex; gap: 12px; font-size: 11px; color: var(--el-text-color-placeholder); }
+.score-detail { font-size: 11px; font-family: ui-monospace, monospace; color: var(--el-text-color-placeholder); }
 
 html.dark .back-btn:hover { background: var(--el-fill-color); }
 html.dark .result-content :deep(.hl) { background: #5a4a00; }

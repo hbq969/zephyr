@@ -26,9 +26,11 @@ public interface KnowledgeService {
 
     void saveConversationKbIds(String conversationId, List<String> kbIds);
 
-    String uploadDoc(String kbId, MultipartFile file, String userName);
+    Map<String, Object> uploadDoc(String kbId, MultipartFile file, String userName);
 
-    void reParseDoc(String docId, String kbId, String userName);
+    void confirmImport(String docId, String kbId, int headingLevel, String markdownContent, String userName);
+
+    Map<String, Object> reParseDoc(String docId, String kbId, String userName);
 
     List<SearchResult> search(String query, List<String> kbIds, int topK);
 

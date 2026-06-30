@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * 文本清洗器：在 Tika 解析后、TextSplitter 之前执行。
@@ -33,6 +32,10 @@ public class TextCleaner {
     private static final int MIN_LINE_LENGTH = 3;
 
     public String clean(String raw) {
+        return clean(raw, false);
+    }
+
+    public String clean(String raw, boolean markdownMode) {
         if (raw == null || raw.isEmpty()) return raw;
 
         // 1. 控制字符 → 空格
@@ -48,19 +51,18 @@ public class TextCleaner {
         String[] lines = text.split("\n");
         List<String> kept = new ArrayList<>();
         String prevLine = null;
+        int minLength = markdownMode ? 2 : MIN_LINE_LENGTH;
         for (String line : lines) {
             String trimmed = line.trim();
-            // 去除行首尾空白
             if (trimmed.isEmpty()) {
                 kept.add("");
                 continue;
             }
-            // 过滤过短行
-            if (trimmed.length() < MIN_LINE_LENGTH) continue;
-            // 过滤纯标点/数字行
-            if (MEANINGLESS_LINE.matcher(trimmed).matches()) continue;
-            // 合并连续完全相同的行
-            if (prevLine != null && prevLine.equals(trimmed)) continue;
+            if (trimmed.length() < minLength) continue;
+            if (!markdownMode) {
+                if (MEANINGLESS_LINE.matcher(trimmed).matches()) continue;
+                if (prevLine != null && prevLine.equals(trimmed)) continue;
+            }
             kept.add(trimmed);
             prevLine = trimmed;
         }
@@ -94,6 +96,6 @@ public class TextCleaner {
                     }
                     return (double) meaningful / len >= 0.4;
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 }
