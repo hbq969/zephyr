@@ -107,6 +107,8 @@ public class McpConnection {
         Path pidFile = pidFilePath();
         try {
             Files.createDirectories(pidFile.getParent());
+            // 写入新 PID 前先杀干净旧 PID 文件中的残留进程，防止覆盖后旧进程成为无法追踪的孤儿
+            killStalePidsFromFile(pidFile);
             StringBuilder sb = new StringBuilder(String.valueOf(process.pid()));
             for (ProcessHandle child : children) {
                 sb.append('\n').append(child.pid());
@@ -367,6 +369,35 @@ public class McpConnection {
 
     private void touch() {
         this.lastUsedAt = System.currentTimeMillis();
+    }
+
+    /** 写入新 PID 文件前清理旧文件中残留的进程，防止旧进程成为追踪不到的孤儿 */
+    private static void killStalePidsFromFile(Path pidFile) {
+        if (!Files.exists(pidFile)) return;
+        try {
+            List<Long> oldPids = Files.readAllLines(pidFile).stream()
+                    .map(String::trim).filter(s -> !s.isEmpty()).map(Long::parseLong).toList();
+            // 逆序杀：叶子进程优先
+            for (int i = oldPids.size() - 1; i >= 0; i--) {
+                ProcessHandle.of(oldPids.get(i)).ifPresent(ph -> {
+                    ph.descendants().forEach(ProcessHandle::destroyForcibly);
+                    ph.destroyForcibly();
+                });
+            }
+            // 等至多 2s，确认进程已死
+            long deadline = System.currentTimeMillis() + 2000;
+            while (System.currentTimeMillis() < deadline) {
+                boolean anyAlive = oldPids.stream().anyMatch(
+                        pid -> ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+                if (!anyAlive) break;
+                try { Thread.sleep(200); } catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
+            }
+            oldPids.stream()
+                    .filter(pid -> ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false))
+                    .forEach(pid -> log.warn("MCP 旧进程未能在覆盖 PID 文件前杀死: pid={}, file={}", pid, pidFile.getFileName()));
+        } catch (Exception e) {
+            log.warn("清理旧 PID 文件残留进程失败: {}", pidFile.getFileName(), e);
+        }
     }
 
     private void killProcessTree() {

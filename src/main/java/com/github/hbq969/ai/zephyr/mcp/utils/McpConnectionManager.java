@@ -95,17 +95,27 @@ public class McpConnectionManager implements ApplicationListener<ScriptInitialDo
                     });
                 }
 
-                // 确认所有 PID 是否都已退出
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException ignored) {}
+                // 等至多 3s 确认进程已死（npm exec 退出需要时间）
+                long deadline = System.currentTimeMillis() + 3000;
+                boolean allDead;
+                do {
+                    allDead = true;
+                    for (long pid : pids) {
+                        if (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)) {
+                            allDead = false;
+                            break;
+                        }
+                    }
+                    if (allDead) break;
+                    try { Thread.sleep(300); } catch (InterruptedException ignored) { break; }
+                } while (System.currentTimeMillis() < deadline);
 
-                boolean allDead = true;
-                for (long pid : pids) {
-                    if (ProcessHandle.of(pid).isPresent()) {
-                        allDead = false;
-                        survived++;
-                        log.warn("MCP 孤儿进程残留: pid={}, file={}", pid, f.getName());
+                if (!allDead) {
+                    for (long pid : pids) {
+                        if (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)) {
+                            survived++;
+                            log.warn("MCP 孤儿进程残留: pid={}, file={}", pid, f.getName());
+                        }
                     }
                 }
 
