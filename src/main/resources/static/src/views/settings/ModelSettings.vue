@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useSettingsStore } from '@/store/settings'
 import { Icon } from '@iconify/vue'
 import { getLangData } from '@/i18n/locale'
+import { ElMessageBox } from 'element-plus'
 import { msg } from '@/utils/Utils'
 import { matchTemplate, getTemplate, TEMPLATES, type ModelTemplate } from '@/modelTemplates'
 
@@ -460,6 +461,15 @@ function onModelSelect(val: string) {
 }
 
 
+async function confirmRemoveModel(m: any) {
+  const modelName = m.modelName || m.name || ''
+  ElMessageBox.confirm(
+    '删除模型 ' + modelName,
+    langData.confirmDelete,
+    { confirmButtonText: langData.btnDelete, cancelButtonText: langData.btnCancel, type: 'warning' }
+  ).then(() => removeModel(m.id)).catch(() => {})
+}
+
 async function removeModel(id: string) { await settingsStore.deleteModelRemote(id) }
 async function setDefault(id: string) { await settingsStore.setDefaultModelRemote(id) }
 
@@ -526,7 +536,7 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
             </div>
             <div class="row-right">
               <button class="action-icon" @click="startEdit(m)"><Icon icon="lucide:pencil" /></button>
-              <button class="action-icon danger" @click="m.id && removeModel(m.id)"><Icon icon="lucide:trash-2" /></button>
+              <button class="action-icon danger" @click="confirmRemoveModel(m)"><Icon icon="lucide:trash-2" /></button>
               <el-tooltip v-if="settingsStore.isAdmin" content="设为共享">
                 <button class="action-icon" @click="toggleScope(m)"><Icon icon="lucide:share-2" /></button>
               </el-tooltip>
@@ -567,7 +577,7 @@ function removeParam(idx: number) { params.value.splice(idx, 1) }
             <div class="row-right">
               <template v-if="settingsStore.isAdmin">
                 <button class="action-icon" @click="startEdit(m)"><Icon icon="lucide:pencil" /></button>
-                <button class="action-icon danger" @click="m.id && removeModel(m.id)"><Icon icon="lucide:trash-2" /></button>
+                <button class="action-icon danger" @click="confirmRemoveModel(m)"><Icon icon="lucide:trash-2" /></button>
                 <el-tooltip content="取消共享">
                   <button class="action-icon" @click="toggleScope(m)"><Icon icon="lucide:lock" /></button>
                 </el-tooltip>
