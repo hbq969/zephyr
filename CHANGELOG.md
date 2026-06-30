@@ -2,6 +2,12 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)，格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.3.4] - 2026-06-30
+
+### 修复
+
+- **MCP 重启后孤儿进程残留**：`initStdio()` 覆盖 PID 文件前先杀旧文件中的残留进程，`cleanupOrphanProcesses()` 用 `isAlive()` + 3s 循环等待替代 200ms 盲等，防止 `npm exec` 进程未及时死亡导致 PID 被覆盖后成为追踪不到的孤儿
+
 ## [1.3.3] - 2026-06-28
 
 ### 新增
